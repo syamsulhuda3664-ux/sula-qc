@@ -1,7 +1,7 @@
 'use client';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import LoginPage from './login/page';
+import LoginPage from '@/components/LoginPage';
 import DashboardLayout from './(dashboard)/layout';
 
 function AppRouter() {
