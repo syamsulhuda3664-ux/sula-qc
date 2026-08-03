@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { extractLineSortKey } from './utils';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -253,11 +254,16 @@ export function exportFQCDailyExcel(
   const headerRow = row;
   row += 1;
 
-  // Data rows – group by date for daily subtotals
+  // Data rows – group by date for daily subtotals, sort by date then by production line
   const sortedData = [...data].sort((a, b) => {
     const da = String(a.inspection_date || '');
     const db = String(b.inspection_date || '');
-    return da.localeCompare(db);
+    const dateComp = da.localeCompare(db);
+    if (dateComp !== 0) return dateComp;
+    // Same date: sort by production line in factory order
+    const la = extractLineSortKey(String(a.line || a.production_line || ''));
+    const lb = extractLineSortKey(String(b.line || b.production_line || ''));
+    return la.localeCompare(lb);
   });
 
   let dateGroups: Record<string, Record<string, unknown>[]> = {};

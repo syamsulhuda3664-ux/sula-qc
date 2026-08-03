@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 import { mapInspectionRow } from '@/lib/db-schema';
+import { sortProductionLines, extractLineSortKey } from '@/lib/utils';
 
 function getDateRange(period: string, refDate?: string) {
   const now = refDate ? new Date(refDate) : new Date();
@@ -142,7 +143,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Map DB rows to app-shaped objects (production_line→line, inspector_name→inspector, style_code→style, sub_*→sub_defects)
-    const allRecords = (records || []).map(mapInspectionRow);
+    let allRecords = (records || []).map(mapInspectionRow);
+
+    // Sort: by date desc first, then by production line in factory order
+    allRecords = allRecords.sort((a, b) => {
+      const dateComp = String(b.inspection_date || '').localeCompare(String(a.inspection_date || ''));
+      if (dateComp !== 0) return dateComp;
+      // Same date: sort by production line
+      const keyA = extractLineSortKey(String(a.line || ''));
+      const keyB = extractLineSortKey(String(b.line || ''));
+      return keyA.localeCompare(keyB);
+    });
     const subtotals = {
       total_records: allRecords.length,
       total_order_qty: 0,

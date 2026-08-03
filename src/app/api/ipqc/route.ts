@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
+import { extractLineSortKey } from '@/lib/utils';
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
@@ -119,7 +120,11 @@ export async function GET(request: NextRequest) {
       pass_qty: r.ok_count,
       fail_qty: r.ng_count,
       detail: r.defect_detail,
-    }));
+    })).sort((a, b) => {
+      const dateComp = String(b.inspection_date || '').localeCompare(String(a.inspection_date || ''));
+      if (dateComp !== 0) return dateComp;
+      return extractLineSortKey(String(a.line || '')).localeCompare(extractLineSortKey(String(b.line || '')));
+    });
 
     return NextResponse.json({
       records: mappedRecords as any[],
