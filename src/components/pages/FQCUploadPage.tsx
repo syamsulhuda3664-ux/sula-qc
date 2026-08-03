@@ -16,6 +16,7 @@ export default function FQCUploadPage() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ success: boolean; message: string; records?: number } | null>(null);
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
 
   const handleFile = (f: File) => {
     if (!f.name.match(/\.xlsx?$/i)) {
@@ -38,12 +39,12 @@ export default function FQCUploadPage() {
     setUploading(true);
     setProgress(0);
     setResult(null);
+    setDebugInfo(null);
 
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      // Simulate progress
       const interval = setInterval(() => {
         setProgress((p) => Math.min(p + 15, 90));
       }, 200);
@@ -58,14 +59,19 @@ export default function FQCUploadPage() {
 
       const data = await res.json();
       if (res.ok) {
+        const count = data.upload?.inspection_count || data.total_records || 0;
         setResult({
           success: true,
           message: t('fqc.upload.success'),
-          records: data.summary?.records_inserted || data.total_records || 0,
+          records: count,
         });
         setFile(null);
       } else {
         setResult({ success: false, message: data.error || t('fqc.upload.error') });
+        // Show debug info if available
+        if (data.debug) {
+          setDebugInfo(data.debug);
+        }
       }
     } catch {
       setResult({ success: false, message: t('login.error.network') });
@@ -142,6 +148,35 @@ export default function FQCUploadPage() {
                 )}
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* Debug Panel — shown when parsing fails */}
+          {debugInfo && (
+            <div className="mt-4 p-4 bg-slate-900 text-slate-200 rounded-lg text-xs font-mono overflow-auto max-h-96">
+              <div className="text-amber-400 font-bold mb-2">Parse Debug Info:</div>
+              <div>Sheet: {String(debugInfo.sheetName)} | Rows: {String(debugInfo.totalRows)} | Cols: {String(debugInfo.totalCols)}</div>
+              <div>Data range: row {String(debugInfo.detectedDataStart)} to row {String(debugInfo.detectedDataEnd)}</div>
+              {debugInfo.sampleDates && Array.isArray(debugInfo.sampleDates) && debugInfo.sampleDates.length > 0 && (
+                <div className="mt-1">Sample dates: {JSON.stringify(debugInfo.sampleDates)}</div>
+              )}
+              {debugInfo.skippedRows && Array.isArray(debugInfo.skippedRows) && debugInfo.skippedRows.length > 0 && (
+                <div className="mt-1">Skipped rows: {JSON.stringify(debugInfo.skippedRows)}</div>
+              )}
+              {debugInfo.firstRowCells && typeof debugInfo.firstRowCells === 'object' && (
+                <div className="mt-2">
+                  <div className="text-amber-300">First rows content:</div>
+                  <pre className="whitespace-pre-wrap mt-1">{JSON.stringify(debugInfo.firstRowCells, null, 2)}</pre>
+                </div>
+              )}
+              {debugInfo.errors && Array.isArray(debugInfo.errors) && debugInfo.errors.length > 0 && (
+                <div className="mt-2 text-red-400">
+                  <div className="font-bold">Errors:</div>
+                  {debugInfo.errors.map((e: string, i: number) => (
+                    <div key={i}>- {e}</div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

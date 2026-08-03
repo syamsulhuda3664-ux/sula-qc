@@ -2,23 +2,24 @@ import * as XLSX from 'xlsx';
 
 /**
  * Column index constants for the FQC Excel format
- * Row 0: Title (skip)
- * Row 1: Category headers
- * Row 2: Sub-defect names (skip)
- * Row 3+: Data rows
- * Last row: Total (skip)
+ * Expected layout:
+ *   Row 0-2+: Header rows (auto-detected)
+ *   Data rows: A=date, B=line, C=inspector, D=style, E=orderNo, F=remark,
+ *             G=orderQty, H=inspectedQty, I=okQty, J=ngQty, K=defectRate
+ *   L-BW: Defect sub-categories (61 columns)
+ *   Last data row(s): May include total/summary row(s) — auto-detected and skipped
  */
 const COL = {
-  date: 0,       // A
-  line: 1,       // B
-  inspector: 2,  // C
-  style: 3,      // D
-  orderNo: 4,    // E
-  remark: 5,     // F
-  orderQty: 6,   // G
+  date: 0,        // A
+  line: 1,        // B
+  inspector: 2,   // C
+  style: 3,       // D
+  orderNo: 4,     // E
+  remark: 5,      // F
+  orderQty: 6,    // G
   inspectedQty: 7, // H
-  okQty: 8,      // I
-  ngQty: 9,      // J
+  okQty: 8,       // I
+  ngQty: 9,       // J
   defectRate: 10, // K
   // Defect categories start at column L (index 11)
   stitchingStart: 11,  // L
@@ -77,6 +78,18 @@ export interface FQCRecord {
   created_at?: Date;
 }
 
+export interface ParseDebugInfo {
+  sheetName: string;
+  totalRows: number;
+  totalCols: number;
+  detectedDataStart: number;
+  detectedDataEnd: number;
+  skippedRows: number[];
+  firstRowCells: Record<string, unknown>;
+  sampleDates: unknown[];
+  errors: string[];
+}
+
 function getCellValue(sheet: XLSX.WorkSheet, row: number, col: number): number | string {
   const addr = XLSX.utils.encode_cell({ r: row, c: col });
   const cell = sheet[addr];
@@ -84,8 +97,16 @@ function getCellValue(sheet: XLSX.WorkSheet, row: number, col: number): number |
   if (cell.t === 'n') return cell.v as number;
   if (cell.t === 'd') return cell.v as Date;
   if (cell.t === 's') return (cell.v as string).trim();
+  if (cell.t === 'b') return cell.v ? 1 : 0;
   const num = Number(cell.v);
-  return isNaN(num) ? (cell.v as string).trim() : num;
+  return isNaN(num) ? String(cell.v).trim() : num;
+}
+
+function getCellRaw(sheet: XLSX.WorkSheet, row: number, col: number): { v: unknown; t: string; w?: string } | null {
+  const addr = XLSX.utils.encode_cell({ r: row, c: col });
+  const cell = sheet[addr];
+  if (!cell) return null;
+  return { v: cell.v, t: cell.t, w: cell.w };
 }
 
 function sumRange(sheet: XLSX.WorkSheet, row: number, startCol: number, endCol: number): number {
@@ -115,53 +136,246 @@ function deriveBusinessType(orderNo: string): string {
   return 'OTHER';
 }
 
-function isTotalRow(sheet: XLSX.WorkSheet, row: number): boolean {
-  const remark = String(getCellValue(sheet, row, COL.remark));
-  return remark.includes('合计') || remark.toLowerCase().includes('total');
+/**
+ * Robust date parser — handles Excel serial numbers, Date objects, and various text formats.
+ */
+function parseDateValue(raw: number | string | Date): Date | null {
+  // Already a Date object (xlsx with cellDates: true)
+  if (raw instanceof Date) {
+    if (isNaN(raw.getTime())) return null;
+    return raw;
+  }
+
+  // Excel serial number (days since 1900-01-01, with the 1900 leap year bug)
+  if (typeof raw === 'number') {
+    if (raw <= 0) return null;
+    // Convert Excel serial to JS Date
+    // Excel epoch is 1899-12-30 (due to the 1900 leap year bug)
+    const epoch = new Date(1899, 11, 30);
+    const ms = epoch.getTime() + raw * 86400000;
+    const d = new Date(ms);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // String date — try multiple formats
+  if (typeof raw === 'string' && raw.length > 0) {
+    // Try ISO format: 2025-01-15 or 2025/01/15
+    let d = new Date(raw.replace(/\//g, '-'));
+    if (!isNaN(d.getTime()) && d.getFullYear() >= 2020 && d.getFullYear() <= 2100) return d;
+
+    // Try DD/MM/YYYY or DD-MM-YYYY
+    const parts = raw.split(/[\/\-\.]/);
+    if (parts.length === 3) {
+      const [a, b, c] = parts.map(Number);
+      if (!isNaN(a) && !isNaN(b) && !isNaN(c)) {
+        // If first part > 31, it's YYYY
+        if (a > 31) {
+          d = new Date(a, b - 1, c);
+        } else if (c > 31) {
+          // DD/MM/YYYY
+          d = new Date(c, b - 1, a);
+        } else {
+          // Ambiguous — try DD/MM/YYYY first (common in Indonesia/Asia)
+          d = new Date(c, b - 1, a);
+          if (isNaN(d.getTime()) || d.getFullYear() < 2020) {
+            d = new Date(c, a - 1, b); // Try MM/DD/YYYY
+          }
+        }
+        if (!isNaN(d.getTime()) && d.getFullYear() >= 2020 && d.getFullYear() <= 2100) return d;
+      }
+    }
+
+    // Last resort: let JS parse it
+    d = new Date(raw);
+    if (!isNaN(d.getTime()) && d.getFullYear() >= 2020 && d.getFullYear() <= 2100) return d;
+  }
+
+  return null;
 }
 
+/**
+ * Check if a row looks like a total/summary row.
+ * Checks multiple columns, not just the remark column.
+ */
+function isTotalRow(sheet: XLSX.WorkSheet, row: number, maxCol: number): boolean {
+  const totalKeywords = ['合计', 'total', 'TOTAL', 'Total', ' Grand Total', 'Subtotal', 'subtotal', ' keseluruhan', 'jumlah', 'JUMLAH'];
+
+  // Check first several columns for total keywords
+  for (let c = 0; c <= Math.min(maxCol, 10); c++) {
+    const val = String(getCellValue(sheet, row, c)).toLowerCase();
+    for (const kw of totalKeywords) {
+      if (val.includes(kw.toLowerCase())) return true;
+    }
+  }
+
+  // Also check if column A has a date but columns D (style) is empty and columns G-J have large numbers (sums)
+  const styleVal = getCellValue(sheet, row, COL.style);
+  const orderQty = Number(getCellValue(sheet, row, COL.orderQty));
+  const inspectedQty = Number(getCellValue(sheet, row, COL.inspectedQty));
+
+  if ((!styleVal || String(styleVal).trim() === '') && orderQty > 100 && inspectedQty > 100) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if a row is a valid data row (has date and style code).
+ */
 function isValidDataRow(sheet: XLSX.WorkSheet, row: number): boolean {
   const dateVal = getCellValue(sheet, row, COL.date);
-  if (!dateVal || dateVal === 0) return false;
   const styleVal = getCellValue(sheet, row, COL.style);
+
+  // Must have a style code
   if (!styleVal || String(styleVal).trim() === '') return false;
+
+  // Date must be present and parseable
+  if (!dateVal || dateVal === 0) return false;
+
+  const parsedDate = parseDateValue(dateVal);
+  if (!parsedDate) return false;
+
   return true;
+}
+
+/**
+ * Auto-detect where data rows begin by scanning for the first row
+ * that has both a valid date (col A) and a style code (col D).
+ * Scans from row 0 up to row 20 (max header depth).
+ */
+function detectDataStartRow(sheet: XLSX.WorkSheet, maxRow: number): { row: number; reason: string } {
+  for (let r = 0; r <= Math.min(maxRow, 20); r++) {
+    const dateVal = getCellValue(sheet, r, COL.date);
+    const styleVal = getCellValue(sheet, r, COL.style);
+    const parsedDate = parseDateValue(dateVal);
+
+    if (parsedDate && styleVal && String(styleVal).trim() !== '') {
+      // Verify it's not a header row — check if col G (orderQty) is numeric
+      const orderQty = getCellValue(sheet, r, COL.orderQty);
+      if (typeof orderQty === 'number' && orderQty > 0) {
+        return { row: r, reason: `Found valid data at row ${r} (date=${parsedDate.toISOString().split('T')[0]}, style=${styleVal}, orderQty=${orderQty})` };
+      }
+    }
+  }
+  return { row: 3, reason: 'Default: no valid data row found in first 21 rows, using row 3' };
+}
+
+/**
+ * Auto-detect where data rows end by scanning backwards from the last row
+ * to find the last valid data row (before any total/summary rows).
+ */
+function detectDataEndRow(sheet: XLSX.WorkSheet, maxRow: number, minRow: number): number {
+  for (let r = maxRow; r >= minRow; r--) {
+    if (isValidDataRow(sheet, r) && !isTotalRow(sheet, r, 10)) {
+      return r;
+    }
+  }
+  return maxRow;
 }
 
 export async function parseFQCExcel(
   buffer: ArrayBuffer
-): Promise<{ date: Date; records: FQCRecord[]; businessType: string }> {
+): Promise<{ date: Date; records: FQCRecord[]; businessType: string; debug?: ParseDebugInfo }> {
+  const debug: ParseDebugInfo = {
+    sheetName: '',
+    totalRows: 0,
+    totalCols: 0,
+    detectedDataStart: 0,
+    detectedDataEnd: 0,
+    skippedRows: [],
+    firstRowCells: {},
+    sampleDates: [],
+    errors: [],
+  };
+
   const workbook = XLSX.read(buffer, {
     type: 'array',
     cellDates: true,
   });
 
   const sheetName = workbook.SheetNames[0];
+  debug.sheetName = sheetName;
   const sheet = workbook.Sheets[sheetName];
-  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+
+  if (!sheet['!ref']) {
+    debug.errors.push('Sheet has no data range (!ref is empty)');
+    return { date: new Date(), records: [], businessType: 'OTHER', debug };
+  }
+
+  const range = XLSX.utils.decode_range(sheet['!ref']);
+  debug.totalRows = range.e.r - range.s.r + 1;
+  debug.totalCols = range.e.c - range.s.c + 1;
+
+  // Collect sample data from first few rows for debugging
+  for (let r = 0; r <= Math.min(range.e.r, 5); r++) {
+    const rowKey = `row${r}`;
+    debug.firstRowCells[rowKey] = {};
+    for (let c = 0; c <= Math.min(range.e.c, 11); c++) {
+      const raw = getCellRaw(sheet, r, c);
+      if (raw) {
+        const colLetter = XLSX.utils.encode_col(c);
+        debug.firstRowCells[rowKey][colLetter] = {
+          type: raw.t,
+          value: raw.t === 'd' ? (raw.v as Date).toISOString() : raw.v,
+          formatted: raw.w || undefined,
+        };
+      }
+    }
+  }
+
+  // Auto-detect data start row
+  const { row: dataStartRow, reason: startReason } = detectDataStartRow(sheet, range.e.r);
+  debug.detectedDataStart = dataStartRow;
+  debug.errors.push(`Data start detection: ${startReason}`);
+
+  // Auto-detect data end row
+  const dataEndRow = detectDataEndRow(sheet, range.e.r, dataStartRow);
+  debug.detectedDataEnd = dataEndRow;
 
   const records: FQCRecord[] = [];
   let sheetDate = new Date();
   const businessTypes = new Set<string>();
 
-  // Data rows start at row 3 (after title, headers, sub-defects)
-  // Last row is total row - skip it
-  const dataStartRow = 3;
-  const dataEndRow = range.e.r - 1; // Exclude last row (total)
-
   for (let r = dataStartRow; r <= dataEndRow; r++) {
-    // Skip empty or invalid rows
-    if (!isValidDataRow(sheet, r)) continue;
-    // Skip total row just in case it's not the last row
-    if (isTotalRow(sheet, r)) continue;
+    // Skip total/summary rows
+    if (isTotalRow(sheet, r, Math.min(range.e.c, 10))) {
+      debug.skippedRows.push(r);
+      continue;
+    }
+
+    // Skip invalid data rows
+    if (!isValidDataRow(sheet, r)) {
+      // Collect info about skipped rows for debugging
+      const dateVal = getCellValue(sheet, r, COL.date);
+      const styleVal = getCellValue(sheet, r, COL.style);
+      if (dateVal !== 0 && dateVal && String(dateVal).trim() !== '') {
+        debug.skippedRows.push(r);
+        const parsedDate = parseDateValue(dateVal);
+        debug.errors.push(`Row ${r} skipped: date=${String(dateVal)} (parsed=${parsedDate ? 'ok' : 'FAIL'}), style=${String(styleVal)}`);
+      }
+      continue;
+    }
 
     const rawDate = getCellValue(sheet, r, COL.date);
-    const inspectionDate = rawDate instanceof Date
-      ? rawDate
-      : new Date();
+    const inspectionDate = parseDateValue(rawDate);
+
+    if (!inspectionDate) {
+      debug.errors.push(`Row ${r}: date parse failed for value ${JSON.stringify(rawDate)}`);
+      continue;
+    }
+
+    // Collect sample dates for debugging
+    if (debug.sampleDates.length < 5) {
+      debug.sampleDates.push({
+        row: r,
+        raw: String(rawDate),
+        parsed: inspectionDate.toISOString().split('T')[0],
+      });
+    }
 
     // Use the first valid date as the sheet date
-    if (records.length === 0 && inspectionDate instanceof Date) {
+    if (records.length === 0) {
       sheetDate = inspectionDate;
     }
 
@@ -225,12 +439,15 @@ export async function parseFQCExcel(
     });
   }
 
+  if (records.length === 0) {
+    debug.errors.push(`No valid records found. Scanned rows ${dataStartRow} to ${dataEndRow}. Total sheet rows: ${range.e.r + 1}.`);
+  }
+
   // Determine primary business type from records
   let primaryBusinessType = 'OTHER';
   if (businessTypes.size === 1) {
     primaryBusinessType = Array.from(businessTypes)[0];
   } else if (businessTypes.size > 1) {
-    // Use the most common business type
     const typeCounts: Record<string, number> = {};
     records.forEach((r) => {
       const bt = r.business_type;
@@ -251,6 +468,7 @@ export async function parseFQCExcel(
     date: sheetDate,
     records,
     businessType: primaryBusinessType,
+    debug,
   };
 }
 
@@ -261,11 +479,10 @@ export async function parseFQCExcel(
 export function getSubDefectNames(sheet: XLSX.WorkSheet): string[] {
   const names: string[] = [];
   for (let c = FIRST_DEFECT_COL; c <= LAST_DEFECT_COL; c++) {
-    const addr = XLSX.utils.encode_cell({ r: 2, c }); // Row 2 (0-indexed) = row 3 in Excel
+    const addr = XLSX.utils.encode_cell({ r: 2, c });
     const cell = sheet[addr];
     if (cell && cell.v) {
       const raw = String(cell.v).trim();
-      // Extract Chinese name (before English/Indonesian text)
       const chineseMatch = raw.match(/^[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef、，。]+/);
       names.push(chineseMatch ? chineseMatch[0] : raw);
     } else {
