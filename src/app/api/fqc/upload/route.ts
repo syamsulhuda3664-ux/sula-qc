@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 import { parseFQCExcel } from '@/lib/fqc-parser';
+import { mapInspectionToDb } from '@/lib/db-schema';
 import { generateOQCLot } from '@/lib/oqc-generator';
 import { generateIPQCRecords } from '@/lib/ipqc-generator';
 
@@ -39,19 +40,10 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[FQC Upload] Parsed: ${parsed.records.length} records, businessType=${parsed.businessType}`);
-    if (parsed.debug) {
-      console.log(`[FQC Upload] Debug: startRow=${parsed.debug.detectedDataStart}, endRow=${parsed.debug.detectedDataEnd}, sheet=${parsed.debug.sheetName}, rows=${parsed.debug.totalRows}, cols=${parsed.debug.totalCols}`);
-      if (parsed.debug.errors.length > 0) {
-        console.log(`[FQC Upload] Debug errors: ${parsed.debug.errors.join('; ')}`);
-      }
-    }
 
     if (parsed.records.length === 0) {
       return NextResponse.json(
-        {
-          error: 'No valid inspection records found in the Excel file',
-          debug: parsed.debug,
-        },
+        { error: 'No valid inspection records found in the Excel file', debug: parsed.debug },
         { status: 400 }
       );
     }
@@ -60,13 +52,16 @@ export async function POST(request: NextRequest) {
     const dateStr = inspectionDate.toISOString().split('T')[0];
 
     // 1. Create daily upload record
+    // DB columns: file_name (NOT filename), file_path, status
     const { data: upload, error: uploadError } = await adminClient
       .from('fqc_daily_uploads')
       .insert({
         upload_date: dateStr,
-        filename: file.name,
+        file_name: file.name,
+        file_path: '',
         business_type: parsed.businessType,
         record_count: parsed.records.length,
+        status: 'completed',
         uploaded_by: auth.user!.id,
       })
       .select('id')
@@ -80,39 +75,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Insert FQC inspection records
-    const inspectionRows = parsed.records.map((r) => ({
-      upload_id: upload.id,
-      inspection_date: dateStr,
-      line: r.line,
-      inspector: r.inspector,
-      style: r.style,
-      order_no: r.order_no,
-      remark: r.remark,
-      order_qty: r.order_qty,
-      inspected_qty: r.inspected_qty,
-      ok_qty: r.ok_qty,
-      ng_qty: r.ng_qty,
-      defect_rate: r.defect_rate,
-      business_type: r.business_type,
-      defect_stitching: r.defect_stitching,
-      defect_logo: r.defect_logo,
-      defect_material: r.defect_material,
-      defect_hardware: r.defect_hardware,
-      defect_appearance: r.defect_appearance,
-      defect_zipper: r.defect_zipper,
-      defect_webbing: r.defect_webbing,
-      defect_other: r.defect_other,
-      defect_preparation: r.defect_preparation,
-      defect_stitch_defect: r.defect_stitch_defect,
-      total_defects: r.total_defects,
-      sub_defects: r.sub_defects,
-    }));
+    // 2. Insert FQC inspection records with correct DB column names
+    // DB uses: production_line (not line), inspector_name (not inspector),
+    //         style_code (not style), sub_* columns (not sub_defects array)
+    const inspectionRows = parsed.records.map((r) =>
+      mapInspectionToDb({
+        upload_id: upload.id,
+        inspection_date: dateStr,
+        line: r.line,
+        inspector: r.inspector,
+        style: r.style,
+        order_no: r.order_no,
+        remark: r.remark,
+        order_qty: r.order_qty,
+        inspected_qty: r.inspected_qty,
+        ok_qty: r.ok_qty,
+        ng_qty: r.ng_qty,
+        defect_rate: r.defect_rate,
+        business_type: r.business_type,
+        defect_stitching: r.defect_stitching,
+        defect_logo: r.defect_logo,
+        defect_material: r.defect_material,
+        defect_hardware: r.defect_hardware,
+        defect_appearance: r.defect_appearance,
+        defect_zipper: r.defect_zipper,
+        defect_webbing: r.defect_webbing,
+        defect_other: r.defect_other,
+        defect_preparation: r.defect_preparation,
+        defect_stitch_defect: r.defect_stitch_defect,
+        total_defects: r.total_defects,
+        sub_defects: r.sub_defects,
+      })
+    );
 
     const { data: insertedInspections, error: inspError } = await adminClient
       .from('fqc_inspections')
       .insert(inspectionRows)
-      .select('id, inspection_date, line, style, order_no');
+      .select('id, inspection_date, production_line, style_code, order_no');
 
     if (inspError) {
       console.error('[FQC Upload] Insert inspections error:', inspError);
@@ -122,8 +121,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Generate and insert OQC lot
+    // 3. OQC lot generation (non-fatal)
     let oqcDailyLot: { id: string } | null = null;
+    let oqcCount = 0;
     try {
       const oqcLot = generateOQCLot(inspectionDate, parsed.records);
       const { data, error: oqcLotError } = await adminClient
@@ -153,40 +153,43 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (oqcLotError) {
-        console.error('[FQC Upload] Insert OQC lot error:', oqcLotError);
+        console.error('[FQC Upload] OQC lot error:', oqcLotError);
       } else if (data) {
         oqcDailyLot = data;
+        oqcCount = 1;
 
-        // 4. Insert OQC lot orders
-        const oqcOrders = oqcLot.orders.map((o) => ({
+        // 4. OQC lot orders (DB: style_code, production_line, inspector_name, fqc_ok_qty, oqc_sample)
+        const oqcOrders = oqcLot.orders.map((o, idx) => ({
           lot_id: oqcDailyLot!.id,
-          style: o.style,
+          inspection_id: insertedInspections[idx]?.id || null,
+          style_code: o.style,
           order_no: o.orderNo,
+          production_line: '',
+          inspector_name: '',
           order_qty: o.orderQty,
-          ok_qty: o.okQty,
-          ng_qty: o.ngQty,
+          fqc_ok_qty: o.okQty,
+          oqc_sample: 0,
+          disposition: '',
+          remarks: '',
         }));
-
         await adminClient.from('oqc_lot_orders').insert(oqcOrders);
 
-        // 5. Insert OQC defects
+        // 5. OQC defects (DB: defect_category, defect_count — NO sub_defect column)
         const oqcDefects = oqcLot.defects.map((d) => ({
           lot_id: oqcDailyLot!.id,
-          category: d.category,
-          sub_defect: d.subDefect,
+          defect_category: d.category,
           defect_count: d.count,
           severity: d.severity,
         }));
-
         if (oqcDefects.length > 0) {
           await adminClient.from('oqc_defects').insert(oqcDefects);
         }
       }
     } catch (oqcErr) {
-      console.error('[FQC Upload] OQC generation error (non-fatal):', oqcErr);
+      console.error('[FQC Upload] OQC error (non-fatal):', oqcErr);
     }
 
-    // 6. Generate and insert IPQC records
+    // 6. IPQC records (DB: production_line, style_code, check_count, ok_count, ng_count)
     let ipqcCount = 0;
     try {
       const ipqcRecords = generateIPQCRecords(
@@ -199,26 +202,23 @@ export async function POST(request: NextRequest) {
       ipqcCount = ipqcRecords.length;
       if (ipqcRecords.length > 0) {
         const ipqcRows = ipqcRecords.map((r) => ({
-          inspection_date: r.inspection_date instanceof Date ? r.inspection_date.toISOString().split('T')[0] : r.inspection_date,
-          stage: r.stage,
-          line: r.line,
-          inspector: r.inspector,
-          style: r.style,
-          order_no: r.order_no,
+          inspection_date: r.inspection_date instanceof Date ? r.inspection_date.toISOString().split('T')[0] : String(r.inspection_date),
           business_type: r.business_type,
-          checked_qty: r.checked_qty,
-          pass_qty: r.pass_qty,
-          fail_qty: r.fail_qty,
+          production_line: r.line,
+          style_code: r.style,
+          order_no: r.order_no,
+          stage: r.stage,
+          check_count: r.checked_qty,
+          ok_count: r.pass_qty,
+          ng_count: r.fail_qty,
           pass_rate: r.pass_rate,
-          defects: r.defects,
-          total_defects: r.total_defects,
-          fqc_record_id: r.fqc_record_id,
+          defect_category: '',
+          defect_detail: JSON.stringify(r.defects || []),
         }));
-
         await adminClient.from('ipqc_records').insert(ipqcRows);
       }
     } catch (ipqcErr) {
-      console.error('[FQC Upload] IPQC generation error (non-fatal):', ipqcErr);
+      console.error('[FQC Upload] IPQC error (non-fatal):', ipqcErr);
     }
 
     return NextResponse.json(
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
           date: dateStr,
           business_type: parsed.businessType,
           inspection_count: parsed.records.length,
-          oqc_generated: !!oqcDailyLot,
+          oqc_generated: oqcCount > 0,
           ipqc_generated: ipqcCount,
         },
       },

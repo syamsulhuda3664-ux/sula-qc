@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
+import { mapInspectionRow } from '@/lib/db-schema';
 
 function getDateRange(period: string, refDate?: string) {
   const now = refDate ? new Date(refDate) : new Date();
@@ -94,10 +95,10 @@ export async function GET(request: NextRequest) {
       query = query.eq('business_type', businessType);
     }
     if (productionLine) {
-      query = query.eq('line', productionLine);
+      query = query.eq('production_line', productionLine);
     }
     if (styleCode) {
-      query = query.ilike('style', `%${styleCode}%`);
+      query = query.ilike('style_code', `%${styleCode}%`);
     }
     if (orderNo) {
       query = query.ilike('order_no', `%${orderNo}%`);
@@ -118,10 +119,10 @@ export async function GET(request: NextRequest) {
       countQuery = countQuery.eq('business_type', businessType);
     }
     if (productionLine) {
-      countQuery = countQuery.eq('line', productionLine);
+      countQuery = countQuery.eq('production_line', productionLine);
     }
     if (styleCode) {
-      countQuery = countQuery.ilike('style', `%${styleCode}%`);
+      countQuery = countQuery.ilike('style_code', `%${styleCode}%`);
     }
     if (orderNo) {
       countQuery = countQuery.ilike('order_no', `%${orderNo}%`);
@@ -140,8 +141,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch inspections' }, { status: 500 });
     }
 
-    // Compute subtotals
-    const allRecords = records || [];
+    // Map DB rows to app-shaped objects (production_line→line, inspector_name→inspector, style_code→style, sub_*→sub_defects)
+    const allRecords = (records || []).map(mapInspectionRow);
     const subtotals = {
       total_records: allRecords.length,
       total_order_qty: 0,
@@ -186,7 +187,7 @@ export async function GET(request: NextRequest) {
         : 0;
 
     return NextResponse.json({
-      records: allRecords,
+      records: allRecords as any[],
       subtotals,
       pagination: {
         page,

@@ -316,9 +316,9 @@ export function exportFQCDailyExcel(
       const vals: (string | number)[] = [
         rowNum++,
         String(rec.inspection_date || ''),
-        String(rec.line || ''),
-        String(rec.inspector || ''),
-        String(rec.style || ''),
+        String(rec.production_line || ''),
+        String(rec.inspector_name || ''),
+        String(rec.style_code || ''),
         String(rec.order_no || ''),
         orderQty,
         inspectedQty,
@@ -527,9 +527,11 @@ export function exportFQCAnalysisExcel(
   writeRow(ws1, row, 0, subHeaders, HEADER_STYLE);
   row++;
 
-  // Aggregate sub-defects from sub_defects array
+  // Aggregate sub-defects from individual sub_* columns (DB has 61 columns, not a JSON array)
+  // Import at top: import { SUBDEFECT_DB_COLUMNS } from '@/lib/db-schema';
+  // We read the raw DB rows here so we need to sum each sub_* column directly.
+  // Reuse the same default names list for display.
   const subDefectCounts: Record<string, { count: number; category: string }> = {};
-  // Default sub-defect names by column range (from fqc-parser COL definitions)
   const SUBDEFECT_DEFAULT_NAMES: { name: string; category: string }[] = [
     // Stitching (15)
     { name: '跳针 Skip stitch', category: '针车问题 / Stitching' },
@@ -605,18 +607,21 @@ export function exportFQCAnalysisExcel(
   ];
 
   for (const r of data) {
-    const subs = r.sub_defects;
-    if (Array.isArray(subs)) {
-      for (let i = 0; i < Math.min(subs.length, SUBDEFECT_DEFAULT_NAMES.length); i++) {
-        const count = Number(subs[i]) || 0;
-        if (count > 0) {
-          const info = SUBDEFECT_DEFAULT_NAMES[i];
-          const key = info.name;
-          if (!subDefectCounts[key]) {
-            subDefectCounts[key] = { count: 0, category: info.category };
-          }
-          subDefectCounts[key].count += count;
+    // DB rows have individual sub_* columns — iterate SUBDEFECT_DB_COLUMNS
+    // We import the column names inline here to avoid a top-level import
+    // that would bloat the already large file.
+    const subCols = [
+      'sub_float_fold_skip','sub_missing_loose_stitch','sub_not_stitched','sub_needle_hole','sub_missing_bartack','sub_presser_mark','sub_backtack_off','sub_wrong_panel','sub_end_unfolded','sub_asymmetric','sub_triangle_uneven','sub_thread_bleed','sub_thread_ends','sub_foam_misaligned','sub_stitch_offcenter','sub_logo_crooked','sub_logo_inverted','sub_logo_defective','sub_logo_detached','sub_color_diff','sub_yarn_pull','sub_wrinkle','sub_damaged','sub_seam_open','sub_scratched','sub_poor_function','sub_missing_accessory','sub_dirty_oily','sub_bone_uneven','sub_bag_crooked','sub_handle_misaligned','sub_missing_rivet','sub_sharp_stuck','sub_zipper_wave','sub_zipper_head_reversed','sub_wrong_color_zipper','sub_webbing_twisted','sub_webbing_misplaced','sub_wash_label_reversed','sub_wash_label_wrong','sub_woven_label_reversed','sub_woven_label_missing','sub_lining_reversed','sub_plastic_defective','sub_rivet_defective','sub_accessory_crooked','sub_paint_off','sub_bartack_misaligned','sub_bartack_nonstandard','sub_logo_tilted','sub_velcro_tilted','sub_velcro_loose','sub_trolley_cover_tilted','sub_trolley_cover_short','sub_webbing_height_off','sub_stitch_margin_inconsistent','sub_loose_thread','sub_float_skip2','sub_pattern_stitch_inconsistent','sub_elastic_tilted','sub_logo_text_detached','sub_logo_scratched','sub_triangle_reversed',
+    ];
+    for (let i = 0; i < Math.min(subCols.length, SUBDEFECT_DEFAULT_NAMES.length); i++) {
+      const count = Number(r[subCols[i]]) || 0;
+      if (count > 0) {
+        const info = SUBDEFECT_DEFAULT_NAMES[i];
+        const key = info.name;
+        if (!subDefectCounts[key]) {
+          subDefectCounts[key] = { count: 0, category: info.category };
         }
+        subDefectCounts[key].count += count;
       }
     }
   }
@@ -656,7 +661,7 @@ export function exportFQCAnalysisExcel(
 
   const styleAgg: Record<string, { defects: number; inspected: number }> = {};
   for (const r of data) {
-    const style = String(r.style || 'Unknown');
+    const style = String(r.style_code || 'Unknown');
     if (!styleAgg[style]) styleAgg[style] = { defects: 0, inspected: 0 };
     styleAgg[style].defects += Number(r.total_defects) || 0;
     styleAgg[style].inspected += Number(r.inspected_qty) || 0;
@@ -897,6 +902,7 @@ export function exportFQCOQCExcel(
   row++;
 
   // Aggregate defects from the nested oqc_defects array if present
+  // DB columns: defect_category (not category), defect_count (not count)
   const oqcCatTotals: Record<string, { count: number; critical: number; major: number; minor: number }> = {};
   const OQC_CATEGORIES = ['Packaging', 'Label', 'Accessory', 'Appearance', 'Hardware', 'Stitching', 'Other'];
 
@@ -904,15 +910,16 @@ export function exportFQCOQCExcel(
     const defects = lot.oqc_defects;
     if (Array.isArray(defects)) {
       for (const d of defects) {
-        const cat = String(d.category || 'Other');
+        const cat = String(d.defect_category || 'Other');
+        const cnt = Number(d.defect_count) || 0;
         if (!oqcCatTotals[cat]) {
           oqcCatTotals[cat] = { count: 0, critical: 0, major: 0, minor: 0 };
         }
-        oqcCatTotals[cat].count += Number(d.count) || 0;
+        oqcCatTotals[cat].count += cnt;
         const sev = String(d.severity || '').toLowerCase();
-        if (sev === 'critical') oqcCatTotals[cat].critical += Number(d.count) || 0;
-        else if (sev === 'major') oqcCatTotals[cat].major += Number(d.count) || 0;
-        else oqcCatTotals[cat].minor += Number(d.count) || 0;
+        if (sev === 'critical') oqcCatTotals[cat].critical += cnt;
+        else if (sev === 'major') oqcCatTotals[cat].major += cnt;
+        else oqcCatTotals[cat].minor += cnt;
       }
     }
   }
@@ -1041,9 +1048,9 @@ export function exportIPQCExcel(
     const stage = String(rec.stage || 'Other');
     if (!stageAgg[stage]) stageAgg[stage] = { count: 0, checked: 0, pass: 0, fail: 0, defects: 0 };
     stageAgg[stage].count++;
-    const checked = Number(rec.checked_qty) || 0;
-    const pass = Number(rec.pass_qty) || 0;
-    const fail = Number(rec.fail_qty) || 0;
+    const checked = Number(rec.check_count) || 0;
+    const pass = Number(rec.ok_count) || 0;
+    const fail = Number(rec.ng_count) || 0;
     const defects = Number(rec.total_defects) || 0;
     stageAgg[stage].checked += checked;
     stageAgg[stage].pass += pass;
@@ -1100,16 +1107,19 @@ export function exportIPQCExcel(
 
   for (let i = 0; i < sortedIPQC.length; i++) {
     const rec = sortedIPQC[i];
-    const checked = Number(rec.checked_qty) || 0;
-    const pass = Number(rec.pass_qty) || 0;
-    const fail = Number(rec.fail_qty) || 0;
+    const checked = Number(rec.check_count) || 0;
+    const pass = Number(rec.ok_count) || 0;
+    const fail = Number(rec.ng_count) || 0;
     const rate = checked > 0 ? pass / checked : 0;
     const defects = Number(rec.total_defects) || 0;
 
-    // Build defect detail string from nested defects array
+    // Build defect detail string from defect_detail JSON string (DB stores as JSON string)
     let defectDetail = '';
-    if (Array.isArray(rec.defects) && rec.defects.length > 0) {
-      defectDetail = (rec.defects as Record<string, unknown>[]).map((d: Record<string, unknown>) =>
+    const rawDetail = String(rec.defect_detail || '');
+    let parsedDefects: Record<string, unknown>[] | null = null;
+    try { parsedDefects = JSON.parse(rawDetail); } catch { /* not JSON */ }
+    if (Array.isArray(parsedDefects) && parsedDefects.length > 0) {
+      defectDetail = parsedDefects.map((d: Record<string, unknown>) =>
         `${d.category || ''}: ${d.subDefect || d.sub_defect || ''} (${d.count || 0})`
       ).join('; ');
     } else {
@@ -1120,9 +1130,9 @@ export function exportIPQCExcel(
       i + 1,
       String(rec.inspection_date || ''),
       stageLabels[String(rec.stage || '')] || String(rec.stage || ''),
-      String(rec.line || ''),
-      String(rec.inspector || ''),
-      String(rec.style || ''),
+      String(rec.production_line || ''),
+      String(rec.inspector_name || ''),
+      String(rec.style_code || ''),
       String(rec.order_no || ''),
       checked,
       pass,

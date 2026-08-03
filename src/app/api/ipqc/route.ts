@@ -38,8 +38,8 @@ export async function GET(request: NextRequest) {
       countQuery = countQuery.eq('business_type', businessType);
     }
     if (productionLine) {
-      query = query.eq('line', productionLine);
-      countQuery = countQuery.eq('line', productionLine);
+      query = query.eq('production_line', productionLine);
+      countQuery = countQuery.eq('production_line', productionLine);
     }
     if (stage) {
       query = query.eq('stage', stage);
@@ -78,9 +78,9 @@ export async function GET(request: NextRequest) {
     }
 
     for (const r of allRecords) {
-      const checked = Number(r.checked_qty) || 0;
-      const pass = Number(r.pass_qty) || 0;
-      const fail = Number(r.fail_qty) || 0;
+      const checked = Number(r.check_count) || 0;
+      const pass = Number(r.ok_count) || 0;
+      const fail = Number(r.ng_count) || 0;
       const defects = Number(r.total_defects) || 0;
       const stageName = r.stage || 'Unknown';
 
@@ -109,8 +109,20 @@ export async function GET(request: NextRequest) {
         : 0;
     }
 
+    // Map DB rows to app-level field names for the frontend
+    const mappedRecords = allRecords.map((r: Record<string, unknown>) => ({
+      ...r,
+      line: r.production_line,
+      inspector: r.inspector_name,
+      style: r.style_code,
+      checked_qty: r.check_count,
+      pass_qty: r.ok_count,
+      fail_qty: r.ng_count,
+      detail: r.defect_detail,
+    }));
+
     return NextResponse.json({
-      records: allRecords,
+      records: mappedRecords as any[],
       subtotals,
       pagination: {
         page,

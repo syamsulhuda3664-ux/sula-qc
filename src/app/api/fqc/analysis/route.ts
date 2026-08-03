@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 import { SUBDEFECT_NAMES, getSubDefectCategory } from '@/lib/rca-generator';
+import { SUBDEFECT_DB_COLUMNS } from '@/lib/db-schema';
 
 const DEFECT_CATEGORIES = [
   { key: 'defect_stitching', name: 'Stitching' },
@@ -69,15 +70,10 @@ export async function GET(request: NextRequest) {
     })).sort((a, b) => b.defectCount - a.defectCount);
 
     // Section B: Top 20 Sub-defects
-    const subDefectCounts: number[] = new Array(SUBDEFECT_NAMES.length).fill(0);
-
-    for (const r of allRecords) {
-      if (Array.isArray(r.sub_defects)) {
-        for (let i = 0; i < Math.min(r.sub_defects.length, subDefectCounts.length); i++) {
-          subDefectCounts[i] += Number(r.sub_defects[i]) || 0;
-        }
-      }
-    }
+    // Sum each sub_* column individually across all rows (DB has 61 individual columns, not a JSON array)
+    const subDefectCounts = SUBDEFECT_DB_COLUMNS.map(col =>
+      allRecords.reduce((sum, r) => sum + (Number(r[col]) || 0), 0)
+    );
 
     const subDefectList = subDefectCounts
       .map((count, index) => ({
@@ -97,7 +93,7 @@ export async function GET(request: NextRequest) {
     const styleAgg: Record<string, { defects: number; inspected: number; inspections: number }> = {};
 
     for (const r of allRecords) {
-      const style = r.style || 'Unknown';
+      const style = r.style_code || 'Unknown';
       if (!styleAgg[style]) {
         styleAgg[style] = { defects: 0, inspected: 0, inspections: 0 };
       }

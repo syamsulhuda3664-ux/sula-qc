@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 import { generateWeeklyRCA } from '@/lib/rca-generator';
+import { mapInspectionRow } from '@/lib/db-schema';
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest) {
     const rca = generateWeeklyRCA(
       new Date(weekStart),
       new Date(weekEnd),
-      fqcRecords || []
+      (fqcRecords || []).map(mapInspectionRow)
     );
 
     // Insert RCA record
