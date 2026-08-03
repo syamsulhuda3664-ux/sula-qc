@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     })).sort((a, b) => b.defectCount - a.defectCount);
 
     // Section B: Top 20 Sub-defects
-    // Sum each sub_* column individually across all rows (DB has 61 individual columns, not a JSON array)
+    // Sum each sub_* column individually across all rows (DB has 64 individual columns, not a JSON array)
     const subDefectCounts = SUBDEFECT_DB_COLUMNS.map(col =>
       allRecords.reduce((sum, r) => sum + (Number(r[col]) || 0), 0)
     );
@@ -97,7 +97,18 @@ export async function GET(request: NextRequest) {
       if (!styleAgg[style]) {
         styleAgg[style] = { defects: 0, inspected: 0, inspections: 0 };
       }
-      styleAgg[style].defects += Number(r.total_defects) || 0;
+      // Compute total defects from category columns (DB has no total_defects column)
+      const rowDefects = (Number(r.defect_stitching) || 0)
+        + (Number(r.defect_logo) || 0)
+        + (Number(r.defect_material) || 0)
+        + (Number(r.defect_hardware) || 0)
+        + (Number(r.defect_appearance) || 0)
+        + (Number(r.defect_zipper) || 0)
+        + (Number(r.defect_webbing) || 0)
+        + (Number(r.defect_other) || 0)
+        + (Number(r.defect_preparation) || 0)
+        + (Number(r.defect_stitch_defect) || 0);
+      styleAgg[style].defects += rowDefects;
       styleAgg[style].inspected += Number(r.inspected_qty) || 0;
       styleAgg[style].inspections += 1;
     }

@@ -663,7 +663,9 @@ export function exportFQCAnalysisExcel(
   for (const r of data) {
     const style = String(r.style_code || 'Unknown');
     if (!styleAgg[style]) styleAgg[style] = { defects: 0, inspected: 0 };
-    styleAgg[style].defects += Number(r.total_defects) || 0;
+    // Compute from category columns (DB has no total_defects)
+    const rowDef = (Number(r.defect_stitching) || 0) + (Number(r.defect_logo) || 0) + (Number(r.defect_material) || 0) + (Number(r.defect_hardware) || 0) + (Number(r.defect_appearance) || 0) + (Number(r.defect_zipper) || 0) + (Number(r.defect_webbing) || 0) + (Number(r.defect_other) || 0) + (Number(r.defect_preparation) || 0) + (Number(r.defect_stitch_defect) || 0);
+    styleAgg[style].defects += rowDef;
     styleAgg[style].inspected += Number(r.inspected_qty) || 0;
   }
 

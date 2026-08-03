@@ -53,7 +53,7 @@ const DEFECT_CATEGORIES: { key: string; name: string }[] = [
 
 /**
  * Sub-defect name definitions per category (index matches sub_defects array position)
- * These correspond to the 61 sub-defect columns in the FQC Excel format
+ * These correspond to the 64 sub-defect columns in the FQC Excel format
  */
 const SUBDEFECT_NAMES: string[] = [
   // Stitching (columns L-Z, indices 0-14)
@@ -108,7 +108,7 @@ const SUBDEFECT_NAMES: string[] = [
   'Woven label missing',
   'Lining reversed',
   'Transparent film defective',
-  // Preparation (columns BD-BV, indices 44-57)
+  // Preparation (columns BD-BV, indices 44-62, 19 cols)
   'Rivet defective',
   'Accessory skewed',
   'Accessory paint peeling',
@@ -123,9 +123,8 @@ const SUBDEFECT_NAMES: string[] = [
   'Webbing height off-position',
   'Stitching edge distance inconsistent',
   'Loose thread / Thread break',
-  // Stitch Defect (column BW, index 58)
   'Float thread / Skip stitch (computerized)',
-  // Additional sub-defects (indices 59-60)
+  'Pattern stitch edge distance inconsistent',
   'Elastic band skewed',
   'Logo font detached',
   'Logo scratched',
@@ -144,7 +143,7 @@ function getSubDefectCategory(index: number): { category: string; categoryKey: s
   if (index < 36) return { category: 'Zipper', categoryKey: 'defect_zipper' };
   if (index < 38) return { category: 'Webbing', categoryKey: 'defect_webbing' };
   if (index < 44) return { category: 'Other', categoryKey: 'defect_other' };
-  if (index < 58) return { category: 'Preparation', categoryKey: 'defect_preparation' };
+  if (index < 63) return { category: 'Preparation', categoryKey: 'defect_preparation' };
   return { category: 'Stitch Defect', categoryKey: 'defect_stitch_defect' };
 }
 
@@ -229,7 +228,9 @@ export function generateWeeklyRCA(
     if (!styleDefects[style]) {
       styleDefects[style] = { defects: 0, inspections: 0, inspected: 0 };
     }
-    styleDefects[style].defects += Number(record.total_defects) || 0;
+    // Compute total defects from category columns (no total_defects in DB)
+    const recTotal = DEFECT_CATEGORIES.reduce((s, cat) => s + (Number(record[cat.key]) || 0), 0);
+    styleDefects[style].defects += recTotal;
     styleDefects[style].inspections += 1;
     styleDefects[style].inspected += inspectedQty;
   }

@@ -6,11 +6,12 @@
  */
 
 /**
- * The 61 sub-defect columns in fqc_inspections table, in order of Excel columns L→BW (index 0→60).
- * Used to expand the parsed sub_defects array into individual DB columns.
+ * The 64 sub-defect columns in fqc_inspections table, in order of Excel columns L→BW.
+ * This list is the EXACT column names from the actual DB, verified via REST API.
  */
-export const SUBDEFECT_COLUMNS: string[] = [
-  'sub_float_fold_skip',        // 0  - L  (Stitching)
+export const SUBDEFECT_DB_COLUMNS: string[] = [
+  // Stitching (针车问题): L-Z = indices 0-14 (15 cols)
+  'sub_float_fold_skip',        // 0  - L
   'sub_missing_loose_stitch',    // 1  - M
   'sub_not_stitched',            // 2  - N
   'sub_needle_hole',             // 3  - O
@@ -19,42 +20,50 @@ export const SUBDEFECT_COLUMNS: string[] = [
   'sub_backtack_off',            // 6  - R
   'sub_wrong_panel',             // 7  - S
   'sub_end_unfolded',            // 8  - T
-  'sub_asymmetric',              // 9  - U
-  'sub_triangle_uneven',         // 10 - V
-  'sub_thread_bleed',            // 11 - W
-  'sub_thread_ends',             // 12 - X
-  'sub_foam_misaligned',         // 13 - Y
-  'sub_stitch_offcenter',        // 14 - Z  (end Stitching, 15 cols)
-  'sub_logo_crooked',            // 15 - AA (Logo)
+  'sub_velcro_reversed',         // 9  - U
+  'sub_asymmetric',              // 10 - V
+  'sub_triangle_uneven',         // 11 - W
+  'sub_thread_bleed',            // 12 - X
+  'sub_thread_ends',             // 13 - Y
+  'sub_foam_misaligned',         // 14 - Z
+  // Logo (LOGO问题): AA-AD = indices 15-18 (4 cols)
+  'sub_logo_crooked',            // 15 - AA
   'sub_logo_inverted',           // 16 - AB
   'sub_logo_defective',          // 17 - AC
-  'sub_logo_detached',           // 18 - AD (end Logo, 4 cols)
-  'sub_color_diff',              // 19 - AE (Material)
+  'sub_logo_detached',           // 18 - AD
+  // Material (面料问题): AE-AI = indices 19-23 (5 cols)
+  'sub_color_diff',              // 19 - AE
   'sub_yarn_pull',               // 20 - AF
   'sub_wrinkle',                 // 21 - AG
   'sub_damaged',                 // 22 - AH
-  'sub_seam_open',               // 23 - AI (end Material, 5 cols)
-  'sub_scratched',               // 24 - AJ (Hardware)
+  'sub_seam_open',               // 23 - AI
+  // Hardware (五金问题): AJ-AL = indices 24-26 (3 cols)
+  'sub_scratched',               // 24 - AJ
   'sub_poor_function',           // 25 - AK
-  'sub_missing_accessory',       // 26 - AL (end Hardware, 3 cols)
-  'sub_dirty_oily',              // 27 - AM (Appearance)
+  'sub_missing_accessory',       // 26 - AL
+  // Appearance (外观问题): AM-AQ = indices 27-31 (5 cols)
+  'sub_dirty_oily',              // 27 - AM
   'sub_bone_uneven',             // 28 - AN
   'sub_bag_crooked',             // 29 - AO
   'sub_handle_misaligned',       // 30 - AP
-  'sub_missing_rivet',           // 31 - AQ (end Appearance, 5 cols)
-  'sub_sharp_stuck',             // 32 - AR (Zipper)
+  'sub_missing_rivet',           // 31 - AQ
+  // Zipper (拉链问题): AR-AU = indices 32-35 (4 cols)
+  'sub_sharp_stuck',             // 32 - AR
   'sub_zipper_wave',             // 33 - AS
   'sub_zipper_head_reversed',    // 34 - AT
-  'sub_wrong_color_zipper',      // 35 - AU (end Zipper, 4 cols)
-  'sub_webbing_twisted',         // 36 - AV (Webbing)
-  'sub_webbing_misplaced',       // 37 - AW (end Webbing, 2 cols)
-  'sub_wash_label_reversed',     // 38 - AX (Other)
+  'sub_wrong_color_zipper',      // 35 - AU
+  // Webbing (织带问题): AV-AW = indices 36-37 (2 cols)
+  'sub_webbing_twisted',         // 36 - AV
+  'sub_stitch_offcenter',        // 37 - AW
+  // Other (其它问题): AX-BC = indices 38-43 (6 cols)
+  'sub_wash_label_reversed',     // 38 - AX
   'sub_wash_label_wrong',        // 39 - AY
   'sub_woven_label_reversed',    // 40 - AZ
   'sub_woven_label_missing',     // 41 - BA
   'sub_lining_reversed',         // 42 - BB
-  'sub_plastic_defective',       // 43 - BC (end Other, 6 cols)
-  'sub_rivet_defective',         // 44 - BD (Preparation)
+  'sub_plastic_defective',       // 43 - BC
+  // Preparation (备料问题): BD-BV = indices 44-62 (19 cols)
+  'sub_rivet_defective',         // 44 - BD
   'sub_accessory_crooked',       // 45 - BE
   'sub_paint_off',               // 46 - BF
   'sub_bartack_misaligned',      // 47 - BG
@@ -64,36 +73,24 @@ export const SUBDEFECT_COLUMNS: string[] = [
   'sub_velcro_loose',            // 51 - BK
   'sub_trolley_cover_tilted',    // 52 - BL
   'sub_trolley_cover_short',     // 53 - BM
-  'sub_webbing_height_off',      // 54 - BN
-  'sub_stitch_margin_inconsistent', // 55 - BO
-  'sub_loose_thread',            // 56 - BP
-  'sub_float_skip2',             // 57 - BQ
-  'sub_pattern_stitch_inconsistent', // 58 - BR
-  'sub_elastic_tilted',          // 59 - BS
-  'sub_logo_text_detached',      // 60 - BT
-  'sub_logo_scratched',          // 61 - BU
-  'sub_triangle_reversed',       // 62 - BV
+  'sub_webbing_misplaced',       // 54 - BN
+  'sub_webbing_height_off',      // 55 - BO
+  'sub_stitch_margin_inconsistent', // 56 - BP
+  'sub_loose_thread',            // 57 - BQ
+  'sub_float_skip2',             // 58 - BR
+  'sub_pattern_stitch_inconsistent', // 59 - BS
+  'sub_elastic_tilted',          // 60 - BT
+  'sub_logo_text_detached',      // 61 - BU
+  'sub_logo_scratched',          // 62 - BV
+  // Stitch Defect (针车不良): BW = index 63 (1 col)
+  'sub_triangle_reversed',       // 63 - BW
 ];
 
-// Note: There are 63 columns listed above but the Excel has 61 sub-defect columns (L=11 to BW=71).
-// Let's verify the count and adjust:
-// Stitching: L-Z = 15 cols (indices 0-14)
-// Logo: AA-AD = 4 cols (indices 15-18)
-// Material: AE-AI = 5 cols (indices 19-23)
-// Hardware: AJ-AL = 3 cols (indices 24-26)
-// Appearance: AM-AQ = 5 cols (indices 27-31)
-// Zipper: AR-AU = 4 cols (indices 32-35)
-// Webbing: AV-AW = 2 cols (indices 36-37)
-// Other: AX-BC = 6 cols (indices 38-43)
-// Preparation: BD-BV = 16 cols (indices 44-59)
-// Stitch Defect: BW = 1 col (index 60)
-// Total: 15+4+5+3+5+4+2+6+16+1 = 61 ✓
-
-// Remove extras — only keep exactly 61
-export const SUBDEFECT_DB_COLUMNS: string[] = SUBDEFECT_COLUMNS.slice(0, 61);
+// Total: 15+4+5+3+5+4+2+6+19+1 = 64
+export const TOTAL_SUBDEFECTS = SUBDEFECT_DB_COLUMNS.length; // 64
 
 /**
- * Expand a sub_defects number array (61 elements) into a DB row object
+ * Expand a sub_defects number array (64 elements) into a DB row object
  * with individual sub_* column names.
  */
 export function expandSubDefects(subDefects: number[]): Record<string, number> {
@@ -105,7 +102,7 @@ export function expandSubDefects(subDefects: number[]): Record<string, number> {
 }
 
 /**
- * Collapse a DB row's sub_* columns back into a number array (61 elements).
+ * Collapse a DB row's sub_* columns back into a number array (64 elements).
  */
 export function collapseSubDefects(row: Record<string, unknown>): number[] {
   return SUBDEFECT_DB_COLUMNS.map(col => Number(row[col]) || 0);
@@ -157,7 +154,7 @@ export function mapInspectionToDb(record: {
       dbRow[key] = val;
     }
   }
-  // Expand sub_defects array into 61 individual sub_* columns
+  // Expand sub_defects array into 64 individual sub_* columns
   return {
     ...dbRow,
     ...expandSubDefects(sub_defects || []),

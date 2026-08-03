@@ -168,7 +168,19 @@ export async function GET(request: NextRequest) {
       subtotals.total_inspected_qty += Number(r.inspected_qty) || 0;
       subtotals.total_ok_qty += Number(r.ok_qty) || 0;
       subtotals.total_ng_qty += Number(r.ng_qty) || 0;
-      subtotals.total_defects += Number(r.total_defects) || 0;
+      // Compute total_defects from category columns (DB has no total_defects column)
+      const rowTotal = (Number(r.defect_stitching) || 0)
+        + (Number(r.defect_logo) || 0)
+        + (Number(r.defect_material) || 0)
+        + (Number(r.defect_hardware) || 0)
+        + (Number(r.defect_appearance) || 0)
+        + (Number(r.defect_zipper) || 0)
+        + (Number(r.defect_webbing) || 0)
+        + (Number(r.defect_other) || 0)
+        + (Number(r.defect_preparation) || 0)
+        + (Number(r.defect_stitch_defect) || 0);
+      subtotals.total_defects += rowTotal;
+      r.total_defects = rowTotal; // attach for frontend use
       subtotals.defect_stitching += Number(r.defect_stitching) || 0;
       subtotals.defect_logo += Number(r.defect_logo) || 0;
       subtotals.defect_material += Number(r.defect_material) || 0;

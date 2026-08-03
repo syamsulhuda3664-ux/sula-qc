@@ -39,13 +39,13 @@ const COL = {
   otherStart: 49,      // AX
   otherEnd: 54,        // BC (6 sub-defects)
   preparationStart: 55, // BD
-  preparationEnd: 70,   // BV (16 sub-defects)
-  stitchDefect: 71,     // BW (1 sub-defect)
+  preparationEnd: 73,   // BV (19 sub-defects)
+  stitchDefect: 74,     // BW (1 sub-defect)
 } as const;
 
 const FIRST_DEFECT_COL = 11; // L
-const LAST_DEFECT_COL = 71;  // BW
-const TOTAL_SUBDEFECTS = LAST_DEFECT_COL - FIRST_DEFECT_COL + 1; // 61
+const LAST_DEFECT_COL = 74;  // BW
+const TOTAL_SUBDEFECTS = LAST_DEFECT_COL - FIRST_DEFECT_COL + 1; // 64
 
 export interface FQCRecord {
   id?: string;
