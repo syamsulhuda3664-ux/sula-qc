@@ -127,6 +127,15 @@ export function mapInspectionRow(row: Record<string, unknown>) {
 }
 
 /**
+ * Columns that exist in the app's FQCRecord but NOT in the DB table.
+ * These must be excluded when building DB insert rows.
+ */
+const APP_ONLY_FIELDS = new Set([
+  'line', 'inspector', 'style', 'sub_defects',
+  'total_defects', 'created_at', 'id',
+]);
+
+/**
  * Map application FQC record to DB column names for insert.
  */
 export function mapInspectionToDb(record: {
@@ -134,14 +143,23 @@ export function mapInspectionToDb(record: {
   inspector: string;
   style: string;
   sub_defects: number[];
- [key: string]: unknown;
+  [key: string]: unknown;
 }): Record<string, unknown> {
-  const { line, inspector, style, sub_defects, ...rest } = record;
-  return {
-    ...rest,
+  const { line, inspector, style, sub_defects } = record;
+  const dbRow: Record<string, unknown> = {
     production_line: line,
     inspector_name: inspector,
     style_code: style,
+  };
+  // Only copy fields that actually exist in the DB
+  for (const [key, val] of Object.entries(record)) {
+    if (!APP_ONLY_FIELDS.has(key)) {
+      dbRow[key] = val;
+    }
+  }
+  // Expand sub_defects array into 61 individual sub_* columns
+  return {
+    ...dbRow,
     ...expandSubDefects(sub_defects || []),
   };
 }
