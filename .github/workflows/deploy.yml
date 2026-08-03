@@ -1,0 +1,35 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel Environment
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: team_J37re7PXsp1VkCYoFcsXzOx1
+          VERCEL_PROJECT_ID: prj_FOkakaqbqZtHG3sYOTobF4AMSdMl
+
+      - name: Build with Vercel
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: team_J37re7PXsp1VkCYoFcsXzOx1
+          VERCEL_PROJECT_ID: prj_FOkakaqbqZtHG3sYOTobF4AMSdMl
+
+      - name: Deploy to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: team_J37re7PXsp1VkCYoFcsXzOx1
+          VERCEL_PROJECT_ID: prj_FOkakaqbqZtHG3sYOTobF4AMSdMl
