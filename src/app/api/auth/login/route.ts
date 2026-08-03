@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { adminClient } from '@/lib/supabase';
 import { signToken, createSessionCookie, getRoleLanguage, mapDbUser } from '@/lib/auth';
+import { adminClient, sbFetch } from '@/lib/supabase-admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,21 +15,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: row, error: dbError } = await adminClient
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .single();
+    // Try Supabase client first, fallback to direct REST
+    let row: Record<string, unknown> | null = null;
 
-    if (dbError || !row) {
-      return NextResponse.json(
-        { error: 'Invalid username or password' },
-        { status: 401 }
-      );
+    try {
+      const { data, error } = await adminClient
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
+      if (!error && data) row = data as Record<string, unknown>;
+    } catch {
+      // client failed, try direct REST
+    }
+
+    if (!row) {
+      const result = await sbFetch('users', {
+        select: '*',
+        eq: ['username', username],
+        single: true,
+      });
+      if (result.error || !result.data) {
+        return NextResponse.json(
+          { error: 'Invalid username or password' },
+          { status: 401 }
+        );
+      }
+      row = result.data as Record<string, unknown>;
     }
 
     // Support both column naming conventions
-    const isActive = row.is_active !== undefined ? row.is_active : row.active;
+    const isActive = row.is_active !== undefined ? (row.is_active as boolean) : (row.active as boolean);
     if (!isActive) {
       return NextResponse.json(
         { error: 'Account is deactivated. Contact administrator.' },
@@ -37,7 +53,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isValidPassword = await bcrypt.compare(password, row.password_hash);
+    const isValidPassword = await bcrypt.compare(password, row.password_hash as string);
     if (!isValidPassword) {
       return NextResponse.json(
         { error: 'Invalid username or password' },

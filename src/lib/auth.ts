@@ -1,7 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
-import { adminClient } from './supabase';
+import { adminClient } from './supabase-admin';
 export { getRoleLanguage } from './i18n';
 
 const JWT_SECRET = new TextEncoder().encode(
@@ -149,11 +149,28 @@ export async function authenticateRequest(
   }
 
   // Verify user is still active in DB
-  const { data: dbUser } = await adminClient
-    .from('users')
-    .select('id, is_active, active')
-    .eq('id', user.id)
-    .single();
+  let dbUser: Record<string, unknown> | null = null;
+  try {
+    const { data } = await adminClient
+      .from('users')
+      .select('id, is_active, active')
+      .eq('id', user.id)
+      .single();
+    if (data) dbUser = data as Record<string, unknown>;
+  } catch {
+    // client failed
+  }
+
+  if (!dbUser) {
+    // Fallback to direct REST
+    const { sbFetch } = await import('./supabase-admin');
+    const result = await sbFetch('users', {
+      select: 'id, is_active, active',
+      eq: ['id', user.id],
+      single: true,
+    });
+    if (result.data) dbUser = result.data as Record<string, unknown>;
+  }
 
   if (!dbUser) {
     return {
@@ -165,7 +182,7 @@ export async function authenticateRequest(
     };
   }
 
-  const isActive = dbUser.is_active !== undefined ? dbUser.is_active : dbUser.active;
+  const isActive = dbUser.is_active !== undefined ? (dbUser.is_active as boolean) : (dbUser.active as boolean);
   if (!isActive) {
     return {
       user: null,
