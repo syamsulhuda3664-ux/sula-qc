@@ -18,6 +18,17 @@ export interface AuthUser {
   is_active: boolean;
 }
 
+/** Map DB columns (full_name, active) to app fields (display_name, is_active) */
+export function mapDbUser(row: Record<string, unknown>): AuthUser {
+  return {
+    id: row.id as string,
+    username: row.username as string,
+    display_name: (row.display_name ?? row.full_name) as string,
+    role: row.role as string,
+    is_active: row.is_active !== undefined ? (row.is_active as boolean) : (row.active as boolean),
+  };
+}
+
 export type AccessLevel = 'full' | 'view' | 'any';
 
 const ROLE_ACCESS: Record<string, AccessLevel> = {
@@ -140,11 +151,22 @@ export async function authenticateRequest(
   // Verify user is still active in DB
   const { data: dbUser } = await adminClient
     .from('users')
-    .select('id, is_active')
+    .select('id, is_active, active')
     .eq('id', user.id)
     .single();
 
-  if (!dbUser || !dbUser.is_active) {
+  if (!dbUser) {
+    return {
+      user: null,
+      error: new Response(JSON.stringify({ error: 'User account is inactive' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    };
+  }
+
+  const isActive = dbUser.is_active !== undefined ? dbUser.is_active : dbUser.active;
+  if (!isActive) {
     return {
       user: null,
       error: new Response(JSON.stringify({ error: 'User account is inactive' }), {

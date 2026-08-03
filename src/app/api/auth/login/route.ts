@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { adminClient } from '@/lib/supabase';
-import { signToken, createSessionCookie, getRoleLanguage } from '@/lib/auth';
+import { signToken, createSessionCookie, getRoleLanguage, mapDbUser } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,33 +15,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: user, error: dbError } = await adminClient
+    const { data: row, error: dbError } = await adminClient
       .from('users')
       .select('*')
       .eq('username', username)
       .single();
 
-    if (dbError || !user) {
+    if (dbError || !row) {
       return NextResponse.json(
         { error: 'Invalid username or password' },
         { status: 401 }
       );
     }
 
-    if (!user.is_active) {
+    // Support both column naming conventions
+    const isActive = row.is_active !== undefined ? row.is_active : row.active;
+    if (!isActive) {
       return NextResponse.json(
         { error: 'Account is deactivated. Contact administrator.' },
         { status: 403 }
       );
     }
 
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    const isValidPassword = await bcrypt.compare(password, row.password_hash);
     if (!isValidPassword) {
       return NextResponse.json(
         { error: 'Invalid username or password' },
         { status: 401 }
       );
     }
+
+    const user = mapDbUser(row);
 
     const token = await signToken({
       id: user.id,

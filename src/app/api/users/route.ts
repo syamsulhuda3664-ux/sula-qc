@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { adminClient } from '@/lib/supabase';
-import { authenticateRequest, getRoleLanguage } from '@/lib/auth';
+import { authenticateRequest, getRoleLanguage, mapDbUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
@@ -19,14 +19,15 @@ export async function GET(request: NextRequest) {
 
     let query = adminClient
       .from('users')
-      .select('id, username, display_name, role, is_active, created_at, updated_at')
+      .select('*')
       .order('created_at', { ascending: true });
 
     if (role) {
       query = query.eq('role', role);
     }
     if (active !== null && active !== undefined && active !== '') {
-      query = query.eq('is_active', active === 'true');
+      // Support both column naming conventions
+      query = query.eq('active', active === 'true');
     }
 
     const { data, error } = await query;
@@ -36,10 +37,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
 
-    const users = (data || []).map((u) => ({
-      ...u,
-      language: getRoleLanguage(u.role),
-    }));
+    const users = (data || []).map((u) => {
+      const mapped = mapDbUser(u);
+      return {
+        id: u.id,
+        username: u.username,
+        display_name: mapped.display_name,
+        role: u.role,
+        is_active: mapped.is_active,
+        created_at: u.created_at,
+        updated_at: u.updated_at,
+        language: getRoleLanguage(u.role),
+      };
+    });
 
     return NextResponse.json({ users });
   } catch (error) {
@@ -92,16 +102,17 @@ export async function POST(request: NextRequest) {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
+    // Use DB column names (full_name, active) for insert
     const { data: user, error } = await adminClient
       .from('users')
       .insert({
         username,
         password_hash: passwordHash,
-        display_name,
+        full_name: display_name,
         role,
-        is_active: true,
+        active: true,
       })
-      .select('id, username, display_name, role, is_active, created_at')
+      .select('*')
       .single();
 
     if (error) {
@@ -109,8 +120,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
     }
 
+    const mapped = mapDbUser(user);
     return NextResponse.json(
-      { user: { ...user, language: getRoleLanguage(user.role) }, message: 'User created successfully' },
+      { user: { id: mapped.id, username: mapped.username, display_name: mapped.display_name, role: mapped.role, is_active: mapped.is_active, created_at: user.created_at, language: getRoleLanguage(user.role) }, message: 'User created successfully' },
       { status: 201 }
     );
   } catch (error) {

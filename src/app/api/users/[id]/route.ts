@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { adminClient } from '@/lib/supabase';
-import { authenticateRequest, getRoleLanguage } from '@/lib/auth';
+import { authenticateRequest, getRoleLanguage, mapDbUser } from '@/lib/auth';
 
 export async function PUT(
   request: NextRequest,
@@ -22,7 +22,7 @@ export async function PUT(
     const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() };
 
     if (display_name !== undefined) {
-      updateData.display_name = display_name;
+      updateData.full_name = display_name; // DB uses full_name column
     }
 
     if (role !== undefined) {
@@ -49,7 +49,7 @@ export async function PUT(
       .from('users')
       .update(updateData)
       .eq('id', id)
-      .select('id, username, display_name, role, is_active, created_at, updated_at')
+      .select('*')
       .single();
 
     if (error || !user) {
@@ -57,8 +57,9 @@ export async function PUT(
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
     }
 
+    const mapped = mapDbUser(user);
     return NextResponse.json({
-      user: { ...user, language: getRoleLanguage(user.role) },
+      user: { id: mapped.id, username: mapped.username, display_name: mapped.display_name, role: mapped.role, is_active: mapped.is_active, created_at: user.created_at, updated_at: user.updated_at, language: getRoleLanguage(user.role) },
       message: 'User updated successfully',
     });
   } catch (error) {
@@ -90,9 +91,9 @@ export async function DELETE(
 
     const { data: user, error } = await adminClient
       .from('users')
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .update({ active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
-      .select('id, username, display_name, role, is_active')
+      .select('*')
       .single();
 
     if (error || !user) {
@@ -100,8 +101,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to deactivate user' }, { status: 500 });
     }
 
+    const mapped = mapDbUser(user);
     return NextResponse.json({
-      user,
+      user: { id: mapped.id, username: mapped.username, display_name: mapped.display_name, role: mapped.role, is_active: mapped.is_active },
       message: 'User deactivated successfully',
     });
   } catch (error) {
