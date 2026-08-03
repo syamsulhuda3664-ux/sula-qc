@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
+import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,7 @@ const DEFECT_KEYS = [
 
 export default function FQCDailyPage() {
   const { t } = useI18n();
+  const { effectiveType, isLocked } = useBusinessTypeLock();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -50,7 +52,8 @@ export default function FQCDailyPage() {
       const params = new URLSearchParams({ page: String(page), page_size: '100' });
       if (dateFrom) params.set('date_from', dateFrom);
       if (dateTo) params.set('date_to', dateTo);
-      if (businessType !== 'ALL') params.set('business_type', businessType);
+      const bt = effectiveType || businessType;
+      if (bt !== 'ALL') params.set('business_type', bt);
       if (line) params.set('production_line', line);
 
       const res = await fetch(`/api/fqc/inspections?${params}`);
@@ -60,7 +63,7 @@ export default function FQCDailyPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, dateFrom, dateTo, businessType, line]);
+  }, [page, dateFrom, dateTo, businessType, effectiveType, line]);
 
   useEffect(() => {
     fetchData();
@@ -71,7 +74,7 @@ export default function FQCDailyPage() {
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'fqc', filters: { date_from: dateFrom, date_to: dateTo, business_type: businessType, production_line: line } }),
+        body: JSON.stringify({ type: 'fqc', filters: { date_from: dateFrom, date_to: dateTo, business_type: effectiveType || businessType, production_line: line } }),
       });
       if (res.ok) {
         const blob = await res.blob();
@@ -107,8 +110,8 @@ export default function FQCDailyPage() {
             </div>
             <div className="w-full sm:w-40">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('fqc.businessType')}</label>
-              <Select value={businessType} onValueChange={(v) => { setBusinessType(v); setPage(1); }}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <Select value={businessType} onValueChange={(v) => { setBusinessType(v); setPage(1); }} disabled={isLocked}>
+                <SelectTrigger className="h-9" disabled={isLocked}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">{t('common.all')}</SelectItem>
                   <SelectItem value="PTOEM">PTOEM</SelectItem>

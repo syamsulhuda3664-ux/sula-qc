@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
+import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ import { RefreshCw } from 'lucide-react';
 
 export default function FQCAnalysisPage() {
   const { t } = useI18n();
+  const { effectiveType, isLocked } = useBusinessTypeLock();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
@@ -37,7 +39,8 @@ export default function FQCAnalysisPage() {
       const params = new URLSearchParams();
       if (dateFrom) params.set('date_from', dateFrom);
       if (dateTo) params.set('date_to', dateTo);
-      if (businessType !== 'ALL') params.set('business_type', businessType);
+      const bt = effectiveType || businessType;
+      if (bt !== 'ALL') params.set('business_type', bt);
 
       const res = await fetch(`/api/fqc/analysis?${params}`);
       if (res.ok) setData(await res.json());
@@ -46,7 +49,7 @@ export default function FQCAnalysisPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, businessType]);
+  }, [dateFrom, dateTo, businessType, effectiveType]);
 
   useEffect(() => {
     fetchData();
@@ -73,8 +76,8 @@ export default function FQCAnalysisPage() {
             </div>
             <div className="w-full sm:w-40">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('fqc.businessType')}</label>
-              <Select value={businessType} onValueChange={setBusinessType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <Select value={businessType} onValueChange={setBusinessType} disabled={isLocked}>
+                <SelectTrigger className="h-9" disabled={isLocked}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">{t('common.all')}</SelectItem>
                   <SelectItem value="PTOEM">PTOEM</SelectItem>

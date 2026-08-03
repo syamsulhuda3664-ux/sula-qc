@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
+import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ import { CheckCircle2, AlertTriangle, XCircle, Package } from 'lucide-react';
 
 export default function OQCRekapPage() {
   const { t } = useI18n();
+  const { effectiveType, isLocked } = useBusinessTypeLock();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
@@ -31,7 +33,8 @@ export default function OQCRekapPage() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ period, value });
-      if (businessType !== 'ALL') params.set('business_type', businessType);
+      const bt = effectiveType || businessType;
+      if (bt !== 'ALL') params.set('business_type', bt);
       const res = await fetch(`/api/oqc/rekap?${params}`);
       if (res.ok) setData(await res.json());
     } catch {
@@ -39,7 +42,7 @@ export default function OQCRekapPage() {
     } finally {
       setLoading(false);
     }
-  }, [period, value, businessType]);
+  }, [period, value, businessType, effectiveType]);
 
   useEffect(() => {
     fetchData();
@@ -70,8 +73,8 @@ export default function OQCRekapPage() {
               />
             </div>
             <div className="w-full sm:w-36">
-              <Select value={businessType} onValueChange={setBusinessType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <Select value={businessType} onValueChange={setBusinessType} disabled={isLocked}>
+                <SelectTrigger className="h-9" disabled={isLocked}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">{t('common.all')}</SelectItem>
                   <SelectItem value="PTOEM">PTOEM</SelectItem>

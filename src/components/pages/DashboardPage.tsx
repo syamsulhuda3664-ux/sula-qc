@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useI18n } from '@/hooks/useI18n';
+import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,6 +38,7 @@ const PIE_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4
 
 export default function DashboardPage() {
   const { t } = useI18n();
+  const { effectiveType, isLocked } = useBusinessTypeLock();
   const [period, setPeriod] = useState<string>('day');
   const [businessType, setBusinessType] = useState<string>('ALL');
   const [fqcData, setFqcData] = useState<any>(null);
@@ -49,7 +51,8 @@ export default function DashboardPage() {
       setLoading(true);
       try {
         const params = new URLSearchParams({ period, page_size: '500' });
-        if (businessType !== 'ALL') params.set('business_type', businessType);
+        const bt = effectiveType || businessType;
+        if (bt !== 'ALL') params.set('business_type', bt);
 
         const [fqcRes, oqcRes, analysisRes] = await Promise.all([
           fetch(`/api/fqc/inspections?${params}`),
@@ -67,7 +70,7 @@ export default function DashboardPage() {
       }
     };
     fetchData();
-  }, [period, businessType]);
+  }, [period, businessType, effectiveType]);
 
   // Compute stats
   const stats = {
@@ -148,7 +151,7 @@ export default function DashboardPage() {
         <Tabs value={businessType} onValueChange={setBusinessType}>
           <TabsList className="bg-slate-100">
             {BUSINESS_TYPES.map((bt) => (
-              <TabsTrigger key={bt} value={bt} className="text-xs sm:text-sm">
+              <TabsTrigger key={bt} value={bt} className="text-xs sm:text-sm" disabled={isLocked}>
                 {bt === 'ALL' ? t('common.all') : t(`business.${bt.toLowerCase()}`)}
               </TabsTrigger>
             ))}

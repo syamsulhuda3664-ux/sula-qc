@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
+import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ function getWeekDates(weekOffset: number = 0) {
 
 export default function FQCRCAPage() {
   const { t } = useI18n();
+  const { isLocked } = useBusinessTypeLock();
   const { isFullAccess } = useAuth();
   const [records, setRecords] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,8 +132,8 @@ export default function FQCRCAPage() {
             </div>
             <div className="w-full sm:w-40">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('fqc.businessType')}</label>
-              <Select value={businessType} onValueChange={setBusinessType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+              <Select value={businessType} onValueChange={setBusinessType} disabled={isLocked}>
+                <SelectTrigger className="h-9" disabled={isLocked}><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">{t('common.all')}</SelectItem>
                   <SelectItem value="PTOEM">PTOEM</SelectItem>

@@ -3,10 +3,19 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/hooks/useI18n';
+import { useBusinessTypeLock, BUSINESS_TYPES, type BusinessType } from '@/contexts/BusinessTypeContext';
+import { BusinessTypeProvider } from '@/contexts/BusinessTypeContext';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   LayoutDashboard,
   FileSpreadsheet,
@@ -21,6 +30,8 @@ import {
   Menu,
   ChevronLeft,
   Database,
+  Lock,
+  Unlock,
 } from 'lucide-react';
 import DashboardPage from '@/components/pages/DashboardPage';
 import FQCDailyPage from '@/components/pages/FQCDailyPage';
@@ -164,6 +175,36 @@ function SidebarNav({ items, activePage, onItemClick, collapsed, rcaPending, use
   );
 }
 
+function BusinessTypeSelector() {
+  const { lockedType, setLockedType, isLocked } = useBusinessTypeLock();
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={() => setLockedType(isLocked ? '' : (BUSINESS_TYPES[0] as BusinessType))}
+        className={`p-1.5 rounded-md transition-colors ${isLocked ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
+        title={isLocked ? 'Unlock business type' : 'Lock business type'}
+      >
+        {isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+      </button>
+      {isLocked && (
+        <Select value={lockedType} onValueChange={(v) => setLockedType(v as BusinessType)}>
+          <SelectTrigger className="h-7 w-[90px] text-xs font-medium border-blue-300 bg-blue-50 text-blue-700">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BUSINESS_TYPES.map((bt) => (
+              <SelectItem key={bt} value={bt} className="text-xs">
+                {bt.replace('PT', '')}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
 export default function DashboardLayout() {
   const { user, logout, isFullAccess } = useAuth();
   const { t, lang } = useI18n();
@@ -212,6 +253,7 @@ export default function DashboardLayout() {
   };
 
   return (
+    <BusinessTypeProvider>
     <div className="flex h-screen bg-slate-50">
       {/* Desktop sidebar */}
       <aside
@@ -253,6 +295,7 @@ export default function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-3">
+            <BusinessTypeSelector />
             <Badge variant="outline" className="text-xs font-normal">
               {lang === 'zh' ? '中文' : 'EN'}
             </Badge>
@@ -276,5 +319,6 @@ export default function DashboardLayout() {
         </main>
       </div>
     </div>
+    </BusinessTypeProvider>
   );
 }
