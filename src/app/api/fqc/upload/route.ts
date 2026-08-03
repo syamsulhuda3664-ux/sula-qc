@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         file_path: '',
         business_type: parsed.businessType,
         record_count: parsed.records.length,
-        status: 'completed',
+        status: 'pending',
         uploaded_by: auth.user!.id,
       })
       .select('id')
