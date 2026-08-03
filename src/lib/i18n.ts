@@ -31,6 +31,7 @@ const translations: Record<Lang, Translations> = {
     'menu.oqc.rekap': 'OQC 汇总',
     'menu.ipqc': 'IPQC 过程检验',
     'menu.userManagement': '用户管理',
+    'menu.dbManagement': '数据库管理',
     'menu.settings': '系统设置',
 
     // Dashboard
@@ -301,6 +302,7 @@ const translations: Record<Lang, Translations> = {
     'menu.oqc.rekap': 'OQC Rekap',
     'menu.ipqc': 'IPQC Inspection',
     'menu.userManagement': 'User Management',
+    'menu.dbManagement': 'Database Management',
     'menu.settings': 'Settings',
 
     // Dashboard

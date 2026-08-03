@@ -20,6 +20,7 @@ import {
   LogOut,
   Menu,
   ChevronLeft,
+  Database,
 } from 'lucide-react';
 import DashboardPage from '@/components/pages/DashboardPage';
 import FQCDailyPage from '@/components/pages/FQCDailyPage';
@@ -30,6 +31,7 @@ import OQCLotsPage from '@/components/pages/OQCLotsPage';
 import OQCRekapPage from '@/components/pages/OQCRekapPage';
 import IPQCPage from '@/components/pages/IPQCPage';
 import UsersPage from '@/components/pages/UsersPage';
+import DBManagementPage from '@/components/pages/DBManagementPage';
 
 type PageKey =
   | 'dashboard'
@@ -40,7 +42,8 @@ type PageKey =
   | 'oqc-lots'
   | 'oqc-rekap'
   | 'ipqc'
-  | 'users';
+  | 'users'
+  | 'db-management';
 
 interface MenuItem {
   key: PageKey;
@@ -60,6 +63,7 @@ const menuItems: MenuItem[] = [
   { key: 'oqc-rekap', icon: <FileText className="h-5 w-5" />, labelKey: 'menu.oqc.rekap' },
   { key: 'ipqc', icon: <Activity className="h-5 w-5" />, labelKey: 'menu.ipqc' },
   { key: 'users', icon: <Users className="h-5 w-5" />, labelKey: 'menu.userManagement', roles: ['staff_qa'] },
+  { key: 'db-management', icon: <Database className="h-5 w-5" />, labelKey: 'menu.dbManagement', roles: ['staff_qa'] },
 ];
 
 function getPageComponent(key: PageKey, isFullAccess: boolean): ReactNode {
@@ -82,6 +86,8 @@ function getPageComponent(key: PageKey, isFullAccess: boolean): ReactNode {
       return <IPQCPage />;
     case 'users':
       return <UsersPage />;
+    case 'db-management':
+      return <DBManagementPage />;
     default:
       return <DashboardPage />;
   }
