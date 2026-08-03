@@ -17,20 +17,32 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { RefreshCw, Save, Loader2, AlertCircle, Plus } from 'lucide-react';
+import { Save, Loader2, AlertCircle, Plus } from 'lucide-react';
+
+function toLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 function getWeekDates(weekOffset: number = 0) {
   const now = new Date();
-  const day = now.getDay() || 7;
+  // Week = Monday to Saturday (6 days)
+  // If today is Sunday, treat it as part of the previous week (Saturday was yesterday)
+  let dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  if (dayOfWeek === 0) dayOfWeek = 7; // Sunday → 7 (so we go back to the current week's Monday)
+  
   const monday = new Date(now);
-  monday.setDate(now.getDate() - day + 1 + weekOffset * 7);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return {
-    start: monday.toISOString().split('T')[0],
-    end: sunday.toISOString().split('T')[0],
-    label: `${monday.toISOString().split('T')[0]} ~ ${sunday.toISOString().split('T')[0]}`,
-  };
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(now.getDate() - dayOfWeek + 1 + weekOffset * 7);
+  
+  const saturday = new Date(monday);
+  saturday.setDate(monday.getDate() + 5);
+  
+  const start = toLocalDateString(monday);
+  const end = toLocalDateString(saturday);
+  return { start, end, label: `${start} ~ ${end}` };
 }
 
 export default function FQCRCAPage() {
@@ -81,7 +93,7 @@ export default function FQCRCAPage() {
         body: JSON.stringify({ weekStart: selectedWeek.start, weekEnd: selectedWeek.end }),
       });
       if (res.status === 409) {
-        setSaveMsg('RCA already exists for this week');
+        setSaveMsg(t('rca.alreadyExists'));
       } else if (res.ok) {
         setSaveMsg(t('common.success'));
         fetchRecords();
@@ -144,7 +156,7 @@ export default function FQCRCAPage() {
             </div>
             {isFullAccess && !selectedRecord && (
               <Button onClick={handleGenerate} size="sm" className="h-9 bg-slate-900 hover:bg-slate-800">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Generate RCA
+                <Plus className="h-3.5 w-3.5 mr-1" /> {t('rca.generate')}
               </Button>
             )}
           </div>
@@ -192,7 +204,7 @@ export default function FQCRCAPage() {
           {/* Top 3 Categories with Sub-Defects */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">{t('rca.topCategories')} (Top 3)</CardTitle>
+              <CardTitle className="text-base font-semibold">{t('rca.topCategories')} {t('rca.top3')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {topCategories.slice(0, 3).map((cat: any, ci: number) => (
@@ -200,14 +212,14 @@ export default function FQCRCAPage() {
                   <div className="flex items-center gap-2 mb-3">
                     <Badge variant="outline" className="bg-slate-100 font-semibold">#{ci + 1}</Badge>
                     <span className="font-medium text-sm">{cat.category || t(`defect.${cat.key?.replace('defect_', '') || 'other'}`)}</span>
-                    <span className="ml-auto text-sm font-bold text-red-600">{cat.count || cat.defectCount} defects</span>
+                    <span className="ml-auto text-sm font-bold text-red-600">{cat.count || cat.defectCount} {t('rca.defects')}</span>
                   </div>
                   <Table>
                     <TableHeader className="bg-slate-50">
                       <TableRow>
                         <TableHead className="text-xs">#</TableHead>
-                        <TableHead className="text-xs">Sub-Defect</TableHead>
-                        <TableHead className="text-xs text-right">Count</TableHead>
+                        <TableHead className="text-xs">{t('rca.subDefectCol')}</TableHead>
+                        <TableHead className="text-xs text-right">{t('common.count')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -235,7 +247,7 @@ export default function FQCRCAPage() {
           {isFullAccess && (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Action Items</CardTitle>
+                <CardTitle className="text-base font-semibold">{t('rca.actionItems')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -243,13 +255,13 @@ export default function FQCRCAPage() {
                     <TableHeader className="bg-slate-50">
                       <TableRow>
                         <TableHead className="text-xs">{t('fqc.style')}</TableHead>
-                        <TableHead className="text-xs">Root Cause</TableHead>
-                        <TableHead className="text-xs">Impact</TableHead>
-                        <TableHead className="text-xs">Process</TableHead>
-                        <TableHead className="text-xs">Corrective Action</TableHead>
-                        <TableHead className="text-xs">Photo</TableHead>
-                        <TableHead className="text-xs">Preventive Action</TableHead>
-                        <TableHead className="text-xs">Deadline</TableHead>
+                        <TableHead className="text-xs">{t('rca.rootCause')}</TableHead>
+                        <TableHead className="text-xs">{t('rca.impact')}</TableHead>
+                        <TableHead className="text-xs">{t('rca.process')}</TableHead>
+                        <TableHead className="text-xs">{t('rca.correctiveAction')}</TableHead>
+                        <TableHead className="text-xs">{t('rca.photo')}</TableHead>
+                        <TableHead className="text-xs">{t('rca.preventiveAction')}</TableHead>
+                        <TableHead className="text-xs">{t('rca.deadline')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -268,7 +280,7 @@ export default function FQCRCAPage() {
                           ))
                         : (
                           <TableRow>
-                            <TableCell colSpan={8} className="text-center py-6 text-sm text-slate-400">No action items</TableCell>
+                            <TableCell colSpan={8} className="text-center py-6 text-sm text-slate-400">{t('rca.noActionItems')}</TableCell>
                           </TableRow>
                         )}
                     </TableBody>
@@ -289,7 +301,7 @@ export default function FQCRCAPage() {
           <CardContent className="flex flex-col items-center justify-center py-16">
             <p className="text-slate-400 text-sm">{t('common.noData')}</p>
             {isFullAccess && (
-              <p className="text-slate-400 text-xs mt-1">Click &quot;Generate RCA&quot; to create analysis for this week</p>
+              <p className="text-slate-400 text-xs mt-1">{t('rca.clickToGenerate')}</p>
             )}
           </CardContent>
         </Card>

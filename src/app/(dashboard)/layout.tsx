@@ -168,7 +168,7 @@ function SidebarNav({ items, activePage, onItemClick, collapsed, rcaPending, use
           className="w-full justify-start text-slate-400 hover:text-white hover:bg-white/10"
         >
           <LogOut className="h-4 w-4 mr-2" />
-          {!collapsed && 'Logout'}
+          {!collapsed && t('common.logout')}
         </Button>
       </div>
     </div>
@@ -183,7 +183,7 @@ function BusinessTypeSelector() {
       <button
         onClick={() => setLockedType(isLocked ? '' : (BUSINESS_TYPES[0] as BusinessType))}
         className={`p-1.5 rounded-md transition-colors ${isLocked ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}
-        title={isLocked ? 'Unlock business type' : 'Lock business type'}
+        title={isLocked ? t('layout.unlockBt') : t('layout.lockBt')}
       >
         {isLocked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
       </button>
@@ -283,7 +283,7 @@ export default function DashboardLayout() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-64 p-0">
-                <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                <SheetTitle className="sr-only">{t('common.navMenu')}</SheetTitle>
                 <SidebarNav {...sidebarProps} collapsed={false} />
               </SheetContent>
             </Sheet>

@@ -105,7 +105,7 @@ export default function FQCAnalysisPage() {
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead className="text-xs w-10">#</TableHead>
-                  <TableHead className="text-xs">{t('fqc.defectAnalysis')}</TableHead>
+                  <TableHead className="text-xs">{t('analysis.category')}</TableHead>
                   <TableHead className="text-xs text-right">{t('rca.defectCount')}</TableHead>
                   <TableHead className="text-xs text-right">{t('rca.percentage')}</TableHead>
                   <TableHead className="text-xs text-right">PPM</TableHead>
@@ -149,7 +149,7 @@ export default function FQCAnalysisPage() {
       {/* Section B: Top 20 Sub-Defects */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">B. {t('rca.subDefects')} (Top 20)</CardTitle>
+          <CardTitle className="text-base font-semibold">B. {t('rca.subDefects')} {t('analysis.top20')}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -157,8 +157,8 @@ export default function FQCAnalysisPage() {
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead className="text-xs w-10">#</TableHead>
-                  <TableHead className="text-xs">{t('fqc.defectAnalysis')}</TableHead>
-                  <TableHead className="text-xs">Category</TableHead>
+                  <TableHead className="text-xs">{t('rca.subDefectCol')}</TableHead>
+                  <TableHead className="text-xs">{t('analysis.category')}</TableHead>
                   <TableHead className="text-xs text-right">{t('rca.defectCount')}</TableHead>
                   <TableHead className="text-xs text-right">{t('rca.percentage')}</TableHead>
                 </TableRow>
@@ -190,7 +190,7 @@ export default function FQCAnalysisPage() {
       {/* Section C: Top 15 Styles */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">C. {t('rca.topStyles')} (Top 15)</CardTitle>
+          <CardTitle className="text-base font-semibold">C. {t('rca.topStyles')} {t('analysis.top15')}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">

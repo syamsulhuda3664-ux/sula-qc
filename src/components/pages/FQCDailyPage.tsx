@@ -122,7 +122,7 @@ export default function FQCDailyPage() {
             </div>
             <div className="w-full sm:w-36">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('fqc.line')}</label>
-              <Input value={line} onChange={(e) => { setLine(e.target.value); setPage(1); }} placeholder="Line" className="h-9" />
+              <Input value={line} onChange={(e) => { setLine(e.target.value); setPage(1); }} placeholder={t('fqc.line')} className="h-9" />
             </div>
             <Button variant="outline" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); setBusinessType('ALL'); setLine(''); setPage(1); }} className="h-9">
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('action.reset')}

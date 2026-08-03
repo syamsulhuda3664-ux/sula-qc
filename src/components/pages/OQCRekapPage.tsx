@@ -129,7 +129,7 @@ export default function OQCRekapPage() {
               <TableHeader className="bg-slate-50">
                 <TableRow>
                   <TableHead className="text-xs">{t('common.date')}</TableHead>
-                  <TableHead className="text-xs text-right">Lots</TableHead>
+                  <TableHead className="text-xs text-right">{t('common.lots')}</TableHead>
                   <TableHead className="text-xs text-right">{t('oqc.lotSize')}</TableHead>
                   <TableHead className="text-xs text-right">{t('oqc.sampleSize')}</TableHead>
                   <TableHead className="text-xs text-right">{t('oqc.totalDefects')}</TableHead>

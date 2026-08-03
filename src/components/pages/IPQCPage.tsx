@@ -99,7 +99,7 @@ export default function IPQCPage() {
             </div>
             <div className="w-full sm:w-32">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('fqc.line')}</label>
-              <Input value={line} onChange={(e) => { setLine(e.target.value); setPage(1); }} placeholder="Line" className="h-9" />
+              <Input value={line} onChange={(e) => { setLine(e.target.value); setPage(1); }} placeholder={t('fqc.line')} className="h-9" />
             </div>
             <div className="w-full sm:w-36">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('ipqc.stage')}</label>
@@ -153,11 +153,11 @@ export default function IPQCPage() {
                   <TableHead className="text-xs">{t('fqc.style')}</TableHead>
                   <TableHead className="text-xs">{t('fqc.orderNo')}</TableHead>
                   <TableHead className="text-xs">{t('ipqc.stage')}</TableHead>
-                  <TableHead className="text-xs text-right">Check</TableHead>
-                  <TableHead className="text-xs text-right">OK</TableHead>
-                  <TableHead className="text-xs text-right">NG</TableHead>
+                  <TableHead className="text-xs text-right">{t('ipqc.checked')}</TableHead>
+                  <TableHead className="text-xs text-right">{t('ipqc.pass')}</TableHead>
+                  <TableHead className="text-xs text-right">{t('ipqc.ng')}</TableHead>
                   <TableHead className="text-xs text-right">{t('oqc.passRate')}</TableHead>
-                  <TableHead className="text-xs">Defects</TableHead>
+                  <TableHead className="text-xs">{t('ipqc.defects')}</TableHead>
                   <TableHead className="text-xs">{t('fqc.remark')}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -177,7 +177,7 @@ export default function IPQCPage() {
                       <TableCell className="text-xs">{r.order_no}</TableCell>
                       <TableCell className="text-xs">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${stageColors[r.stage] || ''}`}>
-                          {stageIcons[r.stage]} {r.stage}
+                          {stageIcons[r.stage]} {t(`ipqc.stage.${r.stage.toLowerCase()}`)}
                         </span>
                       </TableCell>
                       <TableCell className="text-xs text-right">{r.checked_qty}</TableCell>

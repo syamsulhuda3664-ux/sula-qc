@@ -232,7 +232,7 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="date" fontSize={12} tickLine={false} />
                 <YAxis domain={[85, 100]} fontSize={12} tickLine={false} />
-                <Tooltip formatter={(value: number) => [`${value}%`, 'Pass Rate']} />
+                <Tooltip formatter={(value: number) => [`${value}%`, t('common.passRate')]} />
                 <Line type="monotone" dataKey="rate" stroke="#059669" strokeWidth={2} dot={{ fill: '#059669', r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
