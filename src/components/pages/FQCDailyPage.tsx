@@ -27,12 +27,12 @@ import { Download, Search, RefreshCw } from 'lucide-react';
 const DEFECT_COLS = [
   'defect_stitching', 'defect_logo', 'defect_material', 'defect_hardware',
   'defect_appearance', 'defect_zipper', 'defect_webbing', 'defect_other',
-  'defect_preparation', 'defect_stitch_defect',
+  'defect_preparation',
 ];
 
 const DEFECT_KEYS = [
   'stitching', 'logo', 'material', 'hardware', 'appearance',
-  'zipper', 'webbing', 'other', 'preparation', 'stitchDefect',
+  'zipper', 'webbing', 'other', 'preparation',
 ];
 
 export default function FQCDailyPage() {
@@ -161,7 +161,7 @@ export default function FQCDailyPage() {
                 {loading ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
-                      {Array.from({ length: 16 }).map((_, j) => (
+                      {Array.from({ length: 15 }).map((_, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-12" /></TableCell>
                       ))}
                     </TableRow>
@@ -209,7 +209,7 @@ export default function FQCDailyPage() {
                   </>
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-12 text-sm text-slate-400">{t('common.noData')}</TableCell>
+                    <TableCell colSpan={15} className="text-center py-12 text-sm text-slate-400">{t('common.noData')}</TableCell>
                   </TableRow>
                 )}
               </TableBody>

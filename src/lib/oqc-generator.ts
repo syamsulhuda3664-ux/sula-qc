@@ -174,13 +174,6 @@ const FQC_TO_OQC_MAPPING: {
       { category: 'Packaging', weight: 0.2 },
     ],
   },
-  {
-    fqcCategory: 'stitchDefect',
-    oqcCategories: [
-      { category: 'Stitching', weight: 0.8 },
-      { category: 'Appearance', weight: 0.2 },
-    ],
-  },
 ];
 
 /**
@@ -303,11 +296,11 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
     webbing: 0,
     other: 0,
     preparation: 0,
-    stitchDefect: 0,
   };
 
   fqcRecords.forEach((r: any) => {
-    fqcDefectProfile.stitching += r.defect_stitching || 0;
+    // Merge defect_stitch_defect into stitching
+    fqcDefectProfile.stitching += (r.defect_stitching || 0) + (r.defect_stitch_defect || 0);
     fqcDefectProfile.logo += r.defect_logo || 0;
     fqcDefectProfile.material += r.defect_material || 0;
     fqcDefectProfile.hardware += r.defect_hardware || 0;
@@ -316,7 +309,6 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
     fqcDefectProfile.webbing += r.defect_webbing || 0;
     fqcDefectProfile.other += r.defect_other || 0;
     fqcDefectProfile.preparation += r.defect_preparation || 0;
-    fqcDefectProfile.stitchDefect += r.defect_stitch_defect || 0;
   });
 
   const totalFQCDefects = Object.values(fqcDefectProfile).reduce((a, b) => a + b, 0);

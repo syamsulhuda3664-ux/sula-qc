@@ -48,7 +48,6 @@ const DEFECT_CATEGORIES: { key: string; name: string }[] = [
   { key: 'defect_webbing', name: 'Webbing' },
   { key: 'defect_other', name: 'Other' },
   { key: 'defect_preparation', name: 'Preparation' },
-  { key: 'defect_stitch_defect', name: 'Stitch Defect' },
 ];
 
 /**
@@ -144,7 +143,8 @@ function getSubDefectCategory(index: number): { category: string; categoryKey: s
   if (index < 38) return { category: 'Webbing', categoryKey: 'defect_webbing' };
   if (index < 44) return { category: 'Other', categoryKey: 'defect_other' };
   if (index < 63) return { category: 'Preparation', categoryKey: 'defect_preparation' };
-  return { category: 'Stitch Defect', categoryKey: 'defect_stitch_defect' };
+  // Index 63 (sub_triangle_reversed): merged into Stitching
+  return { category: 'Stitching', categoryKey: 'defect_stitching' };
 }
 
 /**
@@ -209,9 +209,13 @@ export function generateWeeklyRCA(
     totalOK += okQty;
     totalNG += ngQty;
 
-    // Sum category defects
+    // Sum category defects (merge defect_stitch_defect into defect_stitching)
     DEFECT_CATEGORIES.forEach((cat) => {
-      const val = Number(record[cat.key]) || 0;
+      let val = Number(record[cat.key]) || 0;
+      // Merge stitch_defect into stitching for display
+      if (cat.key === 'defect_stitching') {
+        val += Number(record.defect_stitch_defect) || 0;
+      }
       categoryDefects[cat.key] += val;
       totalDefects += val;
     });

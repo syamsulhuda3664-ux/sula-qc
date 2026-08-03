@@ -150,7 +150,6 @@ const translations: Record<Lang, Translations> = {
     'defect.webbing': '织带问题',
     'defect.other': '其它问题',
     'defect.preparation': '备料问题',
-    'defect.stitchDefect': '针车不良',
 
     // OQC defect categories
     'defect.packaging': '包装问题',
@@ -421,7 +420,6 @@ const translations: Record<Lang, Translations> = {
     'defect.webbing': 'Webbing',
     'defect.other': 'Other',
     'defect.preparation': 'Preparation',
-    'defect.stitchDefect': 'Stitch Defect',
 
     // OQC defect categories
     'defect.packaging': 'Packaging',

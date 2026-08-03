@@ -82,7 +82,7 @@ export const SUBDEFECT_DB_COLUMNS: string[] = [
   'sub_elastic_tilted',          // 60 - BT
   'sub_logo_text_detached',      // 61 - BU
   'sub_logo_scratched',          // 62 - BV
-  // Stitch Defect (针车不良): BW = index 63 (1 col)
+  // Merged into Stitching for display (针车不良 → 针车问题)
   'sub_triangle_reversed',       // 63 - BW
 ];
 

@@ -96,10 +96,6 @@ const FQC_TO_IPQC_STAGE: Record<string, { stage: IPQCStage; category: string; we
     { stage: 'Cutting', category: 'Preparation', weight: 0.7 },
     { stage: 'Assembly', category: 'Accessory', weight: 0.3 },
   ],
-  stitchDefect: [
-    { stage: 'Sewing', category: 'Stitching', weight: 0.8 },
-    { stage: 'Assembly', category: 'Stitching', weight: 0.2 },
-  ],
 };
 
 /**
@@ -136,7 +132,8 @@ export function generateIPQCRecords(fqcRecords: any[]): IPQCRecord[] {
 
     // Determine which stages to generate for based on FQC defect profile
     const fqcDefectProfile: Record<string, number> = {
-      stitching: fqc.defect_stitching || 0,
+      // Merge defect_stitch_defect into stitching
+      stitching: (fqc.defect_stitching || 0) + (fqc.defect_stitch_defect || 0),
       logo: fqc.defect_logo || 0,
       material: fqc.defect_material || 0,
       hardware: fqc.defect_hardware || 0,
@@ -145,7 +142,6 @@ export function generateIPQCRecords(fqcRecords: any[]): IPQCRecord[] {
       webbing: fqc.defect_webbing || 0,
       other: fqc.defect_other || 0,
       preparation: fqc.defect_preparation || 0,
-      stitchDefect: fqc.defect_stitch_defect || 0,
     };
 
     const totalFQCDefects = Object.values(fqcDefectProfile).reduce((a, b) => a + b, 0);

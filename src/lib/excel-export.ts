@@ -213,12 +213,11 @@ const FQC_DAILY_HEADERS = [
   '织带问题 / Webbing',
   '其它问题 / Other',
   '备料问题 / Preparation',
-  '针车不良 / Stitch Defect',
 ];
 
 const FQC_DAILY_WIDTHS = [
   6, 14, 12, 14, 16, 20, 14, 14, 12, 10, 12,
-  14, 12, 14, 12, 14, 12, 12, 12, 14, 14,
+  14, 12, 14, 12, 14, 12, 12, 12, 14,
 ];
 
 export function exportFQCDailyExcel(
@@ -279,7 +278,6 @@ export function exportFQCDailyExcel(
     defect_stitching: 0, defect_logo: 0, defect_material: 0,
     defect_hardware: 0, defect_appearance: 0, defect_zipper: 0,
     defect_webbing: 0, defect_other: 0, defect_preparation: 0,
-    defect_stitch_defect: 0,
   };
   let rowNum = 1;
 
@@ -292,7 +290,6 @@ export function exportFQCDailyExcel(
       defect_stitching: 0, defect_logo: 0, defect_material: 0,
       defect_hardware: 0, defect_appearance: 0, defect_zipper: 0,
       defect_webbing: 0, defect_other: 0, defect_preparation: 0,
-      defect_stitch_defect: 0,
     };
 
     for (const rec of group) {
@@ -308,7 +305,11 @@ export function exportFQCDailyExcel(
       dayNG += ngQty;
 
       for (const key of Object.keys(dayDefects)) {
-        dayDefects[key] += Number(rec[key]) || 0;
+        let val = Number(rec[key]) || 0;
+        if (key === 'defect_stitching') {
+          val += Number(rec.defect_stitch_defect) || 0;
+        }
+        dayDefects[key] += val;
       }
 
       // Defect rate display: if stored as 0-1 fraction show as %, else as-is
@@ -331,7 +332,7 @@ export function exportFQCDailyExcel(
         okQty,
         ngQty,
         rateDisplay,
-        Number(rec.defect_stitching) || 0,
+        (Number(rec.defect_stitching) || 0) + (Number(rec.defect_stitch_defect) || 0),
         Number(rec.defect_logo) || 0,
         Number(rec.defect_material) || 0,
         Number(rec.defect_hardware) || 0,
@@ -340,7 +341,6 @@ export function exportFQCDailyExcel(
         Number(rec.defect_webbing) || 0,
         Number(rec.defect_other) || 0,
         Number(rec.defect_preparation) || 0,
-        Number(rec.defect_stitch_defect) || 0,
       ];
       writeRow(ws, row, 0, vals, DATA_STYLE);
       row++;
@@ -477,7 +477,7 @@ export function exportFQCAnalysisExcel(
     { key: 'defect_webbing', name: '织带问题 / Webbing' },
     { key: 'defect_other', name: '其它问题 / Other' },
     { key: 'defect_preparation', name: '备料问题 / Preparation' },
-    { key: 'defect_stitch_defect', name: '针车不良 / Stitch Defect' },
+    // defect_stitch_defect merged into defect_stitching
   ];
 
   const catTotals: Record<string, number> = {};
@@ -486,7 +486,12 @@ export function exportFQCAnalysisExcel(
 
   for (const r of data) {
     for (const cat of CAT_KEYS) {
-      catTotals[cat.key] += Number(r[cat.key]) || 0;
+      let val = Number(r[cat.key]) || 0;
+      // Merge defect_stitch_defect into defect_stitching
+      if (cat.key === 'defect_stitching') {
+        val += Number(r.defect_stitch_defect) || 0;
+      }
+      catTotals[cat.key] += val;
     }
     totalInspected += Number(r.inspected_qty) || 0;
   }
@@ -608,8 +613,8 @@ export function exportFQCAnalysisExcel(
     { name: '物料色差 Material color diff', category: '备料问题 / Preparation' },
     { name: '备料延迟 Prep delayed', category: '备料问题 / Preparation' },
     { name: '余料管理 Scrap issue', category: '备料问题 / Preparation' },
-    // Stitch Defect (1)
-    { name: '车缝不良 Sewing defect', category: '针车不良 / Stitch Defect' },
+    // Merged from Stitch Defect into Stitching
+    { name: '车缝不良 Sewing defect', category: '针车问题 / Stitching' },
   ];
 
   for (const r of data) {
@@ -670,7 +675,7 @@ export function exportFQCAnalysisExcel(
     const style = String(r.style_code || 'Unknown');
     if (!styleAgg[style]) styleAgg[style] = { defects: 0, inspected: 0 };
     // Compute from category columns (DB has no total_defects)
-    const rowDef = (Number(r.defect_stitching) || 0) + (Number(r.defect_logo) || 0) + (Number(r.defect_material) || 0) + (Number(r.defect_hardware) || 0) + (Number(r.defect_appearance) || 0) + (Number(r.defect_zipper) || 0) + (Number(r.defect_webbing) || 0) + (Number(r.defect_other) || 0) + (Number(r.defect_preparation) || 0) + (Number(r.defect_stitch_defect) || 0);
+    const rowDef = ((Number(r.defect_stitching) || 0) + (Number(r.defect_stitch_defect) || 0)) + (Number(r.defect_logo) || 0) + (Number(r.defect_material) || 0) + (Number(r.defect_hardware) || 0) + (Number(r.defect_appearance) || 0) + (Number(r.defect_zipper) || 0) + (Number(r.defect_webbing) || 0) + (Number(r.defect_other) || 0) + (Number(r.defect_preparation) || 0);
     styleAgg[style].defects += rowDef;
     styleAgg[style].inspected += Number(r.inspected_qty) || 0;
   }

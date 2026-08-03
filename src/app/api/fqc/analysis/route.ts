@@ -14,7 +14,6 @@ const DEFECT_CATEGORIES = [
   { key: 'defect_webbing', name: 'Webbing' },
   { key: 'defect_other', name: 'Other' },
   { key: 'defect_preparation', name: 'Preparation' },
-  { key: 'defect_stitch_defect', name: 'Stitch Defect' },
 ];
 
 export async function GET(request: NextRequest) {
@@ -54,7 +53,11 @@ export async function GET(request: NextRequest) {
 
     for (const r of allRecords) {
       for (const cat of DEFECT_CATEGORIES) {
-        const val = Number(r[cat.key]) || 0;
+        let val = Number(r[cat.key]) || 0;
+        // Merge defect_stitch_defect into defect_stitching
+        if (cat.key === 'defect_stitching') {
+          val += Number(r.defect_stitch_defect) || 0;
+        }
         categoryTotals[cat.key] += val;
         grandTotalDefects += val;
       }
@@ -98,7 +101,7 @@ export async function GET(request: NextRequest) {
         styleAgg[style] = { defects: 0, inspected: 0, inspections: 0 };
       }
       // Compute total defects from category columns (DB has no total_defects column)
-      const rowDefects = (Number(r.defect_stitching) || 0)
+      const rowDefects = ((Number(r.defect_stitching) || 0) + (Number(r.defect_stitch_defect) || 0))
         + (Number(r.defect_logo) || 0)
         + (Number(r.defect_material) || 0)
         + (Number(r.defect_hardware) || 0)
@@ -106,8 +109,7 @@ export async function GET(request: NextRequest) {
         + (Number(r.defect_zipper) || 0)
         + (Number(r.defect_webbing) || 0)
         + (Number(r.defect_other) || 0)
-        + (Number(r.defect_preparation) || 0)
-        + (Number(r.defect_stitch_defect) || 0);
+        + (Number(r.defect_preparation) || 0);
       styleAgg[style].defects += rowDefects;
       styleAgg[style].inspected += Number(r.inspected_qty) || 0;
       styleAgg[style].inspections += 1;

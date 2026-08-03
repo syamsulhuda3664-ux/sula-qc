@@ -171,7 +171,6 @@ export async function GET(request: NextRequest) {
       defect_webbing: 0,
       defect_other: 0,
       defect_preparation: 0,
-      defect_stitch_defect: 0,
     };
 
     for (const r of allRecords) {
@@ -180,7 +179,8 @@ export async function GET(request: NextRequest) {
       subtotals.total_ok_qty += Number(r.ok_qty) || 0;
       subtotals.total_ng_qty += Number(r.ng_qty) || 0;
       // Compute total_defects from category columns (DB has no total_defects column)
-      const rowTotal = (Number(r.defect_stitching) || 0)
+      // Merge defect_stitch_defect into defect_stitching
+      const rowTotal = ((Number(r.defect_stitching) || 0) + (Number(r.defect_stitch_defect) || 0))
         + (Number(r.defect_logo) || 0)
         + (Number(r.defect_material) || 0)
         + (Number(r.defect_hardware) || 0)
@@ -188,10 +188,11 @@ export async function GET(request: NextRequest) {
         + (Number(r.defect_zipper) || 0)
         + (Number(r.defect_webbing) || 0)
         + (Number(r.defect_other) || 0)
-        + (Number(r.defect_preparation) || 0)
-        + (Number(r.defect_stitch_defect) || 0);
+        + (Number(r.defect_preparation) || 0);
       subtotals.total_defects += rowTotal;
       r.total_defects = rowTotal; // attach for frontend use
+      // Merge defect_stitch_defect into defect_stitching for per-row display
+      r.defect_stitching = (Number(r.defect_stitching) || 0) + (Number(r.defect_stitch_defect) || 0);
       subtotals.defect_stitching += Number(r.defect_stitching) || 0;
       subtotals.defect_logo += Number(r.defect_logo) || 0;
       subtotals.defect_material += Number(r.defect_material) || 0;
@@ -201,7 +202,6 @@ export async function GET(request: NextRequest) {
       subtotals.defect_webbing += Number(r.defect_webbing) || 0;
       subtotals.defect_other += Number(r.defect_other) || 0;
       subtotals.defect_preparation += Number(r.defect_preparation) || 0;
-      subtotals.defect_stitch_defect += Number(r.defect_stitch_defect) || 0;
     }
 
     subtotals.avg_defect_rate =
