@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminClient } from '@/lib/supabase';
+import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 
 function getDateRange(period: string, refDate?: string) {

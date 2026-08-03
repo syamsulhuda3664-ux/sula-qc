@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { adminClient } from '@/lib/supabase';
+import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest, getRoleLanguage, mapDbUser } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {

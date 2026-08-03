@@ -150,32 +150,39 @@ export async function authenticateRequest(
 
   // Verify user is still active in DB
   let dbUser: Record<string, unknown> | null = null;
+  let clientError = '';
   try {
-    const { data } = await adminClient
+    const { data, error } = await adminClient
       .from('users')
       .select('id, is_active, active')
       .eq('id', user.id)
       .single();
+    if (error) clientError = `client: ${error.message}`;
     if (data) dbUser = data as Record<string, unknown>;
-  } catch {
-    // client failed
+  } catch (e) {
+    clientError = `client_throw: ${String(e)}`;
   }
 
   if (!dbUser) {
     // Fallback to direct REST
-    const { sbFetch } = await import('./supabase-admin');
-    const result = await sbFetch('users', {
-      select: 'id, is_active, active',
-      eq: ['id', user.id],
-      single: true,
-    });
-    if (result.data) dbUser = result.data as Record<string, unknown>;
+    try {
+      const { sbFetch } = await import('./supabase-admin');
+      const result = await sbFetch('users', {
+        select: 'id, is_active, active',
+        eq: ['id', user.id],
+        single: true,
+      });
+      if (result.data) dbUser = result.data as Record<string, unknown>;
+      else clientError += ` | rest: ${result.error}`;
+    } catch (e) {
+      clientError += ` | rest_throw: ${String(e)}`;
+    }
   }
 
   if (!dbUser) {
     return {
       user: null,
-      error: new Response(JSON.stringify({ error: 'User account is inactive' }), {
+      error: new Response(JSON.stringify({ error: `DB lookup failed for auth check: ${clientError}` }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       }),
