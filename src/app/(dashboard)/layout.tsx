@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useState, useEffect, type ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/hooks/useI18n';
@@ -23,15 +21,15 @@ import {
   Menu,
   ChevronLeft,
 } from 'lucide-react';
-import DashboardPage from './dashboard/page';
-import FQCDailyPage from './fqc/daily/page';
-import FQCAnalysisPage from './fqc/analysis/page';
-import FQCRCAPage from './fqc/rca/page';
-import FQCUploadPage from './fqc/upload/page';
-import OQCLotsPage from './oqc/lots/page';
-import OQCRekapPage from './oqc/rekap/page';
-import IPQCPage from './ipqc/page';
-import UsersPage from './users/page';
+import DashboardPage from '@/components/pages/DashboardPage';
+import FQCDailyPage from '@/components/pages/FQCDailyPage';
+import FQCAnalysisPage from '@/components/pages/FQCAnalysisPage';
+import FQCRCAPage from '@/components/pages/FQCRCAPage';
+import FQCUploadPage from '@/components/pages/FQCUploadPage';
+import OQCLotsPage from '@/components/pages/OQCLotsPage';
+import OQCRekapPage from '@/components/pages/OQCRekapPage';
+import IPQCPage from '@/components/pages/IPQCPage';
+import UsersPage from '@/components/pages/UsersPage';
 
 type PageKey =
   | 'dashboard'
