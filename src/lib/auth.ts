@@ -154,7 +154,7 @@ export async function authenticateRequest(
   try {
     const { data, error } = await adminClient
       .from('users')
-      .select('id, is_active, active')
+      .select('id, active')
       .eq('id', user.id)
       .single();
     if (error) clientError = `client: ${error.message}`;
@@ -168,7 +168,7 @@ export async function authenticateRequest(
     try {
       const { sbFetch } = await import('./supabase-admin');
       const result = await sbFetch('users', {
-        select: 'id, is_active, active',
+        select: 'id, active',
         eq: ['id', user.id],
         single: true,
       });
@@ -189,7 +189,7 @@ export async function authenticateRequest(
     };
   }
 
-  const isActive = dbUser.is_active !== undefined ? (dbUser.is_active as boolean) : (dbUser.active as boolean);
+  const isActive = dbUser.active !== undefined ? (dbUser.active as boolean) : (dbUser.is_active as boolean);
   if (!isActive) {
     return {
       user: null,

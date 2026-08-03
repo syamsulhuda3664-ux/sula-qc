@@ -33,7 +33,12 @@ export async function sbFetch(
   const params = new URLSearchParams();
 
   if (options.select) params.set('select', options.select);
-  if (options.eq) params.set(options.eq[0], String(options.eq[1]));
+  if (options.eq) {
+    // Supabase REST uses special filter syntax: column=eq.value
+    const col = options.eq[0];
+    const val = String(options.eq[1]);
+    params.set(col, `eq.${val}`);
+  }
   if (options.single) params.set('single', 'true');
   if (options.order) {
     params.set('order', `${options.order[0]}.${options.order[1].ascending ? 'asc' : 'desc'}`);
