@@ -85,6 +85,19 @@ export function sortProductionLines<T extends Record<string, any>>(
 }
 
 /**
+ * Shorten production line name for compact display.
+ * "车缝三组 (Sewing Line 3A)" → "3A"
+ * "Sewing Line 8B"            → "8B"
+ * "车缝一组"                   → "1"
+ */
+export function shortenLineName(line: string): string {
+  if (!line) return '-';
+  const key = extractLineSortKey(line);
+  // Strip leading zero: "03A" → "3A", "01" → "1"
+  return key.replace(/^0+(?!$)/, '');
+}
+
+/**
  * Get a unique sorted list of production lines from records.
  */
 export function getSortedUniqueLines<T extends Record<string, any>>(

@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Download, Search, RefreshCw, Loader2 } from 'lucide-react';
+import { shortenLineName } from '@/lib/utils';
 
 const DEFECT_COLS = [
   'defect_stitching', 'defect_logo', 'defect_material', 'defect_hardware',
@@ -164,22 +165,22 @@ export default function FQCDailyPage() {
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <Table>
+            <Table className="table-fixed w-full">
               <TableHeader className="sticky top-0 z-10 bg-slate-50">
                 <TableRow>
-                  <TableHead className="text-xs w-10">No</TableHead>
-                  <TableHead className="text-xs">{t('common.date')}</TableHead>
-                  <TableHead className="text-xs">{t('fqc.line')}</TableHead>
-                  <TableHead className="text-xs">{t('fqc.inspector')}</TableHead>
-                  <TableHead className="text-xs">{t('fqc.style')}</TableHead>
-                  <TableHead className="text-xs">{t('fqc.orderNo')}</TableHead>
-                  <TableHead className="text-xs text-right">{t('fqc.orderQty')}</TableHead>
-                  <TableHead className="text-xs text-right">{t('fqc.inspectedQty')}</TableHead>
-                  <TableHead className="text-xs text-right">{t('fqc.okQty')}</TableHead>
-                  <TableHead className="text-xs text-right">{t('fqc.ngQty')}</TableHead>
-                  <TableHead className="text-xs text-right">{t('fqc.defectRate')}</TableHead>
+                  <TableHead className="text-xs w-9 whitespace-normal leading-tight text-center p-1.5">No</TableHead>
+                  <TableHead className="text-xs w-[72px] whitespace-normal leading-tight p-1.5">{t('common.date')}</TableHead>
+                  <TableHead className="text-xs w-11 whitespace-normal leading-tight text-center p-1.5">{t('fqc.line')}</TableHead>
+                  <TableHead className="text-xs w-14 whitespace-normal leading-tight p-1.5">{t('fqc.inspector')}</TableHead>
+                  <TableHead className="text-xs w-[76px] whitespace-normal leading-tight p-1.5">{t('fqc.style')}</TableHead>
+                  <TableHead className="text-xs w-[72px] whitespace-normal leading-tight p-1.5">{t('fqc.orderNo')}</TableHead>
+                  <TableHead className="text-xs w-[52px] whitespace-normal leading-tight text-right p-1.5">{t('fqc.orderQty')}</TableHead>
+                  <TableHead className="text-xs w-[52px] whitespace-normal leading-tight text-right p-1.5">{t('fqc.inspectedQty')}</TableHead>
+                  <TableHead className="text-xs w-10 whitespace-normal leading-tight text-right p-1.5">{t('fqc.okQty')}</TableHead>
+                  <TableHead className="text-xs w-10 whitespace-normal leading-tight text-right p-1.5">{t('fqc.ngQty')}</TableHead>
+                  <TableHead className="text-xs w-[52px] whitespace-normal leading-tight text-right p-1.5">{t('fqc.defectRate')}</TableHead>
                   {DEFECT_KEYS.map((key) => (
-                    <TableHead key={key} className="text-xs text-right min-w-[60px]">{t(`defect.${key}`)}</TableHead>
+                    <TableHead key={key} className="text-xs w-11 whitespace-normal leading-tight text-right p-1.5">{t(`defect.${key}`)}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
@@ -196,23 +197,23 @@ export default function FQCDailyPage() {
                   <>
                     {records.map((r: any, i: number) => (
                       <TableRow key={i} className="hover:bg-slate-50">
-                        <TableCell className="text-xs text-slate-500">{(page - 1) * 100 + i + 1}</TableCell>
-                        <TableCell className="text-xs">{r.inspection_date?.split('T')[0]}</TableCell>
-                        <TableCell className="text-xs">{r.line}</TableCell>
-                        <TableCell className="text-xs">{r.inspector}</TableCell>
-                        <TableCell className="text-xs font-medium">{r.style}</TableCell>
-                        <TableCell className="text-xs">{r.order_no}</TableCell>
-                        <TableCell className="text-xs text-right">{r.order_qty}</TableCell>
-                        <TableCell className="text-xs text-right">{r.inspected_qty}</TableCell>
-                        <TableCell className="text-xs text-right text-emerald-600">{r.ok_qty}</TableCell>
-                        <TableCell className="text-xs text-right text-red-600">{r.ng_qty}</TableCell>
-                        <TableCell className="text-xs text-right font-medium">
+                        <TableCell className="text-xs text-slate-500 text-center p-1.5">{(page - 1) * 100 + i + 1}</TableCell>
+                        <TableCell className="text-xs p-1.5">{r.inspection_date?.split('T')[0]}</TableCell>
+                        <TableCell className="text-xs text-center font-medium p-1.5">{shortenLineName(r.line)}</TableCell>
+                        <TableCell className="text-xs p-1.5">{r.inspector}</TableCell>
+                        <TableCell className="text-xs font-medium p-1.5 truncate">{r.style}</TableCell>
+                        <TableCell className="text-xs p-1.5 truncate">{r.order_no}</TableCell>
+                        <TableCell className="text-xs text-right p-1.5">{r.order_qty}</TableCell>
+                        <TableCell className="text-xs text-right p-1.5">{r.inspected_qty}</TableCell>
+                        <TableCell className="text-xs text-right text-emerald-600 p-1.5">{r.ok_qty}</TableCell>
+                        <TableCell className="text-xs text-right text-red-600 p-1.5">{r.ng_qty}</TableCell>
+                        <TableCell className="text-xs text-right font-medium p-1.5">
                           <span className={Number(r.defect_rate) > 5 ? 'text-red-600' : 'text-slate-700'}>
                             {r.defect_rate}%
                           </span>
                         </TableCell>
                         {DEFECT_COLS.map((col) => (
-                          <TableCell key={col} className="text-xs text-right">
+                          <TableCell key={col} className="text-xs text-right p-1.5">
                             {Number(r[col]) > 0 ? <span className="text-red-500 font-medium">{r[col]}</span> : <span className="text-slate-300">0</span>}
                           </TableCell>
                         ))}
@@ -220,14 +221,14 @@ export default function FQCDailyPage() {
                     ))}
                     {/* Subtotal Row */}
                     <TableRow className="bg-slate-100 font-medium">
-                      <TableCell colSpan={6} className="text-xs font-semibold text-slate-700">{t('common.total')}</TableCell>
-                      <TableCell className="text-xs text-right font-semibold">{subtotals.total_order_qty}</TableCell>
-                      <TableCell className="text-xs text-right font-semibold">{subtotals.total_inspected_qty}</TableCell>
-                      <TableCell className="text-xs text-right font-semibold text-emerald-700">{subtotals.total_ok_qty}</TableCell>
-                      <TableCell className="text-xs text-right font-semibold text-red-700">{subtotals.total_ng_qty}</TableCell>
-                      <TableCell className="text-xs text-right font-semibold">{subtotals.avg_defect_rate}%</TableCell>
+                      <TableCell colSpan={6} className="text-xs font-semibold text-slate-700 p-1.5">{t('common.total')}</TableCell>
+                      <TableCell className="text-xs text-right font-semibold p-1.5">{subtotals.total_order_qty}</TableCell>
+                      <TableCell className="text-xs text-right font-semibold p-1.5">{subtotals.total_inspected_qty}</TableCell>
+                      <TableCell className="text-xs text-right font-semibold text-emerald-700 p-1.5">{subtotals.total_ok_qty}</TableCell>
+                      <TableCell className="text-xs text-right font-semibold text-red-700 p-1.5">{subtotals.total_ng_qty}</TableCell>
+                      <TableCell className="text-xs text-right font-semibold p-1.5">{subtotals.avg_defect_rate}%</TableCell>
                       {DEFECT_COLS.map((col) => (
-                        <TableCell key={col} className="text-xs text-right font-semibold">
+                        <TableCell key={col} className="text-xs text-right font-semibold p-1.5">
                           {(subtotals as any)[col] || 0}
                         </TableCell>
                       ))}
