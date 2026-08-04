@@ -36,12 +36,6 @@ import {
   Pie,
   Legend,
 } from 'recharts';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from '@/components/ui/chart';
 
 const PIE_COLORS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -117,15 +111,6 @@ export default function FQCAnalysisPage() {
     })),
     [topStyles]
   );
-
-  // Pie chart config
-  const pieConfig: ChartConfig = useMemo(() => {
-    const cfg: ChartConfig = {};
-    categoryChartData.forEach((c: any, i: number) => {
-      cfg[c.label] = { label: c.label, color: PIE_COLORS[i % PIE_COLORS.length] };
-    });
-    return cfg;
-  }, [categoryChartData]);
 
   // Export handler
   const handleExport = async () => {
@@ -230,7 +215,7 @@ export default function FQCAnalysisPage() {
               {loading ? (
                 <Skeleton className="h-[280px] w-full rounded-lg" />
               ) : categoryChartData.length > 0 ? (
-                <ChartContainer config={pieConfig} className="min-h-[280px] w-full">
+                <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
                     <Pie
                       data={categoryChartData}
@@ -246,10 +231,10 @@ export default function FQCAnalysisPage() {
                         <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Tooltip contentStyle={{ fontSize: 12 }} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                   </PieChart>
-                </ChartContainer>
+                </ResponsiveContainer>
               ) : (
                 <div className="h-[280px] flex items-center justify-center text-sm text-slate-400">{t('common.noData')}</div>
               )}
