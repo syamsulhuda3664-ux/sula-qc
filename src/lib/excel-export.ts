@@ -50,23 +50,22 @@ function applyTextWatermark(
     ws[addr] = { t: 's', v: text };
   }
   // Apply a style to the cell: large font, light gray color
-  // xlsx community edition only supports limited styling through
-  // the `!cols` / `!rows` / cell-level `s` property, so we set the
-  // font size and colour via the `s` property if available.
-  // We use a light grey bold font as a visual watermark cue.
   const cell = ws[addr];
   if (cell) {
     cell.s = {
       font: {
         name: 'Arial',
-        sz: 18,
+        sz: 22,
         bold: true,
-        color: { rgb: 'DDDDDD' },
+        color: { rgb: 'D0E8F0' },
       },
       alignment: {
         horizontal: 'center' as const,
         vertical: 'center' as const,
         textRotation: 0,
+      },
+      fill: {
+        fgColor: { rgb: '1B3A5C' },
       },
     };
   }
@@ -80,10 +79,39 @@ function applyTextWatermark(
 }
 
 /**
- * Set column widths for a worksheet
+ * Set column widths for a worksheet.  Values are in character widths.
  */
 function setColWidths(ws: XLSX.WorkSheet, widths: number[]): void {
   ws['!cols'] = widths.map((w) => ({ wch: w }));
+}
+
+/**
+ * Auto-fit column widths based on the longest value in each column.
+ * Falls back to `fallbacks` array when a column has no data.
+ * Adds a small padding (2 chars) for readability.
+ */
+function autoFitCols(ws: XLSX.WorkSheet, fallbacks: number[], maxW: number = 40): void {
+  const colCount = fallbacks.length;
+  const maxLens: number[] = new Array(colCount).fill(0);
+  // Determine the range of the sheet
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+  for (let c = 0; c < colCount; c++) {
+    let maxLen = 0;
+    for (let r = range.s.r; r <= range.e.r; r++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const cell = ws[addr];
+      if (!cell) continue;
+      const val = String(cell.v || '');
+      // Approximate: CJK chars are ~2x wider than latin
+      const len = [...val].reduce((acc, ch) => acc + (ch.charCodeAt(0) > 0x2E7F ? 2 : 1), 0);
+      if (len > maxLen) maxLen = len;
+    }
+    maxLens[c] = maxLen;
+  }
+  ws['!cols'] = maxLens.map((len, i) => {
+    const fitted = len + 3; // padding
+    return { wch: Math.min(Math.max(fitted, fallbacks[i] || 8), maxW) };
+  });
 }
 
 /**
@@ -136,8 +164,8 @@ function fmtNum(value: number): number {
 }
 
 /**
- * Create a styled title row (company name) merged across columns.
- * Returns the next available row.
+ * Create a styled title block with a dark blue banner, company name,
+ * and subtitle. Returns the next available row.
  */
 function writeTitle(
   ws: XLSX.WorkSheet,
@@ -145,48 +173,114 @@ function writeTitle(
   colStart: number,
   colEnd: number,
 ): number {
-  // Row 0: Watermark hint row (SULA-QC text, very light)
-  applyTextWatermark(ws, 0, colStart, colEnd, 'SULA-QC');
+  const merges = ws['!merges'] = ws['!merges'] || [];
 
-  // Row 1: Actual title
-  writeRow(ws, 1, colStart, [title], {
-    font: { name: 'Arial', sz: 14, bold: true, color: { rgb: '333333' } },
+  // Row 0: Dark navy banner with SULA-QC watermark
+  // Fill the entire row with dark navy background
+  for (let c = colStart; c <= colEnd; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    ws[addr] = { t: 's', v: '' };
+    ws[addr].s = {
+      font: { name: 'Arial', sz: 10 },
+      fill: { fgColor: { rgb: '1B3A5C' } },
+    };
+  }
+  // Watermark in the middle
+  const midCol = Math.floor((colStart + colEnd) / 2);
+  const wmAddr = XLSX.utils.encode_cell({ r: 0, c: midCol });
+  ws[wmAddr] = { t: 's', v: 'SULA-QC' };
+  ws[wmAddr].s = {
+    font: { name: 'Arial', sz: 22, bold: true, color: { rgb: 'D0E8F0' } },
     alignment: { horizontal: 'center', vertical: 'center' },
+    fill: { fgColor: { rgb: '1B3A5C' } },
+  };
+  merges.push({ s: { r: 0, c: colStart }, e: { r: 0, c: colEnd } });
+
+  // Row 1: Main title (large, bold, white on dark blue)
+  writeRow(ws, 1, colStart, [title], {
+    font: { name: 'Arial', sz: 16, bold: true, color: { rgb: 'FFFFFF' } },
+    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    fill: { fgColor: { rgb: '2B5F8A' } },
   });
+  merges.push({ s: { r: 1, c: colStart }, e: { r: 1, c: colEnd } });
 
-  // Merge title cells
-  ws['!merges'] = ws['!merges'] || [];
-  ws['!merges'].push({ s: { r: 1, c: colStart }, e: { r: 1, c: colEnd } });
+  // Row 2: Blank separator with light accent line
+  for (let c = colStart; c <= colEnd; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 2, c });
+    ws[addr] = { t: 's', v: '' };
+    ws[addr].s = {
+      fill: { fgColor: { rgb: '4A90D9' } },
+    };
+  }
+  merges.push({ s: { r: 2, c: colStart }, e: { r: 2, c: colEnd } });
 
-  // Row 2: Blank separator
-  return 3;
+  // Row 3: blank gap
+  return 4;
 }
 
-/** Common header style */
+/** Common header style - deep blue with white bold text */
 const HEADER_STYLE: Partial<XLSX.CellStyle> = {
   font: { name: 'Arial', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
-  fill: { fgColor: { rgb: '4472C4' } },
+  fill: { fgColor: { rgb: '1F4E79' } },
   alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+  border: {
+    top: { style: 'thin', color: { rgb: 'FFFFFF' } },
+    bottom: { style: 'thin', color: { rgb: 'FFFFFF' } },
+    left: { style: 'thin', color: { rgb: '3A7BBF' } },
+    right: { style: 'thin', color: { rgb: '3A7BBF' } },
+  },
 };
 
-/** Subtotal row style */
+/** Subtotal row style - light blue tint */
 const SUBTOTAL_STYLE: Partial<XLSX.CellStyle> = {
-  font: { name: 'Arial', sz: 10, bold: true, color: { rgb: '333333' } },
-  fill: { fgColor: { rgb: 'D9E2F3' } },
+  font: { name: 'Arial', sz: 10, bold: true, color: { rgb: '1F4E79' } },
+  fill: { fgColor: { rgb: 'D6E4F0' } },
   alignment: { horizontal: 'center', vertical: 'center' },
+  border: {
+    top: { style: 'medium', color: { rgb: '1F4E79' } },
+    bottom: { style: 'thin', color: { rgb: '1F4E79' } },
+    left: { style: 'thin', color: { rgb: 'B4C6D9' } },
+    right: { style: 'thin', color: { rgb: 'B4C6D9' } },
+  },
 };
 
-/** Grand total row style */
+/** Grand total row style - dark navy with white text */
 const GRAND_TOTAL_STYLE: Partial<XLSX.CellStyle> = {
-  font: { name: 'Arial', sz: 10, bold: true, color: { rgb: 'FFFFFF' } },
-  fill: { fgColor: { rgb: '333333' } },
+  font: { name: 'Arial', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+  fill: { fgColor: { rgb: '1F4E79' } },
   alignment: { horizontal: 'center', vertical: 'center' },
+  border: {
+    top: { style: 'medium', color: { rgb: 'FFFFFF' } },
+    bottom: { style: 'medium', color: { rgb: 'FFFFFF' } },
+    left: { style: 'thin', color: { rgb: '1F4E79' } },
+    right: { style: 'thin', color: { rgb: '1F4E79' } },
+  },
 };
 
 /** Normal data cell style */
 const DATA_STYLE: Partial<XLSX.CellStyle> = {
   font: { name: 'Arial', sz: 10 },
   alignment: { vertical: 'center' },
+};
+
+/** Alternating row style (even rows) - very light blue */
+const DATA_STYLE_ALT: Partial<XLSX.CellStyle> = {
+  font: { name: 'Arial', sz: 10 },
+  alignment: { vertical: 'center' },
+  fill: { fgColor: { rgb: 'EDF2F9' } },
+};
+
+/** Data cell style for numbers - right aligned */
+const DATA_NUM_STYLE: Partial<XLSX.CellStyle> = {
+  font: { name: 'Arial', sz: 10 },
+  alignment: { vertical: 'center', horizontal: 'right' },
+};
+
+/** Alternating data cell style for numbers */
+const DATA_NUM_STYLE_ALT: Partial<XLSX.CellStyle> = {
+  font: { name: 'Arial', sz: 10 },
+  alignment: { vertical: 'center', horizontal: 'right' },
+  fill: { fgColor: { rgb: 'EDF2F9' } },
 };
 
 // ---------------------------------------------------------------------------
@@ -217,8 +311,8 @@ const FQC_DAILY_HEADERS = [
 ];
 
 const FQC_DAILY_WIDTHS = [
-  6, 14, 12, 14, 16, 20, 14, 14, 12, 10, 12,
-  14, 12, 14, 12, 14, 12, 12, 12, 14,
+  6, 14, 14, 14, 18, 22, 16, 16, 12, 12, 14,
+  16, 14, 16, 14, 16, 14, 14, 14, 16,
 ];
 
 export function exportFQCDailyExcel(
@@ -239,8 +333,9 @@ export function exportFQCDailyExcel(
   if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
   if (filterParts.length > 0) {
     writeRow(ws, row, 0, [filterParts.join('   |   ')], {
-      font: { name: 'Arial', sz: 9, italic: true, color: { rgb: '666666' } },
+      font: { name: 'Arial', sz: 9, italic: true, color: { rgb: '4A6FA5' } },
       alignment: { horizontal: 'left', vertical: 'center' },
+      fill: { fgColor: { rgb: 'EDF2F9' } },
     });
     ws['!merges'] = ws['!merges'] || [];
     ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
@@ -343,7 +438,25 @@ export function exportFQCDailyExcel(
         Number(rec.defect_other) || 0,
         Number(rec.defect_preparation) || 0,
       ];
-      writeRow(ws, row, 0, vals, DATA_STYLE);
+      // Write data row with alternating colors and number alignment
+      const isAlt = rowNum % 2 === 0;
+      const textStyle = isAlt ? DATA_STYLE_ALT : DATA_STYLE;
+      const numStyle = isAlt ? DATA_NUM_STYLE_ALT : DATA_NUM_STYLE;
+      for (let ci = 0; ci < vals.length; ci++) {
+        const c = ci;
+        const addr = XLSX.utils.encode_cell({ r: row, c });
+        const val = vals[ci];
+        if (val === null || val === undefined) continue;
+        let cell: XLSX.CellObject;
+        if (typeof val === 'number') {
+          cell = { t: 'n', v: val };
+          cell.s = { ...numStyle };
+        } else {
+          cell = { t: 's', v: String(val) };
+          cell.s = { ...textStyle };
+        }
+        ws[addr] = cell;
+      }
       row++;
     }
 
@@ -388,20 +501,22 @@ export function exportFQCDailyExcel(
   ws['!merges'].push({ s: { r: row, c: 1 }, e: { r: row, c: 5 } });
   row++;
 
-  // Final merge watermark (just a reminder)
+  // Footer line
   row += 1;
   writeRow(ws, row, 0, [`Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`], {
-    font: { name: 'Arial', sz: 8, italic: true, color: { rgb: 'AAAAAA' } },
+    font: { name: 'Arial', sz: 8, italic: true, color: { rgb: '999999' } },
   });
 
-  setColWidths(ws, FQC_DAILY_WIDTHS);
+  // Auto-fit column widths based on actual content, with minimums from FQC_DAILY_WIDTHS
+  autoFitCols(ws, FQC_DAILY_WIDTHS);
 
-  // Set row heights for title rows
+  // Set row heights for title block
   ws['!rows'] = [
-    { hpt: 24 }, // watermark row
-    { hpt: 36 }, // title row
-    { hpt: 8 },  // separator
-  ];
+    { hpt: 28 }, // row 0: watermark banner
+    { hpt: 42 }, // row 1: main title (larger)
+    { hpt: 6 },  // row 2: accent line
+    { hpt: 4 },  // row 3: gap
+   ];
 
   ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: totalCols - 1 } });
   XLSX.utils.book_append_sheet(wb, ws, 'FQC日报明细 Daily Detail');
