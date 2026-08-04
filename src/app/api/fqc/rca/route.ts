@@ -109,6 +109,37 @@ async function generateRCAForPeriod(
     return null;
   }
 
+  // Auto-insert action items from the generated RCA
+  if (rca.actions && rca.actions.length > 0) {
+    const actionRows = rca.actions.map((a: any) => ({
+      rca_id: inserted.id,
+      rank: a.rank,
+      category: a.category,
+      sub_defects: a.sub_defects || [],
+      defect_qty: a.defect_qty || 0,
+      style_codes: a.style_codes || [],
+      root_cause: a.root_cause || null,
+      impact: a.impact || null,
+      process: a.process || null,
+      corrective_action: a.corrective_action || null,
+      preventive_action: a.preventive_action || null,
+      responsible: null,
+      due_date: null,
+      status: 'pending',
+      photo_before: null,
+      photo_after: null,
+      created_by: userId,
+    }));
+
+    const { error: actionError } = await adminClient
+      .from('rca_actions')
+      .insert(actionRows);
+
+    if (actionError) {
+      console.error('Auto-insert actions error:', actionError);
+    }
+  }
+
   return inserted;
 }
 
