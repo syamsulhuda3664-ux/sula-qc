@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     const dateFrom = filters.dateFrom || filters.date_from;
     const dateTo = filters.dateTo || filters.date_to;
     const businessType = filters.businessType || filters.business_type;
+    const productionLine = filters.productionLine || filters.production_line;
     const period = filters.period;
 
     const exportFilters: ExportFilters = {
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
       dateTo,
       businessType,
       period,
+      productionLine,
     };
 
     let data: Record<string, unknown>[];
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
       if (dateFrom) query = query.gte('inspection_date', dateFrom);
       if (dateTo) query = query.lte('inspection_date', dateTo);
       if (businessType) query = query.eq('business_type', businessType);
+      if (productionLine) query = query.ilike('production_line', `%${productionLine}%`);
 
       const { data: records, error } = await query;
       if (error) {

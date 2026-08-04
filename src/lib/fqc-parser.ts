@@ -99,6 +99,29 @@ export interface ParsedSheet {
   debug?: ParseDebugInfo;
 }
 
+/**
+ * Read a numeric cell value, handling Excel percentage format.
+ * If the cell is formatted as percentage (z contains '%') and the raw value is
+ * between 0 and 1 (exclusive), it returns value * 100.
+ * Otherwise returns the raw numeric value.
+ */
+function getNumericValue(sheet: XLSX.WorkSheet, row: number, col: number): number {
+  const addr = XLSX.utils.encode_cell({ r: row, c: col });
+  const cell = sheet[addr];
+  if (!cell || cell.t !== 'n') return 0;
+  const val = cell.v as number;
+  // Detect percentage format: cell.z often contains '%' for percentage cells
+  // Also check cell.w (formatted text) for '%' sign
+  if (cell.z && String(cell.z).includes('%')) {
+    // Excel stores 3.5% as 0.035
+    if (val > 0 && val < 1) return Math.round(val * 10000) / 100;
+  }
+  if (cell.w && cell.w.includes('%')) {
+    if (val > 0 && val < 1) return Math.round(val * 10000) / 100;
+  }
+  return val;
+}
+
 function getCellValue(sheet: XLSX.WorkSheet, row: number, col: number): number | string {
   const addr = XLSX.utils.encode_cell({ r: row, c: col });
   const cell = sheet[addr];
@@ -420,7 +443,7 @@ function parseSingleSheet(
       inspected_qty: Number(getCellValue(sheet, r, COL.inspectedQty)) || 0,
       ok_qty: Number(getCellValue(sheet, r, COL.okQty)) || 0,
       ng_qty: Number(getCellValue(sheet, r, COL.ngQty)) || 0,
-      defect_rate: Number(getCellValue(sheet, r, COL.defectRate)) || 0,
+      defect_rate: getNumericValue(sheet, r, COL.defectRate),
       business_type: businessType,
       defect_stitching: defectStitching,
       defect_logo: defectLogo,

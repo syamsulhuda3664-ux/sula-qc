@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
       query = query.eq('business_type', businessType);
     }
     if (productionLine) {
-      query = query.eq('production_line', productionLine);
+      query = query.ilike('production_line', `%${productionLine}%`);
     }
     if (styleCode) {
       query = query.ilike('style_code', `%${styleCode}%`);
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       countQuery = countQuery.eq('business_type', businessType);
     }
     if (productionLine) {
-      countQuery = countQuery.eq('production_line', productionLine);
+      countQuery = countQuery.ilike('production_line', `%${productionLine}%`);
     }
     if (styleCode) {
       countQuery = countQuery.ilike('style_code', `%${styleCode}%`);

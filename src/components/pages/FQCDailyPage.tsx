@@ -71,10 +71,17 @@ export default function FQCDailyPage() {
 
   const handleExport = async () => {
     try {
+      const bt = effectiveType || businessType;
+      const filters: Record<string, string> = {};
+      if (dateFrom) filters.date_from = dateFrom;
+      if (dateTo) filters.date_to = dateTo;
+      if (bt !== 'ALL') filters.business_type = bt;
+      if (line) filters.production_line = line;
+
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'fqc', filters: { date_from: dateFrom, date_to: dateTo, business_type: effectiveType || businessType, production_line: line } }),
+        body: JSON.stringify({ type: 'fqc-daily', filters }),
       });
       if (res.ok) {
         const blob = await res.blob();

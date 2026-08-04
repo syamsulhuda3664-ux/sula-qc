@@ -12,6 +12,7 @@ export interface ExportFilters {
   dateFrom?: string;
   dateTo?: string;
   period?: string;
+  productionLine?: string;
 }
 
 export interface ExcelExportResult {

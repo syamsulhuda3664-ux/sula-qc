@@ -5,23 +5,68 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Chinese number mapping
+const CN_NUMS: Record<string, number> = {
+  '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+  '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+  '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15,
+  '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20,
+  '二十一': 21, '二十二': 22, '二十三': 23, '二十四': 24, '二十五': 25,
+  '二十六': 26, '二十七': 27, '二十八': 28, '二十九': 29,
+};
+
+/** Parse a Chinese number like 二十三 → 23 */
+function parseCnNum(s: string): number | null {
+  if (CN_NUMS[s] !== undefined) return CN_NUMS[s];
+  return null;
+}
+
 /**
  * Extract the line sort key from a production_line string.
- * Examples:
+ * Handles multiple formats:
  *   "车缝一组(Sewing Line 1)"        → "01"
  *   "车缝三组 (Sewing Line 3A)"      → "03A"
  *   "车缝二十三组(Sewing Line 23)"   → "23"
  *   "Sewing Line 8B"                → "08B"
+ *   "车缝一组"                      → "01"
+ *   "车缝三组"                      → "03"
+ *   "Line 5A"                       → "05A"
  *   "Unknown"                       → "99"
  */
 export function extractLineSortKey(line: string): string {
   if (!line) return '99';
-  // Match "Sewing Line" followed by optional space, then number, then optional letter
-  const match = line.match(/Sewing\s+Line\s*(\d+)([A-Z])?/i);
-  if (!match) return '99';
-  const num = parseInt(match[1], 10);
-  const suffix = (match[2] || '').toUpperCase();
-  return String(num).padStart(2, '0') + suffix;
+
+  // 1. Try English pattern: "Sewing Line 3A" or "Line 5B"
+  const enMatch = line.match(/(?:Sewing\s+)?Line\s*(\d+)([A-Z])?/i);
+  if (enMatch) {
+    const num = parseInt(enMatch[1], 10);
+    const suffix = (enMatch[2] || '').toUpperCase();
+    return String(num).padStart(2, '0') + suffix;
+  }
+
+  // 2. Try Chinese pattern: "车缝X组" or "车缝X组(...)"  e.g. 车缝一组, 车缝二十三组
+  const cnMatch = line.match(/车缝([一二三四五六七八九十]+)组/);
+  if (cnMatch) {
+    const num = parseCnNum(cnMatch[1]);
+    if (num !== null) {
+      // Check for A/B suffix after the Chinese group, e.g. 车缝三组A or (Sewing Line 3A)
+      const suffixMatch = line.match(/车缝[一二三四五六七八九十]+组\s*[(\s]*[A-Za-z]*\s*(\d+)\s*([A-Z])[)\s]/i);
+      if (suffixMatch) {
+        return String(num).padStart(2, '0') + (suffixMatch[3] || '').toUpperCase();
+      }
+      return String(num).padStart(2, '0');
+    }
+  }
+
+  // 3. Try bare number: just a number like "3" or "23"
+  const bareMatch = line.match(/^(\d+)([A-Z])?$/i);
+  if (bareMatch) {
+    const num = parseInt(bareMatch[1], 10);
+    const suffix = (bareMatch[2] || '').toUpperCase();
+    return String(num).padStart(2, '0') + suffix;
+  }
+
+  return '99';
 }
 
 /**
