@@ -317,13 +317,8 @@ function _exportFQCDailyExcelXlsx(
         dayDefects[key] += val;
       }
 
-      // Defect rate display: if stored as 0-1 fraction show as %, else as-is
-      let rateDisplay: string | number;
-      if (defectRate <= 1 && defectRate >= 0) {
-        rateDisplay = fmtPct(defectRate, true);
-      } else {
-        rateDisplay = `${defectRate}%`;
-      }
+      // DB stores defect_rate as percentage — use directly
+      const rateDisplay: string | number = `${defectRate.toFixed(2)}%`;
 
       const vals: (string | number)[] = [
         rowNum++,
@@ -589,12 +584,9 @@ export async function exportFQCDailyExcel(
         dayDefects[key] += val;
       }
 
-      let rateDisplay: string;
-      if (defectRate <= 1 && defectRate >= 0) {
-        rateDisplay = fmtPct(defectRate, true);
-      } else {
-        rateDisplay = `${defectRate}%`;
-      }
+      // DB stores defect_rate as percentage (e.g. 0.47 = 0.47%, 2.06 = 2.06%)
+      // Use directly — same as web display. Do NOT treat as fraction.
+      const rateDisplay = `${defectRate.toFixed(2)}%`;
 
       const vals: (string | number)[] = [
         rowNum,
