@@ -453,22 +453,19 @@ export default function FQCRCAPage() {
                                             </div>
                                             <div className="space-y-0.5">
                                               {hasData ? (
-                                                catSubs.slice(0, 3).map((s: any, si: number) => (
+                                                catSubs.slice(0, 5).map((s: any, si: number) => (
                                                   <div key={si} className="flex justify-between text-[10px]">
                                                     <span className="text-slate-500 truncate mr-2">{s.subDefect || s.name}</span>
                                                     <span className="text-slate-600 font-medium">{s.defectCount || s.count}</span>
                                                   </div>
                                                 ))
                                               ) : (
-                                                <div className="space-y-0.5">
-                                                  <div className="text-[9px] text-amber-600 italic mb-1">Sub-defect belum di-breakdown di data Excel:</div>
-                                                  {refNames.slice(0, 5).map((name, ri) => (
-                                                    <div key={ri} className="text-[10px] text-slate-400">• {name}</div>
-                                                  ))}
-                                                  {refNames.length > 5 && (
-                                                    <div className="text-[9px] text-slate-300">+{refNames.length - 5} more...</div>
-                                                  )}
-                                                </div>
+                                                refNames.map((name, ri) => (
+                                                  <div key={ri} className="flex justify-between text-[10px]">
+                                                    <span className="text-slate-500 truncate mr-2">{name}</span>
+                                                    <span className="text-slate-300">-</span>
+                                                  </div>
+                                                ))
                                               )}
                                             </div>
                                           </div>
