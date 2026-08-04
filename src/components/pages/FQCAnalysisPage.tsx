@@ -34,7 +34,6 @@ import {
   Cell,
   PieChart,
   Pie,
-  Legend,
 } from 'recharts';
 
 const PIE_COLORS = [
@@ -53,15 +52,20 @@ const BAR_COLORS = [
 export default function FQCAnalysisPage() {
   const { t } = useI18n();
   const { effectiveType, isLocked } = useBusinessTypeLock();
+  const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [businessType, setBusinessType] = useState('ALL');
 
+  useEffect(() => { setMounted(true); }, []);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
       const params = new URLSearchParams();
       if (dateFrom) params.set('date_from', dateFrom);
@@ -70,24 +74,27 @@ export default function FQCAnalysisPage() {
       if (bt !== 'ALL') params.set('business_type', bt);
 
       const res = await fetch(`/api/fqc/analysis?${params}`);
-      if (res.ok) setData(await res.json());
+      if (res.ok) {
+        setData(await res.json());
+      } else {
+        setError('Failed to fetch data');
+      }
     } catch {
-      // ignore
+      setError('Network error');
     } finally {
       setLoading(false);
     }
   }, [dateFrom, dateTo, businessType, effectiveType]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (mounted) fetchData();
+  }, [fetchData, mounted]);
 
   const categorySummary = data?.section_a?.category_summary || [];
   const topSubDefects = data?.section_b?.top_sub_defects || [];
   const topStyles = data?.section_c?.top_styles || [];
   const grandTotal = data?.grand_total_defects || 0;
 
-  // Prepare chart data with i18n category names
   const categoryChartData = useMemo(() =>
     categorySummary.map((c: any) => ({
       ...c,
@@ -112,7 +119,6 @@ export default function FQCAnalysisPage() {
     [topStyles]
   );
 
-  // Export handler
   const handleExport = async () => {
     if (exporting) return;
     setExporting(true);
@@ -151,6 +157,18 @@ export default function FQCAnalysisPage() {
       setExporting(false);
     }
   };
+
+  // Don't render charts until mounted (prevents SSR/hydration issues)
+  if (!mounted) {
+    return (
+      <div className="space-y-4">
+        <Card><CardContent className="p-4"><Skeleton className="h-10 w-full" /></CardContent></Card>
+        <Card><CardContent className="p-4"><Skeleton className="h-[400px] w-full" /></CardContent></Card>
+        <Card><CardContent className="p-4"><Skeleton className="h-[500px] w-full" /></CardContent></Card>
+        <Card><CardContent className="p-4"><Skeleton className="h-[400px] w-full" /></CardContent></Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -194,7 +212,14 @@ export default function FQCAnalysisPage() {
         </CardContent>
       </Card>
 
-      {/* Section A: Category Summary — Chart + Table side by side */}
+      {/* Error State */}
+      {error && (
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Section A: Category Summary */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">A. {t('rca.topCategories')}</CardTitle>
@@ -205,15 +230,15 @@ export default function FQCAnalysisPage() {
           <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
             <Info className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
             <p className="text-xs text-blue-700 leading-relaxed">
-              {t('analysis.tipCategory') || 'Data tabel ini diperoleh dari perhitungan total jumlah defect per kategori (Stitching, Logo, Material, dll) dari seluruh baris Daily Report FQC pada rentang tanggal yang dipilih. PPM dihitung berdasarkan jumlah defect per kategori terhadap total 1 juta unit yang diinspeksi.'}
+              {t('analysis.tipCategory')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Pie Chart */}
-            <div className="min-h-[280px]">
+            <div style={{ height: 280 }}>
               {loading ? (
-                <Skeleton className="h-[280px] w-full rounded-lg" />
+                <Skeleton className="h-full w-full rounded-lg" />
               ) : categoryChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={280}>
                   <PieChart>
@@ -228,15 +253,25 @@ export default function FQCAnalysisPage() {
                       paddingAngle={2}
                     >
                       {categoryChartData.map((_: any, index: number) => (
-                        <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                        <Cell key={`pie-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ fontSize: 12 }} />
-                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    <Tooltip />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[280px] flex items-center justify-center text-sm text-slate-400">{t('common.noData')}</div>
+                <div className="h-full flex items-center justify-center text-sm text-slate-400">{t('common.noData')}</div>
+              )}
+              {/* Custom Legend */}
+              {categoryChartData.length > 0 && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 px-2">
+                  {categoryChartData.map((c: any, i: number) => (
+                    <span key={i} className="flex items-center gap-1 text-[10px] text-slate-600">
+                      <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -293,7 +328,7 @@ export default function FQCAnalysisPage() {
         </CardContent>
       </Card>
 
-      {/* Section B: Top 20 Sub-Defects — Horizontal Bar + Table */}
+      {/* Section B: Top 20 Sub-Defects */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">B. {t('rca.subDefects')} {t('analysis.top20')}</CardTitle>
@@ -303,26 +338,24 @@ export default function FQCAnalysisPage() {
           <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-amber-50 border border-amber-100">
             <Info className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
             <p className="text-xs text-amber-700 leading-relaxed">
-              {t('analysis.tipSubDefect') || 'Sub-defect menampilkan detail jenis defect spesifik (misalnya: skip stitch, loose thread, color deviation) yang dikelompokkan dalam setiap kategori defect. Data diambil dari kolom sub-defect individual pada Daily Report FQC.'}
+              {t('analysis.tipSubDefect')}
             </p>
           </div>
 
           {/* Horizontal Bar Chart */}
-          <div className="min-h-[350px] mb-4">
+          <div style={{ height: Math.max(350, subDefectChartData.length * 28) }} className="mb-4">
             {loading ? (
-              <Skeleton className="h-[350px] w-full rounded-lg" />
+              <Skeleton className="h-full w-full rounded-lg" />
             ) : subDefectChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height={Math.max(350, subDefectChartData.length * 28)}>
                 <BarChart data={subDefectChartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 11 }} />
                   <YAxis type="category" dataKey="label" width={180} tick={{ fontSize: 10 }} />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12 }}
-                  />
+                  <Tooltip />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
                     {subDefectChartData.map((_: any, index: number) => (
-                      <Cell key={index} fill={BAR_COLORS[index % BAR_COLORS.length]} />
+                      <Cell key={`bar-${index}`} fill={BAR_COLORS[index % BAR_COLORS.length]} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -373,7 +406,7 @@ export default function FQCAnalysisPage() {
         </CardContent>
       </Card>
 
-      {/* Section C: Top 15 Styles — Bar Chart + Table */}
+      {/* Section C: Top 15 Styles */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">C. {t('rca.topStyles')} {t('analysis.top15')}</CardTitle>
@@ -383,30 +416,27 @@ export default function FQCAnalysisPage() {
           <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-rose-50 border border-rose-100">
             <Info className="h-4 w-4 text-rose-500 mt-0.5 shrink-0" />
             <p className="text-xs text-rose-700 leading-relaxed">
-              {t('analysis.tipStyle') || 'Tabel ini menunjukkan 15 style (nomor model) dengan jumlah defect tertinggi. Defect Rate dihitung dari (total defect pada style tersebut / total kuantitas yang diinspeksi pada style tersebut) x 100%. Style dengan defect rate > 5% ditandai merah sebagai perhatian khusus.'}
+              {t('analysis.tipStyle')}
             </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* Defect Count Bar Chart */}
-            <div className="min-h-[300px]">
+            {/* Bar Chart */}
+            <div style={{ height: 300 }}>
               {loading ? (
-                <Skeleton className="h-[300px] w-full rounded-lg" />
+                <Skeleton className="h-full w-full rounded-lg" />
               ) : styleChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={styleChartData} margin={{ left: 10, right: 20, top: 5, bottom: 40 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="label" tick={{ fontSize: 9 }} angle={-45} textAnchor="end" height={60} />
                     <YAxis tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      contentStyle={{ fontSize: 12 }}
-                    />
+                    <Tooltip />
                     <Bar dataKey="defectCount" fill="#2563eb" radius={[4, 4, 0, 0]} name="defectCount" />
-                    <Bar dataKey="defectRate" fill="#ef4444" radius={[4, 4, 0, 0]} name="defectRate" />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-[300px] flex items-center justify-center text-sm text-slate-400">{t('common.noData')}</div>
+                <div className="h-full flex items-center justify-center text-sm text-slate-400">{t('common.noData')}</div>
               )}
             </div>
 
