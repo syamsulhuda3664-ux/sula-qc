@@ -350,7 +350,7 @@ export function generateWeeklyRCA(
     ? Math.round((totalOK / totalInspected) * 100 * 100) / 100
     : 100;
 
-  // Top 3 categories by defect count
+  // All categories sorted by defect count (for overview)
   const sortedCategories = DEFECT_CATEGORIES
     .map((cat) => ({
       category: cat.name,
@@ -369,14 +369,12 @@ export function generateWeeklyRCA(
     rank: i + 1,
   }));
 
-  // Collect sub-defects per category (top 5 per category, not global top 10)
-  const topCategoryKeys = new Set(topCategories.map((c) => c.categoryKey));
+  // Top 3 sub-defects GLOBAL (across ALL categories) — this is the RCA focus
   const allSubDefects: RCASubDefect[] = [];
 
   for (let i = 0; i < subDefectCounts.length; i++) {
     if (subDefectCounts[i] === 0) continue;
     const { category, categoryKey } = getSubDefectCategory(i);
-    if (!topCategoryKeys.has(categoryKey)) continue;
     allSubDefects.push({
       subDefect: SUBDEFECT_NAMES[i] || `Sub-defect ${i + 1}`,
       category,
@@ -388,14 +386,12 @@ export function generateWeeklyRCA(
     });
   }
 
-  // Sort within each category and take top 5 per category
-  const topSubDefects = allSubDefects
-    .sort((a, b) => b.defectCount - a.defectCount)
-    .reduce<RCASubDefect[]>((acc, s) => {
-      const countInCategory = acc.filter(x => x.categoryKey === s.categoryKey).length;
-      if (countInCategory < 5) acc.push(s);
-      return acc;
-    }, []);
+  // Global sort, take top 3 — could be 2 Stitching + 1 Other, etc.
+  allSubDefects.sort((a, b) => b.defectCount - a.defectCount);
+  const topSubDefects = allSubDefects.slice(0, 3).map((s, i) => ({
+    ...s,
+    rank: i + 1,
+  }));
 
   // Top 15 styles by defect count
   const topStyles = Object.entries(styleDefects)
@@ -416,28 +412,22 @@ export function generateWeeklyRCA(
       rank: i + 1,
     }));
 
-  // Auto-generate action items for top 3 categories
-  const actions: RCAAction[] = topCategories.map((cat, i) => {
-    const template = ACTION_TEMPLATES[cat.category] || ACTION_TEMPLATES['Other'];
-    // Get sub-defect names for this category
-    const range = CATEGORY_SUB_RANGES[cat.categoryKey];
-    const catSubDefects: string[] = [];
-    if (range) {
-      for (let si = range[0]; si < range[1] && si < subDefectCounts.length; si++) {
-        if (subDefectCounts[si] > 0) {
-          catSubDefects.push(SUBDEFECT_NAMES[si]);
-        }
-      }
-    }
-    // Get top 3 styles for this category (from overall top styles)
-    const actionStyleCodes = topStyles.slice(0, 5).map(s => s.style);
+  // Auto-generate action items for top 3 SUB-DEFECTS (not per category)
+  const actions: RCAAction[] = topSubDefects.map((sub, i) => {
+    const template = ACTION_TEMPLATES[sub.category] || ACTION_TEMPLATES['Other'];
+    // Get other sub-defects from the same category for reference
+    const sameCatSubs = allSubDefects
+      .filter(s => s.categoryKey === sub.categoryKey && s.subDefect !== sub.subDefect)
+      .sort((a, b) => b.defectCount - a.defectCount)
+      .slice(0, 4)
+      .map(s => s.subDefect);
 
     return {
       rank: i + 1,
-      category: cat.category,
-      sub_defects: catSubDefects,
-      defect_qty: cat.defectCount,
-      style_codes: actionStyleCodes,
+      category: sub.category,
+      sub_defects: [sub.subDefect, ...sameCatSubs],
+      defect_qty: sub.defectCount,
+      style_codes: topStyles.slice(0, 5).map(s => s.style),
       root_cause: template.root_cause,
       impact: template.impact,
       process: template.process,
