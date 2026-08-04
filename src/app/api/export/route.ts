@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
       let result: { buffer: Uint8Array; fileName: string };
       try {
-        result = exportFQCDailyExcel(data, exportFilters, lang);
+        result = await exportFQCDailyExcel(data, exportFilters, lang);
       } catch (xlsErr) {
         console.error('XLSX generation error:', xlsErr);
         return NextResponse.json(
