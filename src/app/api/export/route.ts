@@ -71,7 +71,16 @@ export async function POST(request: NextRequest) {
       }
       data = (records as Record<string, unknown>[]) || [];
 
-      const result = exportFQCDailyExcel(data, exportFilters, lang);
+      let result: { buffer: Uint8Array; fileName: string };
+      try {
+        result = exportFQCDailyExcel(data, exportFilters, lang);
+      } catch (xlsErr) {
+        console.error('XLSX generation error:', xlsErr);
+        return NextResponse.json(
+          { error: `Excel generation failed: ${xlsErr instanceof Error ? xlsErr.message : String(xlsErr)}` },
+          { status: 500 },
+        );
+      }
 
       return new NextResponse(result.buffer, {
         status: 200,
@@ -183,6 +192,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Export error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ error: `Export error: ${msg}` }, { status: 500 });
   }
 }

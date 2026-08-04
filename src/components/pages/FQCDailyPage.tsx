@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Download, Search, RefreshCw } from 'lucide-react';
+import { Download, Search, RefreshCw, Loader2 } from 'lucide-react';
 
 const DEFECT_COLS = [
   'defect_stitching', 'defect_logo', 'defect_material', 'defect_hardware',
@@ -69,7 +69,11 @@ export default function FQCDailyPage() {
     fetchData();
   }, [fetchData]);
 
+  const [exporting, setExporting] = useState(false);
+
   const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       const bt = effectiveType || businessType;
       const filters: Record<string, string> = {};
@@ -83,17 +87,32 @@ export default function FQCDailyPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'fqc-daily', filters }),
       });
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `fqc_daily_${new Date().toISOString().split('T')[0]}.xlsx`;
-        a.click();
-        URL.revokeObjectURL(url);
+      if (!res.ok) {
+        let errMsg = `Export failed (${res.status})`;
+        try {
+          const errBody = await res.json();
+          if (errBody.error) errMsg = errBody.error;
+        } catch {}
+        alert(errMsg);
+        return;
       }
-    } catch {
-      // ignore
+      const blob = await res.blob();
+      if (blob.size === 0) {
+        alert('Export returned empty file');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fqc_daily_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(`Export error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -134,8 +153,8 @@ export default function FQCDailyPage() {
             <Button variant="outline" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); setBusinessType('ALL'); setLine(''); setPage(1); }} className="h-9">
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('action.reset')}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExport} className="h-9">
-              <Download className="h-3.5 w-3.5 mr-1" /> {t('action.download')}
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="h-9">
+              {exporting ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Download className="h-3.5 w-3.5 mr-1" />} {t('action.download')}
             </Button>
           </div>
         </CardContent>

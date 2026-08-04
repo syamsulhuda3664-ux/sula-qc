@@ -382,7 +382,6 @@ export function exportFQCDailyExcel(
     grandOrderQty, grandInspected, grandOK, grandNG,
     fmtPct(grandRate, true),
     ...Object.values(grandDefects),
-    grandDefectTotal,
   ];
   writeRow(ws, row, 0, grandVals, GRAND_TOTAL_STYLE);
   ws['!merges'] = ws['!merges'] || [];
