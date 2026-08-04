@@ -209,6 +209,10 @@ CREATE TABLE IF NOT EXISTS rca_weekly (
   top_category_3 TEXT,
   top_category_3_qty INTEGER DEFAULT 0,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'in_progress', 'completed')),
+  top_categories JSONB DEFAULT '[]',
+  top_sub_defects JSONB DEFAULT '[]',
+  top_styles JSONB DEFAULT '[]',
+  created_by UUID REFERENCES users(id),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -228,8 +232,13 @@ CREATE TABLE IF NOT EXISTS rca_actions (
   photo_url TEXT,
   preventive_action TEXT,
   deadline DATE,
+  responsible TEXT,
+  due_date DATE,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'completed')),
   filled_by UUID REFERENCES users(id),
+  created_by UUID REFERENCES users(id),
+  updated_by UUID REFERENCES users(id),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
   filled_at TIMESTAMPTZ
 );
 

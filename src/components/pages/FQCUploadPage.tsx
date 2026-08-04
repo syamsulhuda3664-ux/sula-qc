@@ -90,6 +90,14 @@ export default function FQCUploadPage() {
           partialErrors: data.errors || undefined,
         });
         setFile(null);
+        // Auto-generate RCA for affected Mon-Sat periods
+        try {
+          await fetch('/api/fqc/rca', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'auto-generate' }),
+          });
+        } catch { /* silent */ }
       } else {
         setResult({ success: false, message: data.error || t('fqc.upload.error') });
         if (data.debug) setDebugInfo(data.debug);
