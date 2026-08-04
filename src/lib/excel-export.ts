@@ -623,7 +623,7 @@ export async function exportFQCDailyExcel(
       const bgColor = rowNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
 
       const excelRow = ws.getRow(currentRow);
-      excelRow.height = 13.4;
+      excelRow.height = 20;
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
         const val = vals[c - 1];
@@ -651,7 +651,7 @@ export async function exportFQCDailyExcel(
     ];
 
     const subtotalExcelRow = ws.getRow(currentRow);
-    subtotalExcelRow.height = 14.65;
+    subtotalExcelRow.height = 22;
     ws.mergeCells(currentRow, 2, currentRow, 6);
     for (let c = 1; c <= totalCols; c++) {
       const cell = subtotalExcelRow.getCell(c);
