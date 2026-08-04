@@ -162,39 +162,32 @@ export default function FQCDailyPage() {
 
       {/* Grand Total Summary — above table */}
       {!loading && records.length > 0 && (
-        <Card className="border-blue-200 bg-gradient-to-r from-blue-50 to-slate-50">
-          <CardContent className="px-4 py-3">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">Grand Total ({gt.total_records || 0} {t('common.records')})</span>
-            </div>
-            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-3">
-              <div>
-                <p className="text-[10px] text-slate-500">{t('fqc.orderQty')}</p>
-                <p className="text-sm font-bold text-slate-800">{(gt.total_order_qty || 0).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500">{t('fqc.inspectedQty')}</p>
-                <p className="text-sm font-bold text-slate-800">{(gt.total_inspected_qty || 0).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500">{t('fqc.okQty')}</p>
-                <p className="text-sm font-bold text-emerald-700">{(gt.total_ok_qty || 0).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500">{t('fqc.ngQty')}</p>
-                <p className="text-sm font-bold text-red-700">{(gt.total_ng_qty || 0).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500">{t('fqc.defectRate')}</p>
-                <p className="text-sm font-bold text-slate-800">{gt.avg_defect_rate || 0}%</p>
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-500">Total Defects</p>
-                <p className="text-sm font-bold text-orange-600">{(gt.total_defects || 0).toLocaleString()}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 px-1">
+          <div>
+            <p className="text-[10px] text-slate-500">{t('fqc.orderQty')}</p>
+            <p className="text-base font-bold text-slate-800">{(gt.total_order_qty || 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-500">{t('fqc.inspectedQty')}</p>
+            <p className="text-base font-bold text-slate-800">{(gt.total_inspected_qty || 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-500">{t('fqc.okQty')}</p>
+            <p className="text-base font-bold text-emerald-700">{(gt.total_ok_qty || 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-500">{t('fqc.ngQty')}</p>
+            <p className="text-base font-bold text-red-700">{(gt.total_ng_qty || 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-500">{t('fqc.defectRate')}</p>
+            <p className="text-base font-bold text-slate-800">{gt.avg_defect_rate || 0}%</p>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-500">Total Defects</p>
+            <p className="text-base font-bold text-orange-600">{(gt.total_defects || 0).toLocaleString()}</p>
+          </div>
+        </div>
       )}
 
       {/* Table */}
