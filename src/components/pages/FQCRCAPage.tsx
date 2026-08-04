@@ -388,19 +388,10 @@ export default function FQCRCAPage() {
                           <div className="rounded-lg border border-slate-200 bg-white">
                             <CollapsibleTrigger asChild>
                               <button className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 transition-colors cursor-pointer">
-                                <Badge variant="outline" className={`text-[10px] font-semibold ${btColor} shrink-0`}>
+                                <Badge variant="outline" className={`text-[10px] font-semibold ${btColor}`}>
                                   {BT_SHORT[bt] || bt}
                                 </Badge>
-                                <div className="hidden sm:flex items-center gap-3 text-xs flex-1 min-w-0">
-                                  {(rca.top_sub_defects || []).slice(0, 3).map((s: any, si: number) => (
-                                    <span key={si} className="flex items-center gap-1 truncate">
-                                      <span className="text-[9px] px-1 py-px rounded bg-blue-50 text-blue-500 shrink-0">{s.category}</span>
-                                      <span className="text-slate-600 truncate">{s.subDefect || s.name}</span>
-                                      <b className="text-red-500 shrink-0">{s.defectCount || s.count}</b>
-                                    </span>
-                                  ))}
-                                </div>
-                                <div className="hidden lg:flex items-center gap-4 text-xs shrink-0">
+                                <div className="hidden sm:flex items-center gap-4 text-xs flex-1">
                                   <span className="text-slate-400">{t('rca.totalInspected')}: <b className="text-slate-700">{(rca.total_inspected || 0).toLocaleString()}</b></span>
                                   <span className="text-slate-400">NG: <b className="text-red-600">{(rca.total_ng || 0).toLocaleString()}</b></span>
                                   <span className="text-slate-400">{t('rca.overallPassRate')}: <b className={`${(rca.overall_pass_rate || 0) >= 95 ? 'text-emerald-600' : 'text-red-600'}`}>{rca.overall_pass_rate}%</b></span>
