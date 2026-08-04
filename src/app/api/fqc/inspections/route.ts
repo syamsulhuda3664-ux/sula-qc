@@ -131,6 +131,52 @@ export async function GET(request: NextRequest) {
 
     const { count: totalCount } = await countQuery;
 
+    // ── Grand totals: fetch only numeric columns (no pagination) for ALL matching rows ──
+    let grandQuery = adminClient
+      .from('fqc_inspections')
+      .select('order_qty, inspected_qty, ok_qty, ng_qty, defect_stitching, defect_stitch_defect, defect_logo, defect_material, defect_hardware, defect_appearance, defect_zipper, defect_webbing, defect_other, defect_preparation');
+
+    if (startDate) grandQuery = grandQuery.gte('inspection_date', startDate);
+    if (endDate) grandQuery = grandQuery.lte('inspection_date', endDate);
+    if (businessType) grandQuery = grandQuery.eq('business_type', businessType);
+    if (productionLine) grandQuery = grandQuery.ilike('production_line', `%${productionLine}%`);
+    if (styleCode) grandQuery = grandQuery.ilike('style_code', `%${styleCode}%`);
+    if (orderNo) grandQuery = grandQuery.ilike('order_no', `%${orderNo}%`);
+
+    const { data: grandRows } = await grandQuery;
+    const grandTotals: Record<string, number> = {
+      total_records: 0, total_order_qty: 0, total_inspected_qty: 0,
+      total_ok_qty: 0, total_ng_qty: 0, avg_defect_rate: 0, total_defects: 0,
+      defect_stitching: 0, defect_logo: 0, defect_material: 0,
+      defect_hardware: 0, defect_appearance: 0, defect_zipper: 0,
+      defect_webbing: 0, defect_other: 0, defect_preparation: 0,
+    };
+    for (const r of grandRows || []) {
+      grandTotals.total_records++;
+      grandTotals.total_order_qty += Number(r.order_qty) || 0;
+      grandTotals.total_inspected_qty += Number(r.inspected_qty) || 0;
+      grandTotals.total_ok_qty += Number(r.ok_qty) || 0;
+      grandTotals.total_ng_qty += Number(r.ng_qty) || 0;
+      const stitchMerged = (Number(r.defect_stitching) || 0) + (Number(r.defect_stitch_defect) || 0);
+      grandTotals.defect_stitching += stitchMerged;
+      grandTotals.defect_logo += Number(r.defect_logo) || 0;
+      grandTotals.defect_material += Number(r.defect_material) || 0;
+      grandTotals.defect_hardware += Number(r.defect_hardware) || 0;
+      grandTotals.defect_appearance += Number(r.defect_appearance) || 0;
+      grandTotals.defect_zipper += Number(r.defect_zipper) || 0;
+      grandTotals.defect_webbing += Number(r.defect_webbing) || 0;
+      grandTotals.defect_other += Number(r.defect_other) || 0;
+      grandTotals.defect_preparation += Number(r.defect_preparation) || 0;
+      grandTotals.total_defects += stitchMerged + (Number(r.defect_logo) || 0)
+        + (Number(r.defect_material) || 0) + (Number(r.defect_hardware) || 0)
+        + (Number(r.defect_appearance) || 0) + (Number(r.defect_zipper) || 0)
+        + (Number(r.defect_webbing) || 0) + (Number(r.defect_other) || 0)
+        + (Number(r.defect_preparation) || 0);
+    }
+    grandTotals.avg_defect_rate = grandTotals.total_inspected_qty > 0
+      ? Math.round((grandTotals.total_ng_qty / grandTotals.total_inspected_qty) * 10000) / 100
+      : 0;
+
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     query = query.range(from, to);
@@ -212,6 +258,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       records: allRecords as any[],
       subtotals,
+      grand_totals: grandTotals,
       pagination: {
         page,
         page_size: pageSize,
