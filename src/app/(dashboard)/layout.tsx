@@ -33,9 +33,9 @@ import {
   Lock,
   Unlock,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import DashboardPage from '@/components/pages/DashboardPage';
 import FQCDailyPage from '@/components/pages/FQCDailyPage';
-import FQCAnalysisPage from '@/components/pages/FQCAnalysisPage';
 import FQCRCAPage from '@/components/pages/FQCRCAPage';
 import FQCUploadPage from '@/components/pages/FQCUploadPage';
 import OQCLotsPage from '@/components/pages/OQCLotsPage';
@@ -43,6 +43,11 @@ import OQCRekapPage from '@/components/pages/OQCRekapPage';
 import IPQCPage from '@/components/pages/IPQCPage';
 import UsersPage from '@/components/pages/UsersPage';
 import DBManagementPage from '@/components/pages/DBManagementPage';
+
+const FQCAnalysisPage = dynamic(
+  () => import('@/components/pages/FQCAnalysisPage'),
+  { ssr: false }
+);
 
 type PageKey =
   | 'dashboard'
