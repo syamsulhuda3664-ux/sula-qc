@@ -1,3 +1,5 @@
+import { SUBDEFECT_ACTION_TEMPLATES } from './rca-subdefect-templates';
+
 export interface RCACategory {
   category: string;
   categoryKey: string;
@@ -412,9 +414,12 @@ export function generateWeeklyRCA(
       rank: i + 1,
     }));
 
-  // Auto-generate action items for top 3 SUB-DEFECTS (not per category)
+  // Auto-generate action items for top 3 SUB-DEFECTS using sub-defect kamus
   const actions: RCAAction[] = topSubDefects.map((sub, i) => {
-    const template = ACTION_TEMPLATES[sub.category] || ACTION_TEMPLATES['Other'];
+    // Priority: sub-defect specific kamus > category template > Other fallback
+    const template = SUBDEFECT_ACTION_TEMPLATES[sub.subDefect]
+      || ACTION_TEMPLATES[sub.category]
+      || ACTION_TEMPLATES['Other'];
     // Get other sub-defects from the same category for reference
     const sameCatSubs = allSubDefects
       .filter(s => s.categoryKey === sub.categoryKey && s.subDefect !== sub.subDefect)
