@@ -1034,7 +1034,7 @@ export function exportFQCAnalysisExcel(
     font: { name: 'Arial', sz: 8, italic: true, color: { rgb: 'AAAAAA' } },
   });
 
-  setColWidths(ws1, [10, 36, 18, 16, 16, 16]);
+  setColWidths(ws1, [11.82, 36.0, 20.45, 21.73, 19.36, 16.0]);
   ws1['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: totalCols - 1 } });
   XLSX.utils.book_append_sheet(wb, ws1, '缺陷分析 Analysis');
 
@@ -1315,9 +1315,26 @@ async function buildFQCDailySheet(
 
   // Column widths
   const refWidths = [
-    5.0, 12.36328125, 26.36328125, 10.36328125, 18.1796875, 20.0,
-    12.08984375, 15.54296875, 10.54296875, 9.6328125, 11.54296875,
-    11.90625, 8.43, 8.43, 8.43, 8.43, 8.43, 8.43, 8.43, 8.43,
+    5.0,             // A: No
+    12.36328125,     // B: Date
+    26.36328125,     // C: Line
+    10.36328125,     // D: Inspector
+    18.1796875,      // E: Style
+    20.0,            // F: Order No.
+    12.08984375,     // G: Order Qty
+    15.54296875,     // H: Inspected
+    10.54296875,     // I: OK
+    9.6328125,       // J: NG
+    11.54296875,     // K: Defect Rate
+    11.90625,        // L: Stitching
+    8.453125,        // M: Logo
+    11.7265625,      // N: Material
+    13.0,            // O: Hardware
+    13.0,            // P: Appearance
+    13.0,            // Q: Zipper
+    13.0,            // R: Webbing
+    13.0,            // S: Other
+    13.0,            // T: Preparation
   ];
   for (let c = 0; c < totalCols; c++) {
     ws.getColumn(c + 1).width = refWidths[c] || 8.43;
@@ -1670,12 +1687,12 @@ function buildFQCAnalysisSheet(
   footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
 
   // Column widths
-  ws.getColumn(1).width = 10;
-  ws.getColumn(2).width = 36;
-  ws.getColumn(3).width = 18;
-  ws.getColumn(4).width = 16;
-  ws.getColumn(5).width = 16;
-  ws.getColumn(6).width = 16;
+  ws.getColumn(1).width = 11.82;   // A: Rank
+  ws.getColumn(2).width = 36.0;     // B: Category / Sub-Defect / Style
+  ws.getColumn(3).width = 20.45;    // C: Defect Count / Category / Inspected Qty
+  ws.getColumn(4).width = 21.73;    // D: Percentage / Count / Defect Rate
+  ws.getColumn(5).width = 19.36;    // E: PPM / (empty)
+  ws.getColumn(6).width = 16.0;     // F: Remark / (empty)
 }
 
 // ---------------------------------------------------------------------------
