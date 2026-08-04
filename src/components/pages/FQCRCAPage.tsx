@@ -40,27 +40,48 @@ const BT_SHORT: Record<string, string> = {
   PTGH: 'GH',
 };
 
+/**
+ * Strict monthly week periods.
+ * Week 1 always starts from the 1st of the month (whatever day of week).
+ * Week 1 ends on the first Saturday on or after the 1st.
+ * Subsequent weeks: Monday to Saturday.
+ * If Saturday exceeds month end, cap at last day of month.
+ */
 function getWeekPeriods(year: number, month: number) {
-  const periods: { monday: string; saturday: string; weekNum: number }[] = [];
-  const firstDay = new Date(year, month - 1, 1);
-  let dayOfWeek = firstDay.getDay();
-  if (dayOfWeek === 0) dayOfWeek = 7;
-  const diff = 1 - dayOfWeek;
-  const firstMonday = new Date(firstDay);
-  firstMonday.setDate(firstDay.getDate() + diff);
-  if (firstMonday.getMonth() !== month - 1) {
-    firstMonday.setDate(firstMonday.getDate() + 7);
-  }
+  const periods: { start: string; end: string; weekNum: number }[] = [];
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const lastDate = new Date(year, month, 0).getDate(); // last day of month
+  const monthIdx = month - 1;
+
+  let current = new Date(year, monthIdx, 1); // day 1
   let weekNum = 1;
-  let current = new Date(firstMonday);
-  while (current.getMonth() === month - 1) {
-    const saturday = new Date(current);
-    saturday.setDate(current.getDate() + 5);
-    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    periods.push({ monday: fmt(current), saturday: fmt(saturday), weekNum });
+
+  while (current.getDate() <= lastDate && current.getMonth() === monthIdx) {
+    const weekStart = new Date(current);
+
+    // Find end of week: Saturday, or month end if earlier
+    let weekEnd = new Date(current);
+    while (weekEnd.getDay() !== 6 && weekEnd.getDate() < lastDate) {
+      weekEnd.setDate(weekEnd.getDate() + 1);
+    }
+    // Cap at month end
+    if (weekEnd.getMonth() !== monthIdx) {
+      weekEnd = new Date(year, monthIdx, lastDate);
+    }
+
+    periods.push({ start: fmt(weekStart), end: fmt(weekEnd), weekNum });
     weekNum++;
-    current.setDate(current.getDate() + 7);
+
+    // If week ended on Saturday, next week starts on Monday (skip Sunday)
+    // If week ended before Saturday (month end), we're done
+    if (weekEnd.getDay() === 6) {
+      current = new Date(weekEnd);
+      current.setDate(weekEnd.getDate() + 2); // Sat + 2 = Mon
+    } else {
+      break;
+    }
   }
+
   return periods;
 }
 
@@ -325,18 +346,18 @@ export default function FQCRCAPage() {
           <div className="space-y-3">
             {weekPeriods.map((wp) => {
               // Find all RCAs for this week period
-              const weekRcas = records.filter((r) => r.week_start === wp.monday);
+              const weekRcas = records.filter((r) => r.week_start === wp.start && r.week_end === wp.end);
               const anyExpanded = weekRcas.some((r) => expandedWeeks.has(r.id));
 
               return (
-                <div key={wp.monday} className="space-y-2">
+                <div key={`${wp.start}_${wp.end}`} className="space-y-2">
                   {/* Week header */}
                   <div className="flex items-center gap-2 px-1">
                     <div className="flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold bg-blue-600 text-white">
                       {wp.weekNum}
                     </div>
                     <span className="text-sm font-semibold text-slate-700">{t('rca.weekLabel')} {wp.weekNum}</span>
-                    <span className="text-xs text-slate-400">{wp.monday} ~ {wp.saturday}</span>
+                    <span className="text-xs text-slate-400">{wp.start} ~ {wp.end}</span>
                     {weekRcas.length > 0 && weekRcas.map((r) => (
                       <Badge key={r.id} variant="outline" className={`text-[10px] ${BT_COLORS[r.business_type || ''] || 'bg-slate-100 text-slate-600'}`}>
                         {BT_SHORT[r.business_type || ''] || r.business_type || 'ALL'}

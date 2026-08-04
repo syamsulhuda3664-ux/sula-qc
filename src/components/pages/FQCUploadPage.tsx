@@ -90,13 +90,23 @@ export default function FQCUploadPage() {
           partialErrors: data.errors || undefined,
         });
         setFile(null);
-        // Auto-generate RCA for affected Mon-Sat periods
+        // Auto-generate RCA for affected months using strict weekly periods
         try {
-          await fetch('/api/fqc/rca', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'auto-generate' }),
-          });
+          // Extract date range from sheets to target the right months
+          const sheets = upload.sheets || [];
+          const dates = sheets.map((s: SheetResult) => s.date).filter(Boolean);
+          if (dates.length > 0) {
+            const sorted = dates.sort();
+            await fetch('/api/fqc/rca', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'auto-generate',
+                date_from: sorted[0],
+                date_to: sorted[sorted.length - 1],
+              }),
+            });
+          }
         } catch { /* silent */ }
       } else {
         setResult({ success: false, message: data.error || t('fqc.upload.error') });
