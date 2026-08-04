@@ -1044,6 +1044,641 @@ export function exportFQCAnalysisExcel(
 }
 
 // ---------------------------------------------------------------------------
+// 2b. FQC Combined Export: Sheet 1 = FQC Daily (ExcelJS), Sheet 2 = FQC Analysis (XLSX)
+//     Since ExcelJS and XLSX produce different buffer formats, we build Sheet 1
+//     with ExcelJS, then convert the XLSX-based Analysis sheet into an
+//     ExcelJS worksheet to keep everything in one workbook.
+// ---------------------------------------------------------------------------
+
+export async function exportFQCAnalysisCombinedExcel(
+  data: Record<string, unknown>[],
+  filters: ExportFilters,
+  _lang: ExportLang,
+): Promise<ExcelExportResult> {
+  // ---- Create the combined workbook ----
+  const wb = new ExcelJS.Workbook();
+
+  // Sheet 1: FQC Daily
+  const ws1 = wb.addWorksheet('FQC日报明细 Daily Detail');
+  await buildFQCDailySheet(wb, ws1, data, filters);
+
+  // Sheet 2: FQC Defect Analysis
+  const ws2 = wb.addWorksheet('缺陷分析 Analysis');
+  buildFQCAnalysisSheet(ws2, data, filters);
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const period = filters.dateFrom ? `${filters.dateFrom}_${filters.dateTo || 'all'}` : 'All';
+  return { buffer: new Uint8Array(buffer as ArrayBuffer), fileName: `SULA-QC_FQC_Analysis_Report_${period}.xlsx` };
+}
+
+// Helper: build FQC Daily sheet in ExcelJS (extracted from exportFQCDailyExcel)
+async function buildFQCDailySheet(
+  wb: ExcelJS.Workbook,
+  ws: ExcelJS.Worksheet,
+  data: Record<string, unknown>[],
+  filters: ExportFilters,
+): Promise<void> {
+  const totalCols = FQC_DAILY_HEADERS.length;
+
+  const MED_BLUE    = 'FF2B5F8A';
+  const HEADER_BG   = 'FF1F4E79';
+  const PALE_BLUE   = 'FFEDF2F9';
+  const LIGHT_BLUE  = 'FFD6E4F0';
+  const WHITE_ARGB  = 'FFFFFFFF';
+  const GRAY_FOOTER = 'FF999999';
+  const FILTER_TEXT = 'FF4A6FA5';
+
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top:    { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
+  };
+
+  // Row 1: Title
+  const row1 = ws.getRow(1);
+  row1.height = 63;
+  ws.mergeCells(1, 1, 1, totalCols);
+  const titleCell = row1.getCell(1);
+  titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC Daily Detail Report';
+  titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: WHITE_ARGB } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  // Row 2-3: Spacers
+  ws.getRow(2).height = 4;
+  ws.getRow(3).height = 3;
+
+  // Row 4: Filter info
+  let currentRow = 4;
+  const filterParts: string[] = [];
+  if (filters.dateFrom) filterParts.push(`From: ${filters.dateFrom}`);
+  if (filters.dateTo) filterParts.push(`To: ${filters.dateTo}`);
+  if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
+  if (filters.productionLine) filterParts.push(`Line: ${filters.productionLine}`);
+
+  if (filterParts.length > 0) {
+    const filterRow = ws.getRow(currentRow);
+    filterRow.height = 13.4;
+    ws.mergeCells(currentRow, 1, currentRow, totalCols);
+    const fCell = filterRow.getCell(1);
+    fCell.value = filterParts.join('   |   ');
+    fCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: FILTER_TEXT } };
+    fCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+    fCell.alignment = { vertical: 'middle' };
+  }
+  currentRow++;
+
+  // Header row
+  const headerExcelRow = ws.getRow(currentRow);
+  headerExcelRow.height = 43.5;
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = headerExcelRow.getCell(c);
+    cell.value = FQC_DAILY_HEADERS[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  // Data processing
+  const sortedData = [...data].sort((a, b) => {
+    const da = String(a.inspection_date || '');
+    const db = String(b.inspection_date || '');
+    const dateComp = da.localeCompare(db);
+    if (dateComp !== 0) return dateComp;
+    const la = extractLineSortKey(String(a.line || a.production_line || ''));
+    const lb = extractLineSortKey(String(b.line || b.production_line || ''));
+    return la.localeCompare(lb);
+  });
+
+  const dateGroups: Record<string, Record<string, unknown>[]> = {};
+  for (const record of sortedData) {
+    const dKey = String(record.inspection_date || 'unknown');
+    if (!dateGroups[dKey]) dateGroups[dKey] = [];
+    dateGroups[dKey].push(record);
+  }
+
+  let grandOrderQty = 0, grandInspected = 0, grandOK = 0, grandNG = 0;
+  const grandDefects: Record<string, number> = {
+    defect_stitching: 0, defect_logo: 0, defect_material: 0,
+    defect_hardware: 0, defect_appearance: 0, defect_zipper: 0,
+    defect_webbing: 0, defect_other: 0, defect_preparation: 0,
+  };
+  let rowNum = 1;
+  const dates = Object.keys(dateGroups).sort();
+  const numberColSet = new Set<number>([1, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+
+  for (const date of dates) {
+    const group = dateGroups[date];
+    let dayOrderQty = 0, dayInspected = 0, dayOK = 0, dayNG = 0;
+    const dayDefects: Record<string, number> = {
+      defect_stitching: 0, defect_logo: 0, defect_material: 0,
+      defect_hardware: 0, defect_appearance: 0, defect_zipper: 0,
+      defect_webbing: 0, defect_other: 0, defect_preparation: 0,
+    };
+
+    for (const rec of group) {
+      const orderQty = Number(rec.order_qty) || 0;
+      const inspectedQty = Number(rec.inspected_qty) || 0;
+      const okQty = Number(rec.ok_qty) || 0;
+      const ngQty = Number(rec.ng_qty) || 0;
+      const defectRate = Number(rec.defect_rate) || 0;
+
+      dayOrderQty += orderQty;
+      dayInspected += inspectedQty;
+      dayOK += okQty;
+      dayNG += ngQty;
+
+      for (const key of Object.keys(dayDefects)) {
+        let val = Number(rec[key]) || 0;
+        if (key === 'defect_stitching') {
+          val += Number(rec.defect_stitch_defect) || 0;
+        }
+        dayDefects[key] += val;
+      }
+
+      const rateDisplay = `${defectRate.toFixed(2)}%`;
+
+      const vals: (string | number)[] = [
+        rowNum,
+        String(rec.inspection_date || ''),
+        String(rec.production_line || ''),
+        String(rec.inspector_name || ''),
+        String(rec.style_code || ''),
+        String(rec.order_no || ''),
+        orderQty, inspectedQty, okQty, ngQty, rateDisplay,
+        (Number(rec.defect_stitching) || 0) + (Number(rec.defect_stitch_defect) || 0),
+        Number(rec.defect_logo) || 0,
+        Number(rec.defect_material) || 0,
+        Number(rec.defect_hardware) || 0,
+        Number(rec.defect_appearance) || 0,
+        Number(rec.defect_zipper) || 0,
+        Number(rec.defect_webbing) || 0,
+        Number(rec.defect_other) || 0,
+        Number(rec.defect_preparation) || 0,
+      ];
+
+      const bgColor = rowNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
+      const excelRow = ws.getRow(currentRow);
+      excelRow.height = 20;
+      for (let c = 1; c <= totalCols; c++) {
+        const cell = excelRow.getCell(c);
+        const val = vals[c - 1];
+        cell.value = typeof val === 'number' ? val : String(val);
+        cell.font = { name: 'Arial', size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+        cell.alignment = numberColSet.has(c)
+          ? { horizontal: 'right', vertical: 'middle' }
+          : { horizontal: 'left', vertical: 'middle' };
+        cell.border = thinBorder;
+      }
+      currentRow++;
+      rowNum++;
+    }
+
+    // Daily subtotal
+    const dayRate = dayInspected > 0 ? dayNG / dayInspected : 0;
+    const subtotalVals: (string | number)[] = [
+      '', `小计 Subtotal: ${date}`, '', '', '', '',
+      dayOrderQty, dayInspected, dayOK, dayNG,
+      fmtPct(dayRate, true),
+      ...Object.values(dayDefects),
+    ];
+    const subtotalExcelRow = ws.getRow(currentRow);
+    subtotalExcelRow.height = 22;
+    ws.mergeCells(currentRow, 2, currentRow, 6);
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = subtotalExcelRow.getCell(c);
+      if (c === 1) {
+        cell.value = '';
+      } else if (c >= 7 && c <= 20 && typeof subtotalVals[c - 1] === 'number') {
+        cell.value = subtotalVals[c - 1] as number;
+      } else {
+        cell.value = subtotalVals[c - 1] !== undefined ? String(subtotalVals[c - 1]) : '';
+      }
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+      cell.alignment = numberColSet.has(c)
+        ? { horizontal: 'right', vertical: 'middle' }
+        : { horizontal: 'left', vertical: 'middle' };
+      cell.border = thinBorder;
+    }
+    currentRow++;
+
+    grandOrderQty += dayOrderQty;
+    grandInspected += dayInspected;
+    grandOK += dayOK;
+    grandNG += dayNG;
+    for (const key of Object.keys(grandDefects)) {
+      grandDefects[key] += dayDefects[key];
+    }
+  }
+
+  // Grand total
+  const grandRate = grandInspected > 0 ? grandNG / grandInspected : 0;
+  const grandVals: (string | number)[] = [
+    '', '合计 GRAND TOTAL', '', '', '', '',
+    grandOrderQty, grandInspected, grandOK, grandNG,
+    fmtPct(grandRate, true),
+    ...Object.values(grandDefects),
+  ];
+  const grandExcelRow = ws.getRow(currentRow);
+  grandExcelRow.height = 25;
+  ws.mergeCells(currentRow, 2, currentRow, 6);
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = grandExcelRow.getCell(c);
+    if (c === 1) {
+      cell.value = '';
+    } else if (c >= 7 && c <= 20 && typeof grandVals[c - 1] === 'number') {
+      cell.value = grandVals[c - 1] as number;
+    } else {
+      cell.value = grandVals[c - 1] !== undefined ? String(grandVals[c - 1]) : '';
+    }
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = numberColSet.has(c)
+      ? { horizontal: 'right', vertical: 'middle' }
+      : { horizontal: 'left', vertical: 'middle' };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  // Footer
+  currentRow++;
+  const footerRow = ws.getRow(currentRow);
+  ws.mergeCells(currentRow, 1, currentRow, totalCols);
+  const footerCell = footerRow.getCell(1);
+  footerCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
+  footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
+
+  // Column widths
+  const refWidths = [
+    5.0, 12.36328125, 26.36328125, 10.36328125, 18.1796875, 20.0,
+    12.08984375, 15.54296875, 10.54296875, 9.6328125, 11.54296875,
+    11.90625, 8.43, 8.43, 8.43, 8.43, 8.43, 8.43, 8.43, 8.43,
+  ];
+  for (let c = 0; c < totalCols; c++) {
+    ws.getColumn(c + 1).width = refWidths[c] || 8.43;
+  }
+}
+
+// Helper: build FQC Analysis sheet in ExcelJS
+function buildFQCAnalysisSheet(
+  ws: ExcelJS.Worksheet,
+  data: Record<string, unknown>[],
+  filters: ExportFilters,
+): void {
+  const MED_BLUE    = 'FF2B5F8A';
+  const HEADER_BG   = 'FF1F4E79';
+  const PALE_BLUE   = 'FFEDF2F9';
+  const LIGHT_BLUE  = 'FFD6E4F0';
+  const WHITE_ARGB  = 'FFFFFFFF';
+  const GRAY_FOOTER = 'FF999999';
+  const FILTER_TEXT = 'FF4A6FA5';
+
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top:    { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
+  };
+
+  // ---- Title ----
+  const totalCols = 6;
+  const row1 = ws.getRow(1);
+  row1.height = 50;
+  ws.mergeCells(1, 1, 1, totalCols);
+  const titleCell = row1.getCell(1);
+  titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC Defect Analysis 缺陷分析报告';
+  titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: WHITE_ARGB } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  ws.getRow(2).height = 4;
+  let currentRow = 3;
+
+  // Filter info
+  const filterParts: string[] = [];
+  if (filters.dateFrom) filterParts.push(`From: ${filters.dateFrom}`);
+  if (filters.dateTo) filterParts.push(`To: ${filters.dateTo}`);
+  if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
+  if (filterParts.length > 0) {
+    const filterRow = ws.getRow(currentRow);
+    filterRow.height = 13.4;
+    ws.mergeCells(currentRow, 1, currentRow, totalCols);
+    const fCell = filterRow.getCell(1);
+    fCell.value = filterParts.join('   |   ');
+    fCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: FILTER_TEXT } };
+    fCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+    fCell.alignment = { vertical: 'middle' };
+    currentRow++;
+  } else {
+    currentRow++;
+  }
+
+  // ---- Aggregate data ----
+  const CAT_KEYS = [
+    { key: 'defect_stitching', name: '针车问题 / Stitching' },
+    { key: 'defect_logo', name: 'LOGO问题 / Logo' },
+    { key: 'defect_material', name: '面料问题 / Material' },
+    { key: 'defect_hardware', name: '五金问题 / Hardware' },
+    { key: 'defect_appearance', name: '外观问题 / Appearance' },
+    { key: 'defect_zipper', name: '拉链问题 / Zipper' },
+    { key: 'defect_webbing', name: '织带问题 / Webbing' },
+    { key: 'defect_other', name: '其它问题 / Other' },
+    { key: 'defect_preparation', name: '备料问题 / Preparation' },
+  ];
+
+  const catTotals: Record<string, number> = {};
+  for (const cat of CAT_KEYS) catTotals[cat.key] = 0;
+  let totalInspected = 0;
+
+  for (const r of data) {
+    for (const cat of CAT_KEYS) {
+      let val = Number(r[cat.key]) || 0;
+      if (cat.key === 'defect_stitching') val += Number(r.defect_stitch_defect) || 0;
+      catTotals[cat.key] += val;
+    }
+    totalInspected += Number(r.inspected_qty) || 0;
+  }
+
+  const grandTotalDefects = Object.values(catTotals).reduce((a, b) => a + b, 0);
+  const sortedCats = CAT_KEYS.map((cat) => ({ ...cat, count: catTotals[cat.key] }))
+    .sort((a, b) => b.count - a.count);
+
+  // ---- Section A: Category Summary ----
+  currentRow++;
+  const sectionARow = ws.getRow(currentRow);
+  sectionARow.height = 22;
+  ws.mergeCells(currentRow, 1, currentRow, totalCols);
+  const sectionACell = sectionARow.getCell(1);
+  sectionACell.value = 'A. 缺陷类别汇总 / Defect Category Summary';
+  sectionACell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF333333' } };
+  sectionACell.alignment = { vertical: 'middle' };
+  currentRow++;
+
+  const catHeaders = ['排名 / Rank', '缺陷类别 / Category', '缺陷数 / Defect Count', '占比 / Percentage', 'PPM', '备注 / Remark'];
+  const catHeaderRow = ws.getRow(currentRow);
+  catHeaderRow.height = 28;
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = catHeaderRow.getCell(c);
+    cell.value = catHeaders[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  for (let i = 0; i < sortedCats.length; i++) {
+    const cat = sortedCats[i];
+    const pct = grandTotalDefects > 0 ? ((cat.count / grandTotalDefects) * 100).toFixed(2) + '%' : '0.00%';
+    const ppm = totalInspected > 0 ? Math.round((cat.count / totalInspected) * 1_000_000) : 0;
+    const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
+
+    const excelRow = ws.getRow(currentRow);
+    excelRow.height = 20;
+    const vals: (string | number)[] = [i + 1, cat.name, cat.count, pct, ppm, ''];
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = excelRow.getCell(c);
+      const val = vals[c - 1];
+      cell.value = typeof val === 'number' ? val : String(val);
+      cell.font = { name: 'Arial', size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.alignment = c >= 3 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+      cell.border = thinBorder;
+    }
+    currentRow++;
+  }
+
+  // Category total
+  const catTotalRow = ws.getRow(currentRow);
+  catTotalRow.height = 22;
+  const catTotalVals = ['', '合计 / Total', grandTotalDefects, '100.00%', '', ''];
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = catTotalRow.getCell(c);
+    cell.value = catTotalVals[c - 1] !== undefined ? String(catTotalVals[c - 1]) : '';
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  // ---- Section B: Top 20 Sub-defects ----
+  currentRow++;
+  const sectionBRow = ws.getRow(currentRow);
+  sectionBRow.height = 22;
+  ws.mergeCells(currentRow, 1, currentRow, totalCols);
+  const sectionBCell = sectionBRow.getCell(1);
+  sectionBCell.value = 'B. 子缺陷排名TOP20 / Top 20 Sub-Defects';
+  sectionBCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF333333' } };
+  sectionBCell.alignment = { vertical: 'middle' };
+  currentRow++;
+
+  const subHeaders = ['排名 / Rank', '子缺陷 / Sub-Defect', '类别 / Category', '数量 / Count', '占比 / Percentage', ''];
+  const subHeaderRow = ws.getRow(currentRow);
+  subHeaderRow.height = 28;
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = subHeaderRow.getCell(c);
+    cell.value = subHeaders[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  // Aggregate sub-defects
+  const subCols = [
+    'sub_float_fold_skip','sub_missing_loose_stitch','sub_not_stitched','sub_needle_hole','sub_missing_bartack','sub_presser_mark','sub_backtack_off','sub_wrong_panel','sub_end_unfolded','sub_asymmetric','sub_triangle_uneven','sub_thread_bleed','sub_thread_ends','sub_foam_misaligned','sub_stitch_offcenter','sub_logo_crooked','sub_logo_inverted','sub_logo_defective','sub_logo_detached','sub_color_diff','sub_yarn_pull','sub_wrinkle','sub_damaged','sub_seam_open','sub_scratched','sub_poor_function','sub_missing_accessory','sub_dirty_oily','sub_bone_uneven','sub_bag_crooked','sub_handle_misaligned','sub_missing_rivet','sub_sharp_stuck','sub_zipper_wave','sub_zipper_head_reversed','sub_wrong_color_zipper','sub_webbing_twisted','sub_webbing_misplaced','sub_wash_label_reversed','sub_wash_label_wrong','sub_woven_label_reversed','sub_woven_label_missing','sub_lining_reversed','sub_plastic_defective','sub_rivet_defective','sub_accessory_crooked','sub_paint_off','sub_bartack_misaligned','sub_bartack_nonstandard','sub_logo_tilted','sub_velcro_tilted','sub_velcro_loose','sub_trolley_cover_tilted','sub_trolley_cover_short','sub_webbing_height_off','sub_stitch_margin_inconsistent','sub_loose_thread','sub_float_skip2','sub_pattern_stitch_inconsistent','sub_elastic_tilted','sub_logo_text_detached','sub_logo_scratched','sub_triangle_reversed',
+  ];
+  const SUBDEFECT_DEFAULT_NAMES: { name: string; category: string }[] = [
+    { name: '跳针 Skip stitch', category: '针车问题 / Stitching' },
+    { name: '断线 Thread break', category: '针车问题 / Stitching' },
+    { name: '浮线 Loose thread', category: '针车问题 / Stitching' },
+    { name: '断针 Needle break', category: '针车问题 / Stitching' },
+    { name: '针迹不均 Uneven stitch', category: '针车问题 / Stitching' },
+    { name: '起皱 Puckering', category: '针车问题 / Stitching' },
+    { name: '线头 Thread tail', category: '针车问题 / Stitching' },
+    { name: '重针 Double stitch', category: '针车问题 / Stitching' },
+    { name: '漏针 Missing stitch', category: '针车问题 / Stitching' },
+    { name: '反线 Wrong thread', category: '针车问题 / Stitching' },
+    { name: '针距不对 Wrong pitch', category: '针车问题 / Stitching' },
+    { name: '线迹歪斜 Crooked stitch', category: '针车问题 / Stitching' },
+    { name: '缝合不良 Poor sewing', category: '针车问题 / Stitching' },
+    { name: '接线不良 Joint issue', category: '针车问题 / Stitching' },
+    { name: '爆线 Seam burst', category: '针车问题 / Stitching' },
+    { name: 'Logo歪斜 Logo misaligned', category: 'LOGO问题 / Logo' },
+    { name: 'Logo脱落 Logo peeling', category: 'LOGO问题 / Logo' },
+    { name: 'Logo变色 Logo discolored', category: 'LOGO问题 / Logo' },
+    { name: 'Logo缺件 Logo missing', category: 'LOGO问题 / Logo' },
+    { name: '色差 Color deviation', category: '面料问题 / Material' },
+    { name: '破洞 Hole', category: '面料问题 / Material' },
+    { name: '污渍 Stain', category: '面料问题 / Material' },
+    { name: '起毛 Pilling', category: '面料问题 / Material' },
+    { name: '面料错误 Wrong material', category: '面料问题 / Material' },
+    { name: '拉链不良 Zipper defect', category: '五金问题 / Hardware' },
+    { name: '五金缺失 Hardware missing', category: '五金问题 / Hardware' },
+    { name: '五金松动 Hardware loose', category: '五金问题 / Hardware' },
+    { name: '刮伤 Scratch', category: '外观问题 / Appearance' },
+    { name: '变形 Deformation', category: '外观问题 / Appearance' },
+    { name: '褶皱 Wrinkle', category: '外观问题 / Appearance' },
+    { name: '色斑 Color spot', category: '外观问题 / Appearance' },
+    { name: '尺寸不对 Wrong size', category: '外观问题 / Appearance' },
+    { name: '拉链卡顿 Zipper stuck', category: '拉链问题 / Zipper' },
+    { name: '拉链头缺失 Puller missing', category: '拉链问题 / Zipper' },
+    { name: '拉链脱色 Zipper faded', category: '拉链问题 / Zipper' },
+    { name: '拉链断裂 Zipper broken', category: '拉链问题 / Zipper' },
+    { name: '织带不良 Webbing defect', category: '织带问题 / Webbing' },
+    { name: '织带错色 Wrong webbing color', category: '织带问题 / Webbing' },
+    { name: '尺寸不符 Dimension mismatch', category: '其它问题 / Other' },
+    { name: '重量不符 Weight mismatch', category: '其它问题 / Other' },
+    { name: '异味 Odor', category: '其它问题 / Other' },
+    { name: '标签问题 Label issue', category: '其它问题 / Other' },
+    { name: '包装问题 Packaging issue', category: '其它问题 / Other' },
+    { name: '其他 Other', category: '其它问题 / Other' },
+    { name: '备料错误 Wrong preparation', category: '备料问题 / Preparation' },
+    { name: '物料缺失 Material missing', category: '备料问题 / Preparation' },
+    { name: '物料混料 Material mixed', category: '备料问题 / Preparation' },
+    { name: '裁剪不良 Cutting defect', category: '备料问题 / Preparation' },
+    { name: '排料不当 Layout error', category: '备料问题 / Preparation' },
+    { name: '数量不足 Qty shortage', category: '备料问题 / Preparation' },
+    { name: '规格不符 Spec mismatch', category: '备料问题 / Preparation' },
+    { name: '色号错误 Color code wrong', category: '备料问题 / Preparation' },
+    { name: '批次错误 Batch error', category: '备料问题 / Preparation' },
+    { name: '配件错误 Accessory wrong', category: '备料问题 / Preparation' },
+    { name: '超期物料 Expired material', category: '备料问题 / Preparation' },
+    { name: '物料破损 Material damaged', category: '备料问题 / Preparation' },
+    { name: '物料脏污 Material dirty', category: '备料问题 / Preparation' },
+    { name: '物料色差 Material color diff', category: '备料问题 / Preparation' },
+    { name: '备料延迟 Prep delayed', category: '备料问题 / Preparation' },
+    { name: '余料管理 Scrap issue', category: '备料问题 / Preparation' },
+    { name: '车缝不良 Sewing defect', category: '针车问题 / Stitching' },
+  ];
+
+  const subDefectCounts: Record<string, { count: number; category: string }> = {};
+  for (const r of data) {
+    for (let i = 0; i < Math.min(subCols.length, SUBDEFECT_DEFAULT_NAMES.length); i++) {
+      const count = Number(r[subCols[i]]) || 0;
+      if (count > 0) {
+        const info = SUBDEFECT_DEFAULT_NAMES[i];
+        const key = info.name;
+        if (!subDefectCounts[key]) {
+          subDefectCounts[key] = { count: 0, category: info.category };
+        }
+        subDefectCounts[key].count += count;
+      }
+    }
+  }
+
+  const topSubDefects = Object.entries(subDefectCounts)
+    .map(([name, info]) => ({ name, ...info }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 20);
+
+  for (let i = 0; i < topSubDefects.length; i++) {
+    const sd = topSubDefects[i];
+    const pct = grandTotalDefects > 0 ? ((sd.count / grandTotalDefects) * 100).toFixed(2) + '%' : '0.00%';
+    const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
+    const excelRow = ws.getRow(currentRow);
+    excelRow.height = 20;
+    const vals: (string | number)[] = [i + 1, sd.name, sd.category, sd.count, pct, ''];
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = excelRow.getCell(c);
+      const val = vals[c - 1];
+      cell.value = typeof val === 'number' ? val : String(val);
+      cell.font = { name: 'Arial', size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.alignment = c === 4 || c === 5 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+      cell.border = thinBorder;
+    }
+    currentRow++;
+  }
+
+  // ---- Section C: Top 15 Styles ----
+  currentRow += 2;
+  const sectionCRow = ws.getRow(currentRow);
+  sectionCRow.height = 22;
+  ws.mergeCells(currentRow, 1, currentRow, totalCols);
+  const sectionCCell = sectionCRow.getCell(1);
+  sectionCCell.value = 'C. 款号缺陷排名TOP15 / Top 15 Styles by Defects';
+  sectionCCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF333333' } };
+  sectionCCell.alignment = { vertical: 'middle' };
+  currentRow++;
+
+  const styleHeaders = ['排名 / Rank', '款号 / Style', '缺陷数 / Defect Count', '检验数量 / Inspected Qty', '不良率 / Defect Rate', ''];
+  const styleHeaderRow = ws.getRow(currentRow);
+  styleHeaderRow.height = 28;
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = styleHeaderRow.getCell(c);
+    cell.value = styleHeaders[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  const styleAgg: Record<string, { defects: number; inspected: number }> = {};
+  for (const r of data) {
+    const style = String(r.style_code || 'Unknown');
+    if (!styleAgg[style]) styleAgg[style] = { defects: 0, inspected: 0 };
+    const rowDef = ((Number(r.defect_stitching) || 0) + (Number(r.defect_stitch_defect) || 0))
+      + (Number(r.defect_logo) || 0) + (Number(r.defect_material) || 0)
+      + (Number(r.defect_hardware) || 0) + (Number(r.defect_appearance) || 0)
+      + (Number(r.defect_zipper) || 0) + (Number(r.defect_webbing) || 0)
+      + (Number(r.defect_other) || 0) + (Number(r.defect_preparation) || 0);
+    styleAgg[style].defects += rowDef;
+    styleAgg[style].inspected += Number(r.inspected_qty) || 0;
+  }
+
+  const topStyles = Object.entries(styleAgg)
+    .map(([style, info]) => ({ style, ...info }))
+    .sort((a, b) => b.defects - a.defects)
+    .slice(0, 15);
+
+  for (let i = 0; i < topStyles.length; i++) {
+    const s = topStyles[i];
+    const rate = s.inspected > 0 ? ((s.defects / s.inspected) * 100).toFixed(2) + '%' : '0.00%';
+    const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
+    const excelRow = ws.getRow(currentRow);
+    excelRow.height = 20;
+    const vals: (string | number)[] = [i + 1, s.style, s.defects, s.inspected, rate, ''];
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = excelRow.getCell(c);
+      const val = vals[c - 1];
+      cell.value = typeof val === 'number' ? val : String(val);
+      cell.font = { name: 'Arial', size: 10 };
+      if (c === 5 && s.inspected > 0 && (s.defects / s.inspected) * 100 > 5) {
+        cell.font = { name: 'Arial', size: 10, color: { argb: 'FFDC2626' } };
+      }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.alignment = c >= 3 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+      cell.border = thinBorder;
+    }
+    currentRow++;
+  }
+
+  // Footer
+  currentRow += 2;
+  const footerRow = ws.getRow(currentRow);
+  ws.mergeCells(currentRow, 1, currentRow, totalCols);
+  const footerCell = footerRow.getCell(1);
+  footerCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
+  footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
+
+  // Column widths
+  ws.getColumn(1).width = 10;
+  ws.getColumn(2).width = 36;
+  ws.getColumn(3).width = 18;
+  ws.getColumn(4).width = 16;
+  ws.getColumn(5).width = 16;
+  ws.getColumn(6).width = 16;
+}
+
+// ---------------------------------------------------------------------------
 // 3. OQC Rekap Excel
 // ---------------------------------------------------------------------------
 

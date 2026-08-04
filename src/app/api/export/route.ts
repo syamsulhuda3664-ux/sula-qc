@@ -4,14 +4,15 @@ import { authenticateRequest, getRoleLanguage } from '@/lib/auth';
 import {
   exportFQCDailyExcel,
   exportFQCAnalysisExcel,
+  exportFQCAnalysisCombinedExcel,
   exportFQCOQCExcel,
   exportIPQCExcel,
   type ExportFilters,
 } from '@/lib/excel-export';
 
-type ExportType = 'fqc-daily' | 'fqc-analysis' | 'oqc' | 'ipqc';
+type ExportType = 'fqc-daily' | 'fqc-analysis' | 'fqc-analysis-combined' | 'oqc' | 'ipqc';
 
-const VALID_TYPES: ExportType[] = ['fqc-daily', 'fqc-analysis', 'oqc', 'ipqc'];
+const VALID_TYPES: ExportType[] = ['fqc-daily', 'fqc-analysis', 'fqc-analysis-combined', 'oqc', 'ipqc'];
 
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "type must be 'fqc-daily', 'fqc-analysis', 'oqc', or 'ipqc'",
+            "type must be 'fqc-daily', 'fqc-analysis', 'fqc-analysis-combined', 'oqc', or 'ipqc'",
         },
         { status: 400 },
       );
@@ -110,6 +111,44 @@ export async function POST(request: NextRequest) {
       data = (records as Record<string, unknown>[]) || [];
 
       const result = exportFQCAnalysisExcel(data, exportFilters, lang);
+
+      return new NextResponse(Buffer.from(result.buffer), {
+        status: 200,
+        headers: {
+          'Content-Type':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(result.fileName)}"`,
+          'Cache-Control': 'no-cache',
+        },
+      });
+    }
+
+    if (type === 'fqc-analysis-combined') {
+      let query = adminClient.from('fqc_inspections').select('*');
+
+      if (dateFrom) query = query.gte('inspection_date', dateFrom);
+      if (dateTo) query = query.lte('inspection_date', dateTo);
+      if (businessType) query = query.eq('business_type', businessType);
+
+      const { data: records, error } = await query;
+      if (error) {
+        return NextResponse.json(
+          { error: 'Failed to export FQC analysis data' },
+          { status: 500 },
+        );
+      }
+      data = (records as Record<string, unknown>[]) || [];
+
+      let result: { buffer: Uint8Array; fileName: string };
+      try {
+        result = await exportFQCAnalysisCombinedExcel(data, exportFilters, lang);
+      } catch (xlsErr) {
+        console.error('XLSX generation error:', xlsErr);
+        return NextResponse.json(
+          { error: `Excel generation failed: ${xlsErr instanceof Error ? xlsErr.message : String(xlsErr)}` },
+          { status: 500 },
+        );
+      }
 
       return new NextResponse(Buffer.from(result.buffer), {
         status: 200,
