@@ -177,6 +177,7 @@ function SidebarNav({ items, activePage, onItemClick, collapsed, rcaPending, use
 
 function BusinessTypeSelector() {
   const { lockedType, setLockedType, isLocked } = useBusinessTypeLock();
+  const { t } = useI18n();
 
   return (
     <div className="flex items-center gap-1.5">
