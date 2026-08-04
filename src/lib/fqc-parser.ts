@@ -90,6 +90,15 @@ export interface ParseDebugInfo {
   errors: string[];
 }
 
+export interface ParsedSheet {
+  sheetName: string;
+  date: Date;
+  dateStr: string;
+  records: FQCRecord[];
+  businessType: string;
+  debug?: ParseDebugInfo;
+}
+
 function getCellValue(sheet: XLSX.WorkSheet, row: number, col: number): number | string {
   const addr = XLSX.utils.encode_cell({ r: row, c: col });
   const cell = sheet[addr];
@@ -274,11 +283,16 @@ function detectDataEndRow(sheet: XLSX.WorkSheet, maxRow: number, minRow: number)
   return maxRow;
 }
 
-export async function parseFQCExcel(
-  buffer: ArrayBuffer
-): Promise<{ date: Date; records: FQCRecord[]; businessType: string; debug?: ParseDebugInfo }> {
+/**
+ * Parse a single sheet from an FQC Excel workbook.
+ * Internal helper used by both parseFQCExcel (single-sheet) and parseFQCExcelMultiSheet.
+ */
+function parseSingleSheet(
+  workbook: XLSX.WorkBook,
+  sheetName: string
+): { date: Date; records: FQCRecord[]; businessType: string; debug: ParseDebugInfo } {
   const debug: ParseDebugInfo = {
-    sheetName: '',
+    sheetName,
     totalRows: 0,
     totalCols: 0,
     detectedDataStart: 0,
@@ -289,17 +303,10 @@ export async function parseFQCExcel(
     errors: [],
   };
 
-  const workbook = XLSX.read(buffer, {
-    type: 'array',
-    cellDates: true,
-  });
-
-  const sheetName = workbook.SheetNames[0];
-  debug.sheetName = sheetName;
   const sheet = workbook.Sheets[sheetName];
 
-  if (!sheet['!ref']) {
-    debug.errors.push('Sheet has no data range (!ref is empty)');
+  if (!sheet || !sheet['!ref']) {
+    debug.errors.push(`Sheet "${sheetName}" has no data range (!ref is empty)`);
     return { date: new Date(), records: [], businessType: 'OTHER', debug };
   }
 
@@ -346,7 +353,6 @@ export async function parseFQCExcel(
 
     // Skip invalid data rows
     if (!isValidDataRow(sheet, r)) {
-      // Collect info about skipped rows for debugging
       const dateVal = getCellValue(sheet, r, COL.date);
       const styleVal = getCellValue(sheet, r, COL.style);
       if (dateVal !== 0 && dateVal && String(dateVal).trim() !== '') {
@@ -397,16 +403,9 @@ export async function parseFQCExcel(
     const defectStitchDefect = Number(getCellValue(sheet, r, COL.stitchDefect)) || 0;
 
     const totalDefects =
-      defectStitching +
-      defectLogo +
-      defectMaterial +
-      defectHardware +
-      defectAppearance +
-      defectZipper +
-      defectWebbing +
-      defectOther +
-      defectPreparation +
-      defectStitchDefect;
+      defectStitching + defectLogo + defectMaterial + defectHardware +
+      defectAppearance + defectZipper + defectWebbing + defectOther +
+      defectPreparation + defectStitchDefect;
 
     const subDefects = extractSubDefects(sheet, r);
 
@@ -464,12 +463,43 @@ export async function parseFQCExcel(
     }
   }
 
-  return {
-    date: sheetDate,
-    records,
-    businessType: primaryBusinessType,
-    debug,
-  };
+  return { date: sheetDate, records, businessType: primaryBusinessType, debug };
+}
+
+export async function parseFQCExcel(
+  buffer: ArrayBuffer
+): Promise<{ date: Date; records: FQCRecord[]; businessType: string; debug?: ParseDebugInfo }> {
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const sheetName = workbook.SheetNames[0];
+  const result = parseSingleSheet(workbook, sheetName);
+  return result;
+}
+
+/**
+ * Parse ALL sheets in an Excel file. Each sheet is treated as one day's report.
+ * Returns an array of ParsedSheet, one per sheet that contains valid records.
+ */
+export async function parseFQCExcelMultiSheet(
+  buffer: ArrayBuffer
+): Promise<ParsedSheet[]> {
+  const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+  const results: ParsedSheet[] = [];
+
+  for (const sheetName of workbook.SheetNames) {
+    const parsed = parseSingleSheet(workbook, sheetName);
+    if (parsed.records.length > 0) {
+      results.push({
+        sheetName,
+        date: parsed.date,
+        dateStr: parsed.date.toISOString().split('T')[0],
+        records: parsed.records,
+        businessType: parsed.businessType,
+        debug: parsed.debug,
+      });
+    }
+  }
+
+  return results;
 }
 
 /**

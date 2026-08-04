@@ -281,6 +281,12 @@ const translations: Record<Lang, Translations> = {
     'layout.lockBt': '锁定业务类型',
     'layout.unlockBt': '解锁业务类型',
 
+    // Multi-sheet Upload
+    'upload.multiSheetInfo': '支持多Sheet上传，每个Sheet视为一天的检验报告。可一次上传3天、1周甚至1个月的数据。',
+    'upload.multiSheetSuccess': '成功上传 {sheets} 个Sheet，共 {records} 条记录',
+    'upload.sheetBreakdown': '各Sheet上传详情',
+    'upload.partialErrors': '部分Sheet处理失败：',
+
     // Validation
     'validation.required': '此项为必填项',
     'validation.invalidEmail': '请输入有效的邮箱地址',
@@ -577,6 +583,12 @@ const translations: Record<Lang, Translations> = {
     'common.passRate': 'Pass Rate',
     'layout.lockBt': 'Lock business type',
     'layout.unlockBt': 'Unlock business type',
+
+    // Multi-sheet Upload
+    'upload.multiSheetInfo': 'Supports multi-sheet upload. Each sheet is treated as one day\'s inspection report. Upload 3 days, 1 week, or even 1 month at once.',
+    'upload.multiSheetSuccess': 'Successfully uploaded {sheets} sheets, {records} records total',
+    'upload.sheetBreakdown': 'Sheet Upload Details',
+    'upload.partialErrors': 'Some sheets failed to process:',
 
     // Validation
     'validation.required': 'This field is required',
