@@ -451,23 +451,16 @@ export default function FQCRCAPage() {
                                               <span className="text-xs font-semibold text-slate-700">#{ci + 1} {cat.category || cat.categoryKey?.replace('defect_', '')}</span>
                                               <span className="text-xs font-bold text-red-600">{cat.defectCount || cat.count}</span>
                                             </div>
-                                            <div className="space-y-0.5">
-                                              {hasData ? (
-                                                catSubs.slice(0, 5).map((s: any, si: number) => (
+                                            {hasData && (
+                                              <div className="space-y-0.5">
+                                                {catSubs.slice(0, 5).map((s: any, si: number) => (
                                                   <div key={si} className="flex justify-between text-[10px]">
                                                     <span className="text-slate-500 truncate mr-2">{s.subDefect || s.name}</span>
                                                     <span className="text-slate-600 font-medium">{s.defectCount || s.count}</span>
                                                   </div>
-                                                ))
-                                              ) : (
-                                                refNames.map((name, ri) => (
-                                                  <div key={ri} className="flex justify-between text-[10px]">
-                                                    <span className="text-slate-500 truncate mr-2">{name}</span>
-                                                    <span className="text-slate-300">-</span>
-                                                  </div>
-                                                ))
-                                              )}
-                                            </div>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
                                         );
                                       })}
