@@ -40,6 +40,19 @@ const BT_SHORT: Record<string, string> = {
   PTGH: 'GH',
 };
 
+// Sub-defect reference names per category (for display when no data available)
+const SUBDEFECT_REFERENCE: Record<string, string[]> = {
+  Stitching: ['Float thread / Skip stitch', 'Missing / Loose thread', 'Missed stitching', 'Pinhole', 'Missing bartack', 'Presser foot mark', 'Backtack incomplete', 'Wrong panel assembly', 'Unfolded edge', 'Velcro reversed', 'Uneven edge', 'Triangle piece uneven', 'Thread color bleeding', 'Thread tail', 'Foam insertion incomplete'],
+  Logo: ['Skewed', 'Logo inverted', 'Logo defective', 'Logo detached'],
+  Material: ['Color deviation', 'Yarn pull', 'Wrinkle', 'Damage / Tear', 'Open seam'],
+  Hardware: ['Scratch', 'Poor function', 'Missing accessory'],
+  Appearance: ['Stain / Oil stain', 'Bone uneven', 'Bag crooked', 'Handle misaligned', 'Missing rivet'],
+  Zipper: ['Sharp / Stuck', 'Zipper wavy', 'Zipper puller reversed', 'Wrong color'],
+  Webbing: ['Webbing twisted', 'Stitching off-center'],
+  Other: ['Wash label reversed / Missing', 'Wrong wash label', 'Woven label reversed', 'Woven label missing', 'Lining reversed', 'Transparent film defective'],
+  Preparation: ['Rivet defective', 'Accessory skewed', 'Paint peeling', 'Bartack incomplete / off-standard', 'Logo skewed', 'Velcro skewed / loose thread', 'Trolley cover skewed / short', 'Webbing misaligned / height off', 'Stitching margin inconsistent', 'Loose thread / Float stitch (computerized)', 'Pattern stitch inconsistent', 'Elastic band skewed', 'Logo font detached / scratched', 'Triangle piece reversed'],
+};
+
 /**
  * Strict monthly week periods.
  * Week 1 always starts from the 1st of the month (whatever day of week).
@@ -427,25 +440,40 @@ export default function FQCRCAPage() {
                                   <div>
                                     <h4 className="text-xs font-semibold text-slate-600 mb-2">{t('rca.topCategories')} {t('rca.top3')}</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                      {(rca.top_categories || []).slice(0, 3).map((cat: any, ci: number) => (
-                                        <div key={ci} className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
-                                          <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs font-semibold text-slate-700">#{ci + 1} {cat.category || cat.categoryKey?.replace('defect_', '')}</span>
-                                            <span className="text-xs font-bold text-red-600">{cat.defectCount || cat.count}</span>
-                                          </div>
-                                          <div className="space-y-0.5">
-                                            {(rca.top_sub_defects || [])
-                                              .filter((s: any) => s.categoryKey === cat.categoryKey || s.category === cat.category)
-                                              .slice(0, 3)
-                                              .map((s: any, si: number) => (
-                                                <div key={si} className="flex justify-between text-[10px]">
-                                                  <span className="text-slate-500 truncate mr-2">{s.subDefect || s.name}</span>
-                                                  <span className="text-slate-600 font-medium">{s.defectCount || s.count}</span>
+                                      {(rca.top_categories || []).slice(0, 3).map((cat: any, ci: number) => {
+                                        const catSubs = (rca.top_sub_defects || [])
+                                          .filter((s: any) => s.categoryKey === cat.categoryKey || s.category === cat.category);
+                                        const hasData = catSubs.length > 0;
+                                        const refNames = SUBDEFECT_REFERENCE[cat.category || cat.categoryKey?.replace('defect_', '')] || [];
+                                        return (
+                                          <div key={ci} className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
+                                            <div className="flex items-center justify-between mb-1">
+                                              <span className="text-xs font-semibold text-slate-700">#{ci + 1} {cat.category || cat.categoryKey?.replace('defect_', '')}</span>
+                                              <span className="text-xs font-bold text-red-600">{cat.defectCount || cat.count}</span>
+                                            </div>
+                                            <div className="space-y-0.5">
+                                              {hasData ? (
+                                                catSubs.slice(0, 3).map((s: any, si: number) => (
+                                                  <div key={si} className="flex justify-between text-[10px]">
+                                                    <span className="text-slate-500 truncate mr-2">{s.subDefect || s.name}</span>
+                                                    <span className="text-slate-600 font-medium">{s.defectCount || s.count}</span>
+                                                  </div>
+                                                ))
+                                              ) : (
+                                                <div className="space-y-0.5">
+                                                  <div className="text-[9px] text-amber-600 italic mb-1">Sub-defect belum di-breakdown di data Excel:</div>
+                                                  {refNames.slice(0, 5).map((name, ri) => (
+                                                    <div key={ri} className="text-[10px] text-slate-400">• {name}</div>
+                                                  ))}
+                                                  {refNames.length > 5 && (
+                                                    <div className="text-[9px] text-slate-300">+{refNames.length - 5} more...</div>
+                                                  )}
                                                 </div>
-                                              ))}
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}

@@ -388,25 +388,6 @@ export function generateWeeklyRCA(
     });
   }
 
-  // FIX: If a top category has no sub-defects (all sub-columns zero), add a generic entry
-  for (const cat of topCategories) {
-    const hasSubDefect = subDefects.some(sd => sd.categoryKey === cat.categoryKey);
-    if (!hasSubDefect) {
-      // Get the sub-defect names for this category to show as reference
-      const range = CATEGORY_SUB_RANGES[cat.categoryKey];
-      const subNames = range
-        ? SUBDEFECT_NAMES.slice(range[0], range[1]).join(', ')
-        : '';
-      subDefects.push({
-        subDefect: subNames || `${cat.category} (detail tidak tersedia)`,
-        category: cat.category,
-        categoryKey: cat.categoryKey,
-        defectCount: cat.defectCount,
-        percentage: cat.percentage,
-      });
-    }
-  }
-
   // Sort sub-defects by count, take top 10
   subDefects.sort((a, b) => b.defectCount - a.defectCount);
   const topSubDefects = subDefects.slice(0, 10);
