@@ -461,22 +461,17 @@ export async function exportFQCDailyExcel(
   const ws = wb.addWorksheet('FQC日报明细 Daily Detail');
 
   const totalCols = FQC_DAILY_HEADERS.length;
-  const lastCol = totalCols; // ExcelJS is 1-indexed, so lastCol index = totalCols
 
-  // -- Color constants --
-  const DARK_NAVY   = 'FF1B3A5C';
-  const MED_BLUE    = 'FF2B5F8A';
-  const ACCENT_BLUE = 'FF4A90D9';
-  const HEADER_BG   = 'FF1F4E79';
-  const PALE_BLUE   = 'FFEDF2F9';
-  const LIGHT_BLUE  = 'FFD6E4F0';
-  const WHITE       = 'FFFFFFFF';
-  const GRAY_FOOTER = 'FF999999';
-  const NAVY_TEXT   = 'FF1F4E79';
-  const FILTER_TEXT = 'FF4A6FA5';
-  const WATERMARK_COLOR = 'FFD0E8F0';
+  // -- Color constants (matching user reference file) --
+  const MED_BLUE    = 'FF2B5F8A';   // Title bg
+  const HEADER_BG   = 'FF1F4E79';   // Header & grand total bg
+  const PALE_BLUE   = 'FFEDF2F9';   // Alternating row / filter bg
+  const LIGHT_BLUE  = 'FFD6E4F0';   // Subtotal bg
+  const WHITE_ARGB  = 'FFFFFFFF';   // White fill for alternating rows
+  const GRAY_FOOTER = 'FF999999';   // Footer text
+  const FILTER_TEXT = 'FF4A6FA5';   // Filter info text
 
-  // Shared thin border
+  // Shared thin border (used on headers & data)
   const thinBorder: Partial<ExcelJS.Borders> = {
     top:    { style: 'thin', color: { argb: 'FFB0B0B0' } },
     left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
@@ -484,88 +479,57 @@ export async function exportFQCDailyExcel(
     right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
   };
 
-  const mediumTopBorder: Partial<ExcelJS.Borders> = {
-    top:    { style: 'medium', color: { argb: 'FF1F4E79' } },
-    left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
-    bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
-    right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
-  };
-
-  const mediumTopBottomBorder: Partial<ExcelJS.Borders> = {
-    top:    { style: 'medium', color: { argb: 'FF1F4E79' } },
-    left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
-    bottom: { style: 'medium', color: { argb: 'FF1F4E79' } },
-    right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
-  };
-
-  // ============ Row 1: Dark navy banner with SULA-QC watermark ============
+  // ============ Row 1: Title (merged, height 63, bg #2B5F8A) ============
   const row1 = ws.getRow(1);
-  row1.height = 28;
-  row1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DARK_NAVY } };
+  row1.height = 63;
   ws.mergeCells(1, 1, 1, totalCols);
-  const wmCell = row1.getCell(1);
-  wmCell.value = 'SULA-QC';
-  wmCell.font = { name: 'Arial', size: 22, bold: true, color: { argb: WATERMARK_COLOR } };
-  wmCell.alignment = { horizontal: 'center', vertical: 'middle' };
-
-  // ============ Row 2: Main title on medium blue ============
-  const row2 = ws.getRow(2);
-  row2.height = 42;
-  row2.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
-  ws.mergeCells(2, 1, 2, totalCols);
-  const titleCell = row2.getCell(1);
+  const titleCell = row1.getCell(1);
   titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC Daily Detail Report';
-  titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: WHITE } };
+  titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: WHITE_ARGB } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-  // ============ Row 3: Accent line ============
-  const row3 = ws.getRow(3);
-  row3.height = 6;
-  for (let c = 1; c <= totalCols; c++) {
-    const cell = row3.getCell(c);
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ACCENT_BLUE } };
-  }
+  // ============ Row 2: Spacer (height 4) ============
+  ws.getRow(2).height = 4;
 
-  // ============ Row 4: Gap ============
-  const row4 = ws.getRow(4);
-  row4.height = 4;
+  // ============ Row 3: Spacer (height ~3) ============
+  ws.getRow(3).height = 3;
 
-  // ============ Row 5 (or 4+1): Filter info (conditional) ============
-  let currentRow = 5;
+  // ============ Row 4: Filter info (height 13.4) ============
+  let currentRow = 4;
   const filterParts: string[] = [];
   if (filters.dateFrom) filterParts.push(`From: ${filters.dateFrom}`);
   if (filters.dateTo) filterParts.push(`To: ${filters.dateTo}`);
   if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
   if (filters.productionLine) filterParts.push(`Line: ${filters.productionLine}`);
 
-  let hasFilters = filterParts.length > 0;
+  const hasFilters = filterParts.length > 0;
   if (hasFilters) {
     const filterRow = ws.getRow(currentRow);
-    filterRow.height = 20;
+    filterRow.height = 13.4;
     ws.mergeCells(currentRow, 1, currentRow, totalCols);
     const fCell = filterRow.getCell(1);
     fCell.value = filterParts.join('   |   ');
     fCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: FILTER_TEXT } };
     fCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
     fCell.alignment = { vertical: 'middle' };
-    currentRow++;
   }
+  currentRow++; // move to header row (row 5 if no filters, row 5 if filters)
 
-  // ============ Header row ============
-  const headerRowNum = currentRow;
-  const headerExcelRow = ws.getRow(headerRowNum);
-  headerExcelRow.height = 28;
+  // ============ Header row (height 43.5) ============
+  const headerExcelRow = ws.getRow(currentRow);
+  headerExcelRow.height = 43.5;
   for (let c = 1; c <= totalCols; c++) {
     const cell = headerExcelRow.getCell(c);
     cell.value = FQC_DAILY_HEADERS[c - 1];
-    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE } };
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     cell.border = thinBorder;
   }
   currentRow++;
 
-  // ============ Data processing (same logic as original) ============
+  // ============ Data processing ============
   const sortedData = [...data].sort((a, b) => {
     const da = String(a.inspection_date || '');
     const db = String(b.inspection_date || '');
@@ -593,7 +557,7 @@ export async function exportFQCDailyExcel(
 
   const dates = Object.keys(dateGroups).sort();
 
-  // Number columns (1-indexed): 1, 7-11, 12-20
+  // Number columns (1-indexed): No(1), Order Qty(7), Inspected(8), OK(9), NG(10), Rate(11), defects(12-20)
   const numberColSet = new Set<number>([1, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
 
   for (const date of dates) {
@@ -633,7 +597,7 @@ export async function exportFQCDailyExcel(
       }
 
       const vals: (string | number)[] = [
-        rowNum++,
+        rowNum,
         String(rec.inspection_date || ''),
         String(rec.production_line || ''),
         String(rec.inspector_name || ''),
@@ -655,12 +619,11 @@ export async function exportFQCDailyExcel(
         Number(rec.defect_preparation) || 0,
       ];
 
-      // Alternating row colors
-      const isEven = rowNum % 2 === 0;
-      const bgColor = isEven ? PALE_BLUE : WHITE;
+      // Alternating: odd rows → pale blue, even rows → white (matching reference)
+      const bgColor = rowNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
 
       const excelRow = ws.getRow(currentRow);
-      excelRow.height = 20;
+      excelRow.height = 13.4;
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
         const val = vals[c - 1];
@@ -673,6 +636,7 @@ export async function exportFQCDailyExcel(
         cell.border = thinBorder;
       }
       currentRow++;
+      rowNum++;
     }
 
     // Daily subtotal row
@@ -687,24 +651,23 @@ export async function exportFQCDailyExcel(
     ];
 
     const subtotalExcelRow = ws.getRow(currentRow);
-    subtotalExcelRow.height = 22;
-    ws.mergeCells(currentRow, 2, currentRow, 6); // merge cols 2-6 for label
+    subtotalExcelRow.height = 14.65;
+    ws.mergeCells(currentRow, 2, currentRow, 6);
     for (let c = 1; c <= totalCols; c++) {
       const cell = subtotalExcelRow.getCell(c);
-      cell.value = subtotalVals[c - 1] !== undefined ? String(subtotalVals[c - 1]) : '';
       if (c === 1) {
         cell.value = '';
-      }
-      // For numeric subtotal values (cols 7-20), keep as number
-      if (c >= 7 && c <= 20 && typeof subtotalVals[c - 1] === 'number') {
+      } else if (c >= 7 && c <= 20 && typeof subtotalVals[c - 1] === 'number') {
         cell.value = subtotalVals[c - 1] as number;
+      } else {
+        cell.value = subtotalVals[c - 1] !== undefined ? String(subtotalVals[c - 1]) : '';
       }
-      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: NAVY_TEXT } };
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
       cell.alignment = numberColSet.has(c)
         ? { horizontal: 'right', vertical: 'middle' }
         : { horizontal: 'left', vertical: 'middle' };
-      cell.border = mediumTopBorder;
+      cell.border = thinBorder;
     }
     currentRow++;
 
@@ -717,7 +680,7 @@ export async function exportFQCDailyExcel(
     }
   }
 
-  // ============ Grand total row ============
+  // ============ Grand total row (height 25) ============
   const grandRate = grandInspected > 0 ? grandNG / grandInspected : 0;
   const grandVals: (string | number)[] = [
     '',
@@ -729,7 +692,7 @@ export async function exportFQCDailyExcel(
   ];
 
   const grandExcelRow = ws.getRow(currentRow);
-  grandExcelRow.height = 26;
+  grandExcelRow.height = 25;
   ws.mergeCells(currentRow, 2, currentRow, 6);
   for (let c = 1; c <= totalCols; c++) {
     const cell = grandExcelRow.getCell(c);
@@ -740,16 +703,16 @@ export async function exportFQCDailyExcel(
     } else {
       cell.value = grandVals[c - 1] !== undefined ? String(grandVals[c - 1]) : '';
     }
-    cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: WHITE } };
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
     cell.alignment = numberColSet.has(c)
       ? { horizontal: 'right', vertical: 'middle' }
       : { horizontal: 'left', vertical: 'middle' };
-    cell.border = mediumTopBottomBorder;
+    cell.border = thinBorder;
   }
   currentRow++;
 
-  // ============ Footer ============
+  // ============ Footer (1 blank row gap) ============
   currentRow++;
   const footerRow = ws.getRow(currentRow);
   ws.mergeCells(currentRow, 1, currentRow, totalCols);
@@ -757,32 +720,31 @@ export async function exportFQCDailyExcel(
   footerCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
   footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
 
-  // ============ Auto-fit column widths ============
-  // Collect all cell string values per column to compute max width
-  const colMaxWidths: number[] = new Array(totalCols).fill(0);
-
-  // Scan header row
+  // ============ Column widths (from user reference file) ============
+  const refWidths = [
+    5.0,    // A: No
+    12.36,  // B: Date
+    26.36,  // C: Line
+    10.36,  // D: Inspector
+    18.18,  // E: Style
+    20.0,   // F: Order No.
+    12.09,  // G: Order Qty
+    15.54,  // H: Inspected
+    10.54,  // I: OK
+    9.63,   // J: NG
+    11.54,  // K: Defect Rate
+    11.91,  // L: Stitching
+    8.43,   // M: Logo (default)
+    8.43,   // N: Material
+    8.43,   // O: Hardware
+    8.43,   // P: Appearance
+    8.43,   // Q: Zipper
+    8.43,   // R: Webbing
+    8.43,   // S: Other
+    8.43,   // T: Preparation
+  ];
   for (let c = 0; c < totalCols; c++) {
-    colMaxWidths[c] = Math.max(colMaxWidths[c], estimateStringWidth(FQC_DAILY_HEADERS[c]) + 2);
-  }
-
-  // Scan all data rows (including subtotal/grand total text)
-  ws.eachRow({ includeEmpty: false }, (row) => {
-    row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-      const idx = colNumber - 1;
-      if (idx < 0 || idx >= totalCols) return;
-      const text = String(cell.value || '');
-      const w = estimateStringWidth(text) + 2;
-      colMaxWidths[idx] = Math.max(colMaxWidths[idx], w);
-    });
-  });
-
-  // Apply widths: min from FQC_DAILY_MIN_WIDTHS, max 42
-  for (let c = 0; c < totalCols; c++) {
-    const minW = FQC_DAILY_MIN_WIDTHS[c] || 6;
-    const fitted = Math.max(minW, colMaxWidths[c]);
-    const final = Math.min(fitted, 42);
-    ws.getColumn(c + 1).width = final;
+    ws.getColumn(c + 1).width = refWidths[c] || 8.43;
   }
 
   // ============ Generate buffer ============

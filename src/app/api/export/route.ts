@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      return new NextResponse(result.buffer, {
+      return new NextResponse(Buffer.from(result.buffer), {
         status: 200,
         headers: {
           'Content-Type':
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
       const result = exportFQCAnalysisExcel(data, exportFilters, lang);
 
-      return new NextResponse(result.buffer, {
+      return new NextResponse(Buffer.from(result.buffer), {
         status: 200,
         headers: {
           'Content-Type':
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
 
       const result = exportFQCOQCExcel(data, exportFilters, lang);
 
-      return new NextResponse(result.buffer, {
+      return new NextResponse(Buffer.from(result.buffer), {
         status: 200,
         headers: {
           'Content-Type':
@@ -181,7 +181,7 @@ export async function POST(request: NextRequest) {
 
     const result = exportIPQCExcel(data, exportFilters, lang);
 
-    return new NextResponse(result.buffer, {
+    return new NextResponse(Buffer.from(result.buffer), {
       status: 200,
       headers: {
         'Content-Type':
