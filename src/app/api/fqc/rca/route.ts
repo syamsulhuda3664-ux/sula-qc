@@ -4,14 +4,14 @@ import { authenticateRequest } from '@/lib/auth';
 import { generateWeeklyRCA } from '@/lib/rca-generator';
 import { mapInspectionRow } from '@/lib/db-schema';
 
+const BUSINESS_TYPES = ['PTOEM', 'PTB2C', 'PTGH'];
+
 /**
  * Calculate the Monday-Saturday week range for a given date.
- * Returns { monday, saturday } as YYYY-MM-DD strings.
  */
 function getMondaySaturdayRange(dateStr: string): { monday: string; saturday: string } {
   const d = new Date(dateStr + 'T00:00:00');
-  const day = d.getDay(); // 0=Sun
-  // If Sunday (0), go back 1 day to Saturday's week
+  const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   const monday = new Date(d);
   monday.setDate(d.getDate() + diff);
@@ -22,69 +22,32 @@ function getMondaySaturdayRange(dateStr: string): { monday: string; saturday: st
 }
 
 /**
- * Get all Monday-Saturday week periods in a given month.
- * A week belongs to a month if its Monday falls within that month.
- */
-function getWeekPeriodsInMonth(year: number, month: number): { monday: string; saturday: string; weekNum: number }[] {
-  const periods: { monday: string; saturday: string; weekNum: number }[] = [];
-  // Start from the 1st of the month
-  const firstDay = new Date(year, month - 1, 1);
-  const day = firstDay.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const firstMonday = new Date(firstDay);
-  firstMonday.setDate(firstDay.getDate() + diff);
-
-  // If firstMonday is in previous month, start from next Monday
-  if (firstMonday.getMonth() !== month - 1) {
-    firstMonday.setDate(firstMonday.getDate() + 7);
-  }
-
-  let weekNum = 1;
-  let current = new Date(firstMonday);
-  while (current.getMonth() === month - 1) {
-    const saturday = new Date(current);
-    saturday.setDate(current.getDate() + 5);
-    periods.push({
-      monday: current.toISOString().split('T')[0],
-      saturday: saturday.toISOString().split('T')[0],
-      weekNum,
-    });
-    weekNum++;
-    current.setDate(current.getDate() + 7);
-  }
-  return periods;
-}
-
-/**
- * Generate RCA for a single Mon-Sat period if data exists.
- * Returns the created RCA or null if no data/already exists.
+ * Generate RCA for a single Mon-Sat period + specific business type.
  */
 async function generateRCAForPeriod(
   monday: string,
   saturday: string,
-  businessType: string | null,
+  businessType: string,
   userId: string
 ): Promise<Record<string, unknown> | null> {
-  // Check if already exists
-  const { data: existing } = await adminClient
+  // Check duplicate: same week_start + week_end + business_type
+  let existsQuery = adminClient
     .from('rca_weekly')
     .select('id')
     .eq('week_start', monday)
     .eq('week_end', saturday)
-    .maybeSingle();
+    .eq('business_type', businessType);
 
+  const { data: existing } = await existsQuery.maybeSingle();
   if (existing) return null;
 
-  // Fetch FQC records for the week
+  // Fetch FQC records for the week + business type
   let query = adminClient
     .from('fqc_inspections')
     .select('*')
     .gte('inspection_date', monday)
-    .lte('inspection_date', saturday);
-
-  if (businessType && businessType !== 'ALL') {
-    query = query.eq('business_type', businessType);
-  }
+    .lte('inspection_date', saturday)
+    .eq('business_type', businessType);
 
   const { data: fqcRecords, error: fqcError } = await query;
   if (fqcError || !fqcRecords || fqcRecords.length === 0) return null;
@@ -94,13 +57,12 @@ async function generateRCAForPeriod(
 
   if (rca.totalInspected === 0) return null;
 
-  // Insert
   const { data: inserted, error: insertError } = await adminClient
     .from('rca_weekly')
     .insert({
       week_start: monday,
       week_end: saturday,
-      business_type: businessType === 'ALL' ? null : businessType,
+      business_type: businessType,
       total_inspections: rca.totalInspections,
       total_inspected: rca.totalInspected,
       total_ok: rca.totalOK,
@@ -112,11 +74,11 @@ async function generateRCAForPeriod(
       status: 'pending',
       created_by: userId,
     })
-    .select('id, week_start, week_end')
+    .select('id, week_start, week_end, business_type')
     .single();
 
   if (insertError || !inserted) {
-    console.error('Auto-generate RCA error:', insertError);
+    console.error('Generate RCA error:', insertError);
     return null;
   }
 
@@ -129,7 +91,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get('month'); // format: YYYY-MM
+    const month = searchParams.get('month');
+    const bt = searchParams.get('business_type');
 
     let query = adminClient
       .from('rca_weekly')
@@ -137,16 +100,20 @@ export async function GET(request: NextRequest) {
         *,
         rca_actions (*)
       `)
-      .order('week_start', { ascending: false });
+      .order('week_start', { ascending: true });
 
     if (month) {
       const [yearStr, monthStr] = month.split('-');
       const year = parseInt(yearStr, 10);
       const m = parseInt(monthStr, 10);
-      // Get first and last day of month
       const firstDay = `${year}-${String(m).padStart(2, '0')}-01`;
       const lastDay = new Date(year, m, 0).toISOString().split('T')[0];
-      query = query.gte('week_start', firstDay).lte('week_end', lastDay);
+      // Use gte on week_start only (week may spill into next month)
+      query = query.gte('week_start', firstDay).lte('week_start', lastDay);
+    }
+
+    if (bt && bt !== 'ALL') {
+      query = query.eq('business_type', bt);
     }
 
     const { data, error } = await query;
@@ -170,41 +137,43 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
+    const userId = auth.user!.id;
 
-    // AUTO-GENERATE: Generate RCAs for all periods that have data but no RCA yet
+    // AUTO-GENERATE
     if (action === 'auto-generate') {
-      const { date_from, date_to, business_type } = body;
-      const userId = auth.user!.id;
+      const { date_from, date_to, business_type: bt } = body;
 
-      // Find all unique inspection dates in the range
-      let dateQuery = adminClient
+      // Determine which business types to generate for
+      const typesToGenerate = bt && bt !== 'ALL' ? [bt] : BUSINESS_TYPES;
+
+      // Find all unique week periods from inspection dates
+      const dateQueryBase = adminClient
         .from('fqc_inspections')
-        .select('inspection_date')
+        .select('inspection_date, business_type')
         .order('inspection_date', { ascending: true });
 
-      if (date_from) dateQuery = dateQuery.gte('inspection_date', date_from);
-      if (date_to) dateQuery = dateQuery.lte('inspection_date', date_to);
-      if (business_type && business_type !== 'ALL') {
-        dateQuery = dateQuery.eq('business_type', business_type);
-      }
+      if (date_from) dateQueryBase.gte('inspection_date', date_from);
+      if (date_to) dateQueryBase.lte('inspection_date', date_to);
 
-      const { data: dateRows } = await dateQuery;
+      const { data: dateRows } = await dateQueryBase;
       if (!dateRows || dateRows.length === 0) {
         return NextResponse.json({ message: 'No inspection data found', created: 0 });
       }
 
-      // Collect unique week periods from the dates
-      const weekSet = new Set<string>();
+      // Collect unique (week, businessType) pairs
+      const pairSet = new Set<string>();
       for (const row of dateRows) {
+        const rowBt = String(row.business_type || '');
+        if (!typesToGenerate.includes(rowBt)) continue;
         const d = String(row.inspection_date).split('T')[0];
         const { monday, saturday } = getMondaySaturdayRange(d);
-        weekSet.add(`${monday}__${saturday}`);
+        pairSet.add(`${monday}__${saturday}__${rowBt}`);
       }
 
       let created = 0;
-      for (const key of weekSet) {
-        const [monday, saturday] = key.split('__');
-        const result = await generateRCAForPeriod(monday, saturday, business_type || null, userId);
+      for (const key of pairSet) {
+        const [monday, saturday, btKey] = key.split('__');
+        const result = await generateRCAForPeriod(monday, saturday, btKey, userId);
         if (result) created++;
       }
 
@@ -214,25 +183,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // MANUAL GENERATE: Generate for a specific week
+    // MANUAL GENERATE
     const { weekStart, weekEnd, business_type: bt } = body;
 
-    if (!weekStart || !weekEnd) {
+    if (!weekStart || !weekEnd || !bt) {
       return NextResponse.json(
-        { error: 'weekStart and weekEnd are required' },
+        { error: 'weekStart, weekEnd, and business_type are required' },
         { status: 400 }
       );
     }
 
-    const result = await generateRCAForPeriod(weekStart, weekEnd, bt || null, auth.user!.id);
+    const result = await generateRCAForPeriod(weekStart, weekEnd, bt, userId);
 
     if (!result) {
-      // Check if it's because it already exists
       const { data: existing } = await adminClient
         .from('rca_weekly')
         .select('id')
         .eq('week_start', weekStart)
         .eq('week_end', weekEnd)
+        .eq('business_type', bt)
         .maybeSingle();
 
       if (existing) {
@@ -257,4 +226,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export { getMondaySaturdayRange, getWeekPeriodsInMonth, generateRCAForPeriod };
+export { getMondaySaturdayRange };

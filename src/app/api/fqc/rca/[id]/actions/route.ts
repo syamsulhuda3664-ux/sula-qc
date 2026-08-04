@@ -2,37 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 
-/**
- * GET: Fetch all actions for an RCA
- * PUT: Save actions array (upsert by rank)
- */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const auth = await authenticateRequest(request, 'view');
-  if (auth.error) return auth.error;
-
-  try {
-    const { id } = await params;
-    const { data, error } = await adminClient
-      .from('rca_actions')
-      .select('*')
-      .eq('rca_id', id)
-      .order('rank', { ascending: true });
-
-    if (error) {
-      console.error('Fetch RCA actions error:', error);
-      return NextResponse.json({ error: 'Failed to fetch actions' }, { status: 500 });
-    }
-
-    return NextResponse.json({ actions: data || [] });
-  } catch (error) {
-    console.error('Fetch RCA actions error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -45,14 +14,13 @@ export async function PUT(
     const body = await request.json();
     const { actions, status: rcaStatus } = body;
 
-    // Verify the RCA exists
-    const { data: rca, error: rcaError } = await adminClient
+    const { data: rca } = await adminClient
       .from('rca_weekly')
       .select('id')
       .eq('id', id)
       .single();
 
-    if (rcaError || !rca) {
+    if (!rca) {
       return NextResponse.json({ error: 'RCA record not found' }, { status: 404 });
     }
 
@@ -61,13 +29,12 @@ export async function PUT(
     const results: Record<string, unknown>[] = [];
 
     if (Array.isArray(actions)) {
-      // Upsert each action by (rca_id, rank)
       for (const action of actions) {
-        const { rank, category, sub_defects, defect_qty, style_codes, root_cause, impact, process, corrective_action, preventive_action, responsible, due_date, status: actionStatus } = action;
+        const { rank, category, sub_defects, defect_qty, style_codes, root_cause, impact, process, corrective_action, preventive_action, responsible, due_date, status: actionStatus, photo_before, photo_after } = action;
 
         if (!rank) continue;
 
-        const row = {
+        const row: Record<string, unknown> = {
           rca_id: id,
           rank,
           category: category || null,
@@ -82,11 +49,12 @@ export async function PUT(
           responsible: responsible || null,
           due_date: due_date || null,
           status: actionStatus || 'pending',
+          photo_before: photo_before || null,
+          photo_after: photo_after || null,
           updated_by: userId,
           updated_at: now,
         };
 
-        // Check if action exists for this rca_id + rank
         const { data: existing } = await adminClient
           .from('rca_actions')
           .select('id')
@@ -117,26 +85,18 @@ export async function PUT(
       }
     }
 
-    // Optionally update RCA status
-    if (rcaStatus && ['pending', 'in_progress', 'completed'].includes(rcaStatus)) {
+    // Auto-update RCA status
+    if (actions?.length > 0) {
+      const allCompleted = actions.every((a: { status?: string }) => a.status === 'completed');
+      await adminClient
+        .from('rca_weekly')
+        .update({ status: allCompleted ? 'completed' : 'in_progress' })
+        .eq('id', id);
+    } else if (rcaStatus && ['pending', 'in_progress', 'completed'].includes(rcaStatus)) {
       await adminClient
         .from('rca_weekly')
         .update({ status: rcaStatus })
         .eq('id', id);
-    } else if (actions?.length > 0) {
-      // Auto-set to in_progress if actions are being saved
-      const allCompleted = actions.every((a: { status?: string }) => a.status === 'completed');
-      if (allCompleted) {
-        await adminClient
-          .from('rca_weekly')
-          .update({ status: 'completed' })
-          .eq('id', id);
-      } else {
-        await adminClient
-          .from('rca_weekly')
-          .update({ status: 'in_progress' })
-          .eq('id', id);
-      }
     }
 
     return NextResponse.json({
