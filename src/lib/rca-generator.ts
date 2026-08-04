@@ -369,15 +369,15 @@ export function generateWeeklyRCA(
     rank: i + 1,
   }));
 
-  // Top 10 sub-defects for each of the top 3 categories
+  // Collect sub-defects per category (top 5 per category, not global top 10)
   const topCategoryKeys = new Set(topCategories.map((c) => c.categoryKey));
-  const subDefects: RCASubDefect[] = [];
+  const allSubDefects: RCASubDefect[] = [];
 
   for (let i = 0; i < subDefectCounts.length; i++) {
     if (subDefectCounts[i] === 0) continue;
     const { category, categoryKey } = getSubDefectCategory(i);
     if (!topCategoryKeys.has(categoryKey)) continue;
-    subDefects.push({
+    allSubDefects.push({
       subDefect: SUBDEFECT_NAMES[i] || `Sub-defect ${i + 1}`,
       category,
       categoryKey,
@@ -388,9 +388,14 @@ export function generateWeeklyRCA(
     });
   }
 
-  // Sort sub-defects by count, take top 10
-  subDefects.sort((a, b) => b.defectCount - a.defectCount);
-  const topSubDefects = subDefects.slice(0, 10);
+  // Sort within each category and take top 5 per category
+  const topSubDefects = allSubDefects
+    .sort((a, b) => b.defectCount - a.defectCount)
+    .reduce<RCASubDefect[]>((acc, s) => {
+      const countInCategory = acc.filter(x => x.categoryKey === s.categoryKey).length;
+      if (countInCategory < 5) acc.push(s);
+      return acc;
+    }, []);
 
   // Top 15 styles by defect count
   const topStyles = Object.entries(styleDefects)
