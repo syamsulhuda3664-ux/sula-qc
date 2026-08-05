@@ -6,7 +6,7 @@
  *
  * 适用企业：厦门鑫威发工业有限公司
  *
- * 注意：process 字段保留英文（与印尼版一致），因工序名称为国际通用。
+ * process 字段已翻译为简体中文工序名称。
  * Fallback：若子缺陷未在词典中找到，使用 rca-generator.ts 中的分类模板。
  */
 
@@ -28,7 +28,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '缝线张力过松，弯针/旋梭积线脏污，或弯针与机针时间不同步，导致缝线在车缝过程中无法正常锁定。',
     impact:
       '缝线松散、易拉脱，降低包袋缝合强度，可能导致客户退货，影响产品耐用性。',
-    process: 'Stitching / Sewing',
+    process: '缝制/车缝',
     corrective_action:
       '调整面线和底线张力，清洁弯针/旋梭积线，校对弯针-机针同步时间，并在恢复生产前用余料试车验证。',
     preventive_action:
@@ -40,7 +40,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '底线未穿入或车缝中途断线，可能原因包括底线轴耗尽、穿线路径卡线或过线器磨损。',
     impact:
       '缝线边缘不整齐、易散边，影响产品美观及受拉力部位的连接强度。',
-    process: 'Stitching / Sewing',
+    process: '缝制/车缝',
     corrective_action:
       '更换耗尽的底线轴，修复卡线的穿线路径，更换磨损的过线器，确保底线穿好后才可车缝。',
     preventive_action:
@@ -52,7 +52,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '操作员漏车需缝制区域，通常出现在面板转角处、弧形区域或难以操作的位置，也可能是导板未安装。',
     impact:
       '面板未能完全连接，包袋出现开口导致物品掉落或进水，结构强度显著降低。',
-    process: 'Stitching / Sewing',
+    process: '缝制/车缝',
     corrective_action:
       '用同机补缝漏车区域，确保导板安装到位，在易漏车的关键部位做好标记。',
     preventive_action:
@@ -64,7 +64,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '机针弯曲、针号过大不适合材料，或针头磨损，导致穿刺时撕裂布料纤维。',
     impact:
       '材料表面出现针孔，降低防水性能和布料强度。薄料上的针孔在受拉时可能扩大。',
-    process: 'Stitching / Sewing',
+    process: '缝制/车缝',
     corrective_action:
       '更换弯曲/磨损的机针，确保针号与材料厚度匹配，检查针杆对位。',
     preventive_action:
@@ -76,7 +76,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '操作员遗漏打枣工序，可能因无清单、打枣机故障或纸样上未标注打枣位置。',
     impact:
       '缝线末端易散脱，在提手连接、肩带、D型环等承重部位极其危险。',
-    process: 'Stitching / Bartacking',
+    process: '缝制/打枣',
     corrective_action:
       '在遗漏点补打枣，检查打枣机（机针、线张力），在纸样上标注每个打枣位置。',
     preventive_action:
@@ -88,7 +88,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '压脚压力过大，材料对压力敏感（薄PU皮、涂层布），或压脚表面粗糙/磨损。',
     impact:
       '材料外表面出现压痕，深色和光面材料尤为明显。压痕为永久性缺陷，无法修复。',
-    process: 'Stitching / Sewing',
+    process: '缝制/车缝',
     corrective_action:
       '降低压脚压力，对敏感材料更换特氟龙压脚或滚轮压脚，调高送布牙以减少摩擦。',
     preventive_action:
@@ -100,7 +100,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '自动倒针功能故障、倒针针数设置过少（仅1-2针），或操作员在倒针完成前过早抬起压脚。',
     impact:
       '缝线末端未能完全锁定，受拉时易散脱。在拉链端部和提手等受力点可能导致结构失效。',
-    process: 'Stitching / Sewing',
+    process: '缝制/车缝',
     corrective_action:
       '修复自动倒针机构，设置最低4-5针倒针，培训操作员待倒针完成后再抬压脚。',
     preventive_action:
@@ -112,7 +112,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '操作员拼错面板（左右反装、上下颠倒），通常因面板无左/右标签或操作员对新款式培训不足。',
     impact:
       '产品整体缺陷（报废或大量返工），包袋结构完全错误，返工成本极高且降低产能。',
-    process: 'Assembly / Stitching',
+    process: '组装/车缝',
     corrective_action:
       '立即停产，排查在制品（WIP）所有面板，在每块面板上增加左/右/上/下标签，并重新培训操作员。',
     preventive_action:
@@ -124,7 +124,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '折边工序不规整或在车缝前未完全折好，通常出现在包边条、嵌线或热熔胶折边未充分加热的情况。',
     impact:
       '包袋边缘不平整、不精密，降低产品美观度。折边部位经多次使用后可能翻开。',
-    process: 'Stitching / Edge Folding',
+    process: '缝制/折边',
     corrective_action:
       '修正折边工序（确保热熔胶折边机或折边器工作正常），调整折边导板，对未车缝的部件重新折边。',
     preventive_action:
@@ -136,7 +136,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '操作员将魔术贴刺面和毛面反装（刺面装在应为毛面的位置），通常因两面外观相似或无方向标识。',
     impact:
       '刺面对刺面、毛面对毛面无法粘合，产品功能异常，必须返工。',
-    process: 'Assembly / Velcro Attachment',
+    process: '组装/魔术贴安装',
     corrective_action:
       '拆除装反的魔术贴，按正确位置重新安装，在作业区标注刺面（H）和毛面（L）。',
     preventive_action:
@@ -148,7 +148,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '材料裁剪不精密，或车缝导板不直导致缝线偏离边缘。也可能因车缝时材料浮动。',
     impact:
       '包袋边缘不对称，不整齐、不精密。高端产品中此类缺陷严重影响品质感知。',
-    process: 'Cutting / Stitching',
+    process: '裁剪/车缝',
     corrective_action:
       '检查刀模或裁纸精度，修复车缝导板，车缝时使用夹具/固定夹固定材料。',
     preventive_action:
@@ -160,7 +160,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '三角片（用于提手底座、肩带连接）裁剪不对称，或缝线偏离中心导致左右不等。',
     impact:
       '提手或肩带歪斜安装，正面观包袋不对称。此为极为显眼的视觉缺陷。',
-    process: 'Cutting / Assembly',
+    process: '裁剪/组装',
     corrective_action:
       '更换不对称的三角片，检查模板/纸样，安装时使用对位夹具。',
     preventive_action:
@@ -172,7 +172,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '深色缝线（黑色、藏青色）遇雨水或汗液掉色，通常因供应商缝线未通过足够的色牢度处理。',
     impact:
       '缝线颜色渗透至包袋面料，产品外观污损且无法清洗，可能导致严重客诉。',
-    process: 'Material / Stitching',
+    process: '材料/车缝',
     corrective_action:
       '更换同批次中通过色牢度测试的缝线，隔离受影响产品，向缝线供应商提出索赔。',
     preventive_action:
@@ -184,7 +184,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '操作员未在车缝结束后剪断线头，或自动剪线器故障/未正确设定剪线长度。',
     impact:
       '线头悬垂在产品上，外观不整洁、不专业。内部线头可能缠绕并影响隔层功能。',
-    process: 'Finishing / Stitching',
+    process: '后整/车缝',
     corrective_action:
       '修复自动剪线器，手动剪除残留线头，每道车缝完成后进行目视检查。',
     preventive_action:
@@ -196,7 +196,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '海绵/EVA未完全填入面板，通常因面板过小、海绵过厚或无辅助插入工具。',
     impact:
       '面板局部塌陷、不饱满，影响包袋外形和防护性能，手感不饱满。',
-    process: 'Pre-assembly / Foam Insertion',
+    process: '预装/泡棉填充',
     corrective_action:
       '用插杆/滚轮重新填入海绵，确保海绵尺寸与面板匹配，插入后进行压烫定型。',
     preventive_action:
@@ -212,7 +212,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '商标安装歪斜，定位夹具松动或未校准。也可能是操作员未将商标准确对准中心标记。',
     impact:
       '商标不对称、不精密，在产品上极为显眼，直接降低品牌品质感知。',
-    process: 'Logo Attachment / Heat Press',
+    process: '商标安装/热压',
     corrective_action:
       '修复商标定位夹具，重新校准中心点，热压前用尺子进行对位检查。',
     preventive_action:
@@ -224,7 +224,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '商标倒置安装（上下颠倒或镜像），通常因取料时未检查方向，或机器镜像图档未正确设置。',
     impact:
       '商标倒置导致产品100%报废。此为严重缺陷，需大量返工或报废处理。',
-    process: 'Logo Attachment / Heat Press / Embroidery',
+    process: '商标安装/热压/绣花',
     corrective_action:
       '立即停产，检查库存中所有商标，修复机器图档设置，在每个商标上增加方向标识。',
     preventive_action:
@@ -236,7 +236,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '商标来自供应商时已损坏（印刷模糊、绣花漏针、压印不平），或在安装过程中损坏（热压温度过高、压力过大）。',
     impact:
       '商标无法辨认或不清晰，品牌形象无法有效传达。对于设计焦点的商标，显著降低产品价值。',
-    process: 'Incoming QC / Logo Attachment',
+    process: '来料QC/商标安装',
     corrective_action:
       '挑出损坏的商标，更换为合格品，调整热压参数（温度、时间、压力），在样品上试压。',
     preventive_action:
@@ -248,7 +248,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '商标脱落因胶水不牢固、热压温度不足、压烫时间过短，或材料表面与胶水类型不匹配。',
     impact:
       '商标在使用或清洗时脱落，导致客户投诉和退货，品牌形象严重受损。',
-    process: 'Logo Attachment / Heat Press',
+    process: '商标安装/热压',
     corrective_action:
       '更换脱落商标，检查胶水类型并匹配材料，提高热压温度/时间，在样品上做粘合力拉力测试。',
     preventive_action:
@@ -264,7 +264,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '材料批次色差（批间差异），或材料长期存放因光照/紫外线导致颜色变化。',
     impact:
       '同一包袋上各面板颜色不一致，大面板产品尤为明显，产品与客户确认的样品不一致。',
-    process: 'Material Receiving / Cutting',
+    process: '材料收货/裁剪',
     corrective_action:
       '按批号/色号分拣材料，确保同一包袋使用同批号材料，对偏差批次向供应商索赔。',
     preventive_action:
@@ -276,7 +276,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '布料纤维被机器或粗暴搬运拉出，通常出现在针织布、轻薄梭织布或纤维松散的材料上。',
     impact:
       '纤维拉丝痕迹凸出在材料表面，影响产品外观。无法在不进一步损伤材料的情况下修复。',
-    process: 'Cutting / Handling / Stitching',
+    process: '裁剪/搬运/车缝',
     corrective_action:
       '停止使用严重拉丝的材料，改善搬运方式（避免拉扯材料），检查送布牙/压脚。',
     preventive_action:
@@ -288,7 +288,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '材料在裁剪或车缝时起皱，可能因材料卷放时间过长、裁剪过程挤压材料，或车缝时送料不均匀。',
     impact:
       '包袋表面不平滑，外观不整齐。光面材料上的褶皱尤为明显，车缝后无法熨平。',
-    process: 'Material Handling / Cutting / Stitching',
+    process: '材料搬运/裁剪/车缝',
     corrective_action:
       '材料加工前进行松放处理（展开静置），调整送料速度，使用滚轮保持材料平整。',
     preventive_action:
@@ -300,7 +300,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '材料在裁剪时撕裂（刀片钝）、搬运时（过度拉扯），或车缝时（机针穿透薄弱处）损坏。也可能供应商来料已有缺陷。',
     impact:
       '包袋结构性损坏，无法修复，必须报废或更换面板返工，增加废料和生产成本。',
-    process: 'Cutting / Handling / Stitching',
+    process: '裁剪/搬运/车缝',
     corrective_action:
       '更换损坏面板，检查裁剪刀片，改善搬运流程，挑出来料有缺陷的材料。',
     preventive_action:
@@ -312,7 +312,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '缝线断裂、张力过高或针距过稀（每英寸针数过低），导致缝线强度不足以承受拉力。',
     impact:
       '面板连接处开裂，包内物品可能掉落。在底部、肩带连接等承重部位极其危险，可能导致包袋断裂。',
-    process: 'Stitching / Seam Strength',
+    process: '缝制/缝口强度',
     corrective_action:
       '用正确针距重新车缝，检查并调整缝线张力，更换脆化缝线，在样品上做缝口强度测试。',
     preventive_action:
@@ -328,7 +328,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '五金件在供应商电镀时划伤，工厂搬运/组装时（金属工具接触），或五金件在包装中相互摩擦。',
     impact:
       '拉链头、插扣、D型环、弹簧钩上的划痕极为显眼，降低产品高端感。无法修复，必须更换。',
-    process: 'Hardware Installation / Assembly / Incoming QC',
+    process: '五金安装/组装/来料QC',
     corrective_action:
       '更换划伤的五金件，改善搬运方式（使用橡胶/尼龙涂层工具），将五金件独立包装。',
     preventive_action:
@@ -340,7 +340,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '五金件功能不良：拉链卡顿、插扣不锁、弹簧钩不弹，通常因供应商质量低或规格不符。',
     impact:
       '产品无法正常使用——卡顿的拉链使隔层无法打开，不锁的插扣使肩带无法调节。',
-    process: 'Incoming QC / Hardware Installation',
+    process: '来料QC/五金安装',
     corrective_action:
       '更换不良五金件，安装前执行100%功能测试，批次问题向供应商索赔。',
     preventive_action:
@@ -352,7 +352,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '配件（插扣、D型环、弹簧钩、密码锁、肩带）未安装，因工作区遗失、操作员遗漏或未列入BOM/配料单。',
     impact:
       '产品不完整，无法销售，直至配件补装。导致出货延迟和返工时间增加。',
-    process: 'Assembly / Material Preparation',
+    process: '组装/备料',
     corrective_action:
       '补装缺失配件，核对配料单与BOM，确保产线开工前配件库存充足。',
     preventive_action:
@@ -368,7 +368,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '车缝机油渍（漏油）、操作员手印，或胶水/粘合剂沾染到材料外表面。也可能是工作台不洁。',
     impact:
       '材料外表面油渍极为显眼，浅色材料尤为严重。不可清洗的材料出现油渍意味着报废或大幅降价。',
-    process: 'All Processes / Finishing',
+    process: '全工序/后整',
     corrective_action:
       '清洁作业区，修复漏油的车缝机，搬运时戴手套，用合适溶剂尝试去除油渍。',
     preventive_action:
@@ -380,7 +380,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '骨条/支撑条安装不对称或未贴合面板轮廓，通常因裁切不精密或安装夹具松动。',
     impact:
       '包袋不挺括、歪斜/不对称。顶部边缘骨条不整齐导致包口不平整。',
-    process: 'Pre-assembly / Bone Insertion',
+    process: '预装/骨条插入',
     corrective_action:
       '拆除并重新安装骨条，检查裁切模板，使用对位夹具。',
     preventive_action:
@@ -392,7 +392,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '包袋整体歪斜，因组装不对称——某面板偏长、肩带连接点不对齐或底部面板不居中。',
     impact:
       '包袋正面/侧面观不规整。此为终端客户可直接看到的缺陷，降低对品牌的信心。',
-    process: 'Assembly / Final QC',
+    process: '组装/成品QC',
     corrective_action:
       '找出不对称原因（测量面板、检查肩带位置），可返工则返工，否则报废。',
     preventive_action:
@@ -404,7 +404,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '提手左右安装不对称，通常因提手车缝点未正确标注或安装夹具松动。',
     impact:
       '包袋持握时不平衡，提手不正。在托特包和手提包上尤为显眼。',
-    process: 'Assembly / Handle Attachment',
+    process: '组装/提手安装',
     corrective_action:
       '拆除并重新安装提手，使用对位夹具，测量两侧距边缘的距离。',
     preventive_action:
@@ -416,7 +416,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '铆钉未安装，因铆钉机故障、产线铆钉缺料或操作员遗漏未标注的铆钉点。',
     impact:
       '连接结构因缺少铆钉而不牢固。在提手连接或肩带固定处可能导致提手脱落。',
-    process: 'Assembly / Rivet Setting',
+    process: '组装/铆钉安装',
     corrective_action:
       '补装缺失的铆钉，检查铆钉机，确保铆钉库存充足。若已车缝，用手动铆钉补装或以打枣加固。',
     preventive_action:
@@ -432,7 +432,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '拉链头卡顿，因齿牙不均匀、拉头来料缺陷，或拉链布带在车缝后过刚（缝线距齿牙太近）。',
     impact:
       '拉链无法顺畅开合，使用者需用力拉动。严重时拉头脱落或齿牙断裂，严重影响日常使用。',
-    process: 'Zipper Installation / Incoming QC',
+    process: '拉链安装/来料QC',
     corrective_action:
       '更换卡顿的拉链，检查缝线距齿牙距离（最少3mm），批次问题向供应商索赔。',
     preventive_action:
@@ -444,7 +444,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '拉链车缝后起波浪，因面线和底线张力不平衡，或沿拉链车缝时送料不均匀。',
     impact:
       '拉链不直，包袋外观不整洁。严重时布带偏移导致拉链无法完全闭合。',
-    process: 'Zipper Sewing',
+    process: '拉链车缝',
     corrective_action:
       '调整面线和底线张力使其平衡，调整送布牙保持一致性，必要时拆车重缝。',
     preventive_action:
@@ -456,7 +456,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '拉链头倒装（商标朝下），通常因操作员安装拉头时未注意方向。',
     impact:
       '拉链头商标无法正确辨认。虽不影响功能，但属视觉缺陷，降低品牌形象。',
-    process: 'Zipper Installation',
+    process: '拉链安装',
     corrective_action:
       '更换为正确方向的拉头，在作业区增加方向标识，车缝前进行目视检查。',
     preventive_action:
@@ -468,7 +468,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '拉链颜色与规格不符，通常因仓库配料错误（颜色编码相近）或供应商发错货。',
     impact:
       '拉链颜色与包身不匹配，极为显眼，不更换整条拉链无法返工。',
-    process: 'Material Preparation / Zipper Installation',
+    process: '备料/拉链安装',
     corrective_action:
       '更换正确颜色的拉链，改善配料系统（扫码），供应商发错货则索赔。',
     preventive_action:
@@ -484,7 +484,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '织带在车缝时扭曲，因未保持平行，送料方向错误，或无固定夹具。',
     impact:
       '织带不平整、呈扭曲状，降低美观度，同时因纤维不对齐而降低强度。',
-    process: 'Webbing Sewing / Assembly',
+    process: '织带车缝/组装',
     corrective_action:
       '拆除缝线，理直织带，重新安装并保持平行，使用胶带/夹子固定位置。',
     preventive_action:
@@ -496,7 +496,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '织带上缝线偏离中心，通常因针位导板未校准或织带车缝时无夹具导致滑动。',
     impact:
       '缝线不整齐、不精密。窄织带上的偏心缝线可能降低连接强度。',
-    process: 'Webbing Sewing',
+    process: '织带车缝',
     corrective_action:
       '重新校准针位，使用中心导板/织带压脚，必要时重新车缝。',
     preventive_action:
@@ -512,7 +512,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '洗水标倒置或未安装，通常因操作员未注意标签正面，或产线标签缺料。',
     impact:
       '洗护信息无法读取，客户可能因使用不当的洗涤方式而损坏产品，同时违反标签法规。',
-    process: 'Labeling / Finishing',
+    process: '贴标/后整',
     corrective_action:
       '按正确方向安装标签，确保标签库存充足，在标签作业区标注正面朝向。',
     preventive_action:
@@ -524,7 +524,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '安装了错误的洗水标（A款标签装在B款产品上），通常因工作区标签混放或无扫码验证。',
     impact:
       '错误的洗护信息可能导致客户损坏产品，成分/面料信息不符也涉及法规问题。',
-    process: 'Labeling / Finishing',
+    process: '贴标/后整',
     corrective_action:
       '更换为正确标签，按款式分开存放标签，安装前执行扫码。',
     preventive_action:
@@ -536,7 +536,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '织标倒置车缝，通常因操作员从错误方向取标签，或标签上无上下标识。',
     impact:
       '品牌商标倒置，极为显眼，严重损害品牌形象。必须返工（拆缝重装）。',
-    process: 'Labeling / Finishing',
+    process: '贴标/后整',
     corrective_action:
       '拆除并按正确方向重装标签，在标签库存上增加方向标识。',
     preventive_action:
@@ -548,7 +548,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '织标未安装，因产线缺料、操作员遗漏或未列入BOM/配料单。',
     impact:
       '无品牌商标的包袋无法销售——无品牌标识，产品必须返工加装标签。',
-    process: 'Labeling / Finishing',
+    process: '贴标/后整',
     corrective_action:
       '补装遗漏的标签，检查标签库存，确保BOM包含所有标签。',
     preventive_action:
@@ -560,7 +560,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '里布倒置（错误面朝外），因操作员未注意正确面或面板无标识。',
     impact:
       '包袋内衬显示错误面——本应隐藏的面反而外露。需重工序返工（拆车身-里布缝线）。',
-    process: 'Assembly / Lining Insertion',
+    process: '组装/里布安装',
     corrective_action:
       '拆除里布与车身缝线，修正里布方向，重新车缝。在里布面板上标注正确面。',
     preventive_action:
@@ -572,7 +572,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '透明膜（通常用于ID卡窗口或包装保护）损坏——起皱、破裂或透明度降低。通常因搬运粗暴或材料质量低。',
     impact:
       'ID卡窗口功能失效（无法看到名片），或保护膜降低产品外观。',
-    process: 'Material Preparation / Assembly',
+    process: '备料/组装',
     corrective_action:
       '更换损坏的薄膜，改善搬运方式（避免折叠/摩擦薄膜），检查供应商薄膜质量。',
     preventive_action:
@@ -588,7 +588,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '铆钉安装后松动、不平或划伤。通常因铆钉机压力设定不当、供应商来料不精密，或材料过厚与铆钉规格不匹配。',
     impact:
       '铆钉承重不足，使用时可能脱落。为明显的视觉缺陷。',
-    process: 'Preparation / Rivet Setting',
+    process: '准备/铆钉安装',
     corrective_action:
       '重新设定铆钉机压力，更换不良铆钉，确保铆钉规格与材料厚度匹配。',
     preventive_action:
@@ -600,7 +600,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '配件（插扣、夹片、D型环）歪斜安装，因安装夹具松动、中心点未标注或操作员未注意对位。',
     impact:
       '配件不对称，不整齐、不精密。插扣歪斜可能影响肩带调节功能。',
-    process: 'Preparation / Accessory Setting',
+    process: '准备/配件安装',
     corrective_action:
       '拆除并重新安装配件，使用对位夹具，测量两侧距边缘的距离。',
     preventive_action:
@@ -612,7 +612,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '配件（插扣、弹簧钩）漆面剥落，因供应商电镀质量低，或工厂搬运/组装时划伤。',
     impact:
       '配件外观差、不高端，剥落的漆面可能露出金属氧化层。显著降低产品价值。',
-    process: 'Incoming QC / Preparation',
+    process: '来料QC/准备',
     corrective_action:
       '更换漆面剥落的配件，改善搬运（使用橡胶涂层工具），向供应商索赔。',
     preventive_action:
@@ -624,7 +624,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '准备阶段的打枣不完整——针数不足、位置偏移或打枣机未校准。与缝制阶段打枣不同，此处在准备/预装阶段。',
     impact:
       '半成品关键点未牢固锁定，进入主组装工序后可能散脱。',
-    process: 'Preparation / Bartacking',
+    process: '准备/打枣',
     corrective_action:
       '校准打枣机，增加针数，对不完整的打枣重新制作。',
     preventive_action:
@@ -636,7 +636,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '打枣位置偏离规定点，通常因打枣机夹具/限位器松动或无定位导板。',
     impact:
       '打枣未能正确保护关键点，缝线仍可能散脱。不对称位置也影响美观。',
-    process: 'Preparation / Bartacking',
+    process: '准备/打枣',
     corrective_action:
       '修复打枣机夹具/限位器，安装定位导板，在正确位置重新打枣。',
     preventive_action:
@@ -648,7 +648,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '准备/预装阶段商标歪斜，通常因定位不精密或夹具不当。与Logo类别的商标不同，此处为准备阶段。',
     impact:
       '商标歪斜的半成品进入组装工序。如未检出，错误将进入最终产品。',
-    process: 'Preparation / Logo Attachment',
+    process: '准备/商标安装',
     corrective_action:
       '修正定位，使用对位夹具，进入下工序前用尺子检查。',
     preventive_action:
@@ -660,7 +660,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '准备阶段魔术贴歪斜安装，通常因无安装夹具或夹具松动导致车缝时魔术贴滑动。',
     impact:
       '魔术贴与面板不对齐，粘合面积减小，闭合不精密。紧凑隔层中可能导致魔术贴无法粘合。',
-    process: 'Preparation / Velcro Attachment',
+    process: '准备/魔术贴安装',
     corrective_action:
       '拆除并按正确位置重装魔术贴，使用定位夹具，车缝时保持位置。',
     preventive_action:
@@ -672,7 +672,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '魔术贴区域车缝后出现松线，通常因自动剪线器未正确剪线或魔术贴吸附了前工序的浮线。',
     impact:
       '松线附着在魔术贴上降低粘合效果，外观也不整洁。',
-    process: 'Preparation / Velcro Attachment',
+    process: '准备/魔术贴安装',
     corrective_action:
       '清理魔术贴区域所有残留线头，检查自动剪线器，清洁魔术贴上的浮线。',
     preventive_action:
@@ -684,7 +684,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '拉杆盖歪斜安装于包袋主体，通常因车缝点不对称或拉杆区域安装夹具不精密。',
     impact:
       '盖子未能正确覆盖拉杆区域，留下缝隙或不均匀。在旅行包上极为显眼。',
-    process: 'Preparation / Trolley Cover Assembly',
+    process: '准备/拉杆罩组装',
     corrective_action:
       '拆除并按正确位置重装盖子，使用对位夹具，测量距边缘的距离。',
     preventive_action:
@@ -696,7 +696,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '拉杆盖与包身距离过短，盖子无法完全覆盖拉杆区域。通常因纸样裁剪错误或材料缩水。',
     impact:
       '拉杆区域外露、未受保护，外观不整齐。包袋作为旅行包功能不足。',
-    process: 'Preparation / Cutting / Trolley Assembly',
+    process: '准备/裁剪/拉杆组装',
     corrective_action:
       '更换正确尺寸的盖子，检查裁剪纸样，考虑材料缩水余量。',
     preventive_action:
@@ -708,7 +708,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '准备阶段织带与面板/连接点不对齐，通常因无对位标记或安装夹具。',
     impact:
       '织带不对称，肩带歪斜安装。若织带用于主肩带，可能导致使用不舒适。',
-    process: 'Preparation / Webbing Attachment',
+    process: '准备/织带安装',
     corrective_action:
       '拆除并按正确位置重装织带，使用对位夹具，从两侧测量。',
     preventive_action:
@@ -720,7 +720,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '织带/肩带连接点距面板边缘的高度偏离规格，通常因无高度量具或夹具松动。',
     impact:
       '肩带高度不符合设计，包袋比例失调。在背包上可能影响佩戴舒适度。',
-    process: 'Preparation / Webbing Attachment',
+    process: '准备/织带安装',
     corrective_action:
       '拆除并按正确高度重装织带，使用高度量具夹具，用尺子验证。',
     preventive_action:
@@ -732,7 +732,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '缝线距边缘距离不一致（有时3mm，有时6mm），通常因操作员无导板或导板松动。',
     impact:
       '缝线不整齐、不专业，距离过近的缝线降低缝制强度。',
-    process: 'Preparation / Stitching',
+    process: '准备/车缝',
     corrective_action:
       '在车缝机上安装/修复边缘导板，按规格调整导板距离，对不一致的缝线重新车缝。',
     preventive_action:
@@ -744,7 +744,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '准备区域出现松线或断线，通常因自动剪线器故障、电脑车剪线不整齐，或缝线质量低。',
     impact:
       '松线悬垂在半成品上，外观不整洁。若带入后续工序可能缠绕并引发其他问题。',
-    process: 'Preparation / Finishing',
+    process: '准备/后整',
     corrective_action:
       '剪除所有松线，检查自动剪线器，更换频繁断线的缝线，进行剪线处理。',
     preventive_action:
@@ -756,7 +756,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '电脑车（打枣/花样车缝）出现浮线或跳针，因张力不当、花样程序错误或弯针/机针磨损。',
     impact:
       '花样缝线不完整或不整齐，降低打枣或装饰缝线的美观和功能。',
-    process: 'Preparation / Computerized Stitching',
+    process: '准备/电脑车缝',
     corrective_action:
       '修复电脑车张力，验证花样程序，更换磨损的机针/弯针，在样品上重新运行。',
     preventive_action:
@@ -768,7 +768,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '花样缝线（装饰缝）距边缘距离不一致，通常因机台程序不精密或材料在车缝时滑动。',
     impact:
       '花样缝线不整齐、不精密，降低产品美观度，尤其是设计焦点部位。',
-    process: 'Preparation / Computerized Stitching',
+    process: '准备/电脑车缝',
     corrective_action:
       '修正机台程序，使用绣框/夹具保持材料位置，调整原点。',
     preventive_action:
@@ -780,7 +780,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '松紧带歪斜或不均匀安装，通常因车缝时拉力不一致或无安装夹具。',
     impact:
       '松紧带功能不佳——应为弹性的部分不均匀。视觉上也很显眼。',
-    process: 'Preparation / Elastic Attachment',
+    process: '准备/松紧带安装',
     corrective_action:
       '拆除并以均匀拉力重装松紧带，使用安装夹具，确保松紧带未扭曲。',
     preventive_action:
@@ -792,7 +792,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '商标上的字体/字母脱落，因胶水不牢固或热压工序不足。通常出现在贴布绣或转印商标上。',
     impact:
       '商标字体脱落导致品牌名无法辨认。此为严重视觉缺陷，显著损害品牌形象。',
-    process: 'Preparation / Logo Attachment',
+    process: '准备/商标安装',
     corrective_action:
       '更换字体脱落的商标，修正热压参数（温度、压力、时间），进行粘合力测试。',
     preventive_action:
@@ -804,7 +804,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '商标在搬运过程中或安装后被划伤，通常因金属工具接触或与其他组件摩擦。',
     impact:
       '商标上的划痕极为显眼，尤其是金属/金属质感商标。无法修复，必须更换。',
-    process: 'Preparation / Handling',
+    process: '准备/搬运',
     corrective_action:
       '更换划伤的商标，排查划伤来源，改善搬运流程（使用保护膜或隔离垫）。',
     preventive_action:
@@ -816,7 +816,7 @@ export const SUBDEFECT_ACTION_TEMPLATES_ZH: Record<string, SubDefectTemplate> = 
       '三角片（用于提手底座/肩带锚点）装反，通常因三角片无上下标识或操作员从错误方向取料。',
     impact:
       '三角片反装导致缝线外观异常，降低提手/肩带锚点的结构强度。',
-    process: 'Preparation / Assembly',
+    process: '准备/组装',
     corrective_action:
       '拆除并按正确方向重装三角片，增加方向标识。',
     preventive_action:
