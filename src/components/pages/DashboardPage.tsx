@@ -16,6 +16,13 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { CheckCircle2, XCircle, Package, TrendingUp, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { SUBDEFECT_NAMES_ZH, SUBDEFECT_NAMES } from '@/lib/rca-generator';
+
+/** Lookup: English sub-defect name → Mandarin */
+const SUBDEFECT_ZH_MAP: Record<string, string> = {};
+SUBDEFECT_NAMES.forEach((name, idx) => {
+  if (SUBDEFECT_NAMES_ZH[idx]) SUBDEFECT_ZH_MAP[name] = SUBDEFECT_NAMES_ZH[idx];
+});
 import {
   LineChart,
   Line,
@@ -37,7 +44,9 @@ const BUSINESS_TYPES = ['ALL', 'PTOEM', 'PTB2C', 'PTGH'] as const;
 const PIE_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#6366f1', '#84cc16'];
 
 export default function DashboardPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isZhMode = lang === 'zh';
+  const zhSubDefect = (sub: string) => (isZhMode ? (SUBDEFECT_ZH_MAP[sub] || sub) : sub);
   const { effectiveType, isLocked } = useBusinessTypeLock();
   const [period, setPeriod] = useState<string>('day');
   const [businessType, setBusinessType] = useState<string>('ALL');
@@ -112,7 +121,7 @@ export default function DashboardPage() {
   // Top 5 defects bar
   const barData = analysisData?.section_b?.top_sub_defects
     ?.slice(0, 5)
-    .map((s: any) => ({ name: s.name?.slice(0, 20) || '', count: s.count })) || [];
+    .map((s: any) => ({ name: zhSubDefect(s.name || '').slice(0, 20) || '', count: s.count })) || [];
 
   // Recent activity
   const recentFQC = (fqcData?.records || []).slice(0, 5);
