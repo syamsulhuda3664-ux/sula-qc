@@ -368,7 +368,7 @@ export default function DashboardPage() {
                       <TableRow key={i}>
                         <TableCell className="text-xs">{lot.lot_date?.split('T')[0]}</TableCell>
                         <TableCell className="text-xs">{lot.lot_size}</TableCell>
-                        <TableCell className="text-xs">{lot.pass_rate}%</TableCell>
+                        <TableCell className="text-xs">{lot.pass_rate != null ? (Number(lot.pass_rate) <= 1 ? `${Math.round(Number(lot.pass_rate) * 10000) / 100}` : `${Math.round(Number(lot.pass_rate) * 100) / 100}`) : '-'}%</TableCell>
                         <TableCell className="text-xs">
                           <Badge
                             variant="outline"
