@@ -25,9 +25,16 @@ import {
   RefreshCw, CheckCircle2, XCircle, Clock, Camera, X, Image as ImageIcon,
   Pencil, Lock, FileText,
 } from 'lucide-react';
+import { CATEGORY_ZH, SUBDEFECT_NAMES_ZH, SUBDEFECT_NAMES } from '@/lib/rca-generator';
 
 const MONTH_NAMES_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const MONTH_NAMES_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+/** Lookup: English sub-defect name → Mandarin */
+const SUBDEFECT_ZH_MAP: Record<string, string> = {};
+SUBDEFECT_NAMES.forEach((name, idx) => {
+  if (SUBDEFECT_NAMES_ZH[idx]) SUBDEFECT_ZH_MAP[name] = SUBDEFECT_NAMES_ZH[idx];
+});
 
 const BT_COLORS: Record<string, string> = {
   PTOEM: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -241,6 +248,7 @@ function EyeIcon({ className }: { className?: string }) {
 // ═══════════════════════════════════════════════════════════
 export default function FQCRCAPage() {
   const { t, lang } = useI18n();
+  const isZhMode = lang === 'zh';
   const { isFullAccess } = useAuth();
   const { effectiveType, isLocked } = useBusinessTypeLock();
   const monthNames = lang === 'zh' ? MONTH_NAMES_ID.map((m, i) => `${i + 1}月`) : MONTH_NAMES_EN;
@@ -525,6 +533,9 @@ export default function FQCRCAPage() {
     return editingRcas.has(key);
   };
 
+  const zhCategory = (cat: string) => (isZhMode ? (CATEGORY_ZH[cat] || cat) : cat);
+  const zhSubDefect = (sub: string) => (isZhMode ? (SUBDEFECT_ZH_MAP[sub] || sub) : sub);
+
   const statusColor = (status: string) => {
     if (status === 'completed') return 'text-emerald-600 bg-emerald-50 border-emerald-200';
     if (status === 'in_progress') return 'text-amber-600 bg-amber-50 border-amber-200';
@@ -683,18 +694,18 @@ export default function FQCRCAPage() {
                                 {/* Top 3 Sub-Defects */}
                                 {(rca.top_sub_defects || []).length > 0 && (
                                   <div>
-                                    <h4 className="text-xs font-semibold text-slate-600 mb-2">Top 3 Sub-Defects</h4>
+                                    <h4 className="text-xs font-semibold text-slate-600 mb-2">{isZhMode ? '前3项子缺陷' : 'Top 3 Sub-Defects'}</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                       {(rca.top_sub_defects || []).slice(0, 3).map((s: any, si: number) => (
                                         <div key={si} className="rounded-lg border border-slate-100 bg-slate-50/50 p-3">
                                           <div className="flex items-center justify-between mb-1">
                                             <div className="flex items-center gap-1.5">
                                               <span className="text-xs font-bold text-slate-700">#{si + 1}</span>
-                                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">{s.category || ''}</span>
+                                              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-medium">{zhCategory(s.category || '')}</span>
                                             </div>
                                             <span className="text-xs font-bold text-red-600">{s.defectCount || s.count}</span>
                                           </div>
-                                          <span className="text-[11px] text-slate-600 leading-tight block">{s.subDefect || s.name}</span>
+                                          <span className="text-[11px] text-slate-600 leading-tight block">{zhSubDefect(s.subDefect || s.name || '')}</span>
                                         </div>
                                       ))}
                                     </div>
@@ -755,7 +766,7 @@ export default function FQCRCAPage() {
                                                   <TableCell className="text-xs font-bold text-slate-500">
                                                     <div className="flex flex-col items-center">
                                                       <span>{action.rank}</span>
-                                                      <span className="text-[9px] text-slate-400 normal-case max-w-[60px] truncate">{action.category}</span>
+                                                      <span className="text-[9px] text-slate-400 normal-case max-w-[60px] truncate">{zhCategory(action.category)}</span>
                                                     </div>
                                                   </TableCell>
                                                   <TableCell className="text-xs"><Textarea className="min-h-[36px] text-xs p-1.5" value={action.root_cause} onChange={(e) => updateActionField(key, action.rank, 'root_cause', e.target.value)} /></TableCell>
@@ -823,7 +834,7 @@ export default function FQCRCAPage() {
                                                     <TableCell className="text-xs font-bold text-slate-500">
                                                       <div className="flex flex-col items-center">
                                                         <span>{action.rank}</span>
-                                                        <span className="text-[9px] text-slate-400 normal-case max-w-[60px] truncate">{action.category}</span>
+                                                        <span className="text-[9px] text-slate-400 normal-case max-w-[60px] truncate">{zhCategory(action.category)}</span>
                                                       </div>
                                                     </TableCell>
                                                     <TableCell className="text-xs text-slate-700 leading-relaxed">{action.root_cause || '-'}</TableCell>

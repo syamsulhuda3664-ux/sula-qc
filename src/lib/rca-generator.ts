@@ -472,4 +472,98 @@ export function generateWeeklyRCA(
   };
 }
 
-export { DEFECT_CATEGORIES, SUBDEFECT_NAMES, getSubDefectCategory, ACTION_TEMPLATES, type RCALang };
+/**
+ * Mandarin translations for defect categories (keyed by English category name)
+ */
+const CATEGORY_ZH: Record<string, string> = {
+  'Stitching': '针车',
+  'Logo': 'LOGO',
+  'Material': '面料',
+  'Hardware': '五金',
+  'Appearance': '外观',
+  'Zipper': '拉链',
+  'Webbing': '织带',
+  'Other': '其它',
+  'Preparation': '备料',
+};
+
+/**
+ * Mandarin translations for sub-defect names (index-aligned with SUBDEFECT_NAMES)
+ */
+const SUBDEFECT_NAMES_ZH: string[] = [
+  // Stitching (indices 0-14)
+  '浮线/断线/跳针',
+  '假线缺失/散线',
+  '漏针',
+  '针孔',
+  '套结缺失',
+  '压脚痕',
+  '回针不完整',
+  '裁片组装错误',
+  '翻边不到位',
+  '魔术贴反',
+  '边距不均',
+  '三角片不均',
+  '褪色/串色',
+  '线头',
+  '泡棉填充不完整',
+  // Logo (indices 15-18)
+  '歪斜',
+  'LOGO反',
+  'LOGO不良',
+  'LOGO脱落',
+  // Material (indices 19-23)
+  '色差',
+  '抽纱',
+  '皱褶',
+  '破损/撕裂',
+  '开缝',
+  // Hardware (indices 24-26)
+  '刮伤',
+  '功能不良',
+  '配件缺失',
+  // Appearance (indices 27-31)
+  '污渍/油渍',
+  '骨条不均',
+  '袋子歪斜',
+  '提手偏位',
+  '铆钉缺失',
+  // Zipper (indices 32-35)
+  '锋利/卡顿',
+  '拉链波浪',
+  '拉链头反',
+  '颜色错误',
+  // Webbing (indices 36-37)
+  '织带扭转',
+  '车线偏心',
+  // Other (indices 38-43)
+  '洗水标反/缺失',
+  '洗水标错误',
+  '织标反',
+  '织标缺失',
+  '里布反',
+  '透明膜不良',
+  // Preparation (indices 44-62)
+  '铆钉不良',
+  '配件歪斜',
+  '配件掉漆',
+  '套结不完整',
+  '套结位置偏差',
+  'LOGO歪斜',
+  '魔术贴歪斜',
+  '魔术贴散线',
+  '拉杆罩歪斜',
+  '拉杆罩距离偏短',
+  '织带偏位',
+  '织带高度偏差',
+  '车线边距不一致',
+  '散线/断线',
+  '浮线/跳针（电脑车）',
+  '花车边距不一致',
+  '松紧带歪斜',
+  'LOGO字体脱落',
+  'LOGO刮伤',
+  '三角片反',
+];
+
+export { DEFECT_CATEGORIES, SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, CATEGORY_ZH, getSubDefectCategory, ACTION_TEMPLATES, type RCALang };
