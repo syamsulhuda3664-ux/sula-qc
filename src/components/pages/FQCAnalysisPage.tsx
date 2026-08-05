@@ -23,6 +23,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RefreshCw, Download, Loader2, Info } from 'lucide-react';
+import { CATEGORY_ZH, SUBDEFECT_NAMES_ZH, SUBDEFECT_NAMES } from '@/lib/rca-generator';
+
+/** Lookup: English sub-defect name → Mandarin */
+const SUBDEFECT_ZH_MAP: Record<string, string> = {};
+SUBDEFECT_NAMES.forEach((name, idx) => {
+  if (SUBDEFECT_NAMES_ZH[idx]) SUBDEFECT_ZH_MAP[name] = SUBDEFECT_NAMES_ZH[idx];
+});
 
 const PIE_COLORS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e',
@@ -139,7 +146,10 @@ function VerticalBarChart({ data }: { data: { label: string; value: number; colo
 
 /* ── Main Page ─────────────────────────────────────────── */
 export default function FQCAnalysisPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isZhMode = lang === 'zh';
+  const zhCategory = (cat: string) => (isZhMode ? (CATEGORY_ZH[cat] || cat) : cat);
+  const zhSubDefect = (sub: string) => (isZhMode ? (SUBDEFECT_ZH_MAP[sub] || sub) : sub);
   const { effectiveType, isLocked } = useBusinessTypeLock();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -191,11 +201,11 @@ export default function FQCAnalysisPage() {
 
   const subBarData = useMemo(() =>
     topSubDefects.map((s: any, i: number) => ({
-      label: s.name || '',
+      label: zhSubDefect(s.name || ''),
       value: s.count || 0,
       color: BAR_COLORS[i % BAR_COLORS.length],
     })),
-    [topSubDefects]
+    [topSubDefects, isZhMode]
   );
 
   const styleBarData = useMemo(() =>
@@ -389,10 +399,10 @@ export default function FQCAnalysisPage() {
                     <TableCell className="text-xs font-medium">
                       <div className="flex items-center gap-2">
                         <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }} />
-                        {s.name}
+                        {zhSubDefect(s.name)}
                       </div>
                     </TableCell>
-                    <TableCell className="text-xs text-slate-500">{s.category}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{zhCategory(s.category)}</TableCell>
                     <TableCell className="text-xs text-right font-medium">{s.count}</TableCell>
                     <TableCell className="text-xs text-right">{s.percentage}%</TableCell>
                   </TableRow>

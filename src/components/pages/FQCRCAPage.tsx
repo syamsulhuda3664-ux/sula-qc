@@ -26,6 +26,7 @@ import {
   Pencil, Lock, FileText,
 } from 'lucide-react';
 import { CATEGORY_ZH, SUBDEFECT_NAMES_ZH, SUBDEFECT_NAMES } from '@/lib/rca-generator';
+import { SUBDEFECT_ACTION_TEMPLATES_ZH } from '@/lib/rca-subdefect-templates-zh';
 
 const MONTH_NAMES_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const MONTH_NAMES_EN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -35,6 +36,30 @@ const SUBDEFECT_ZH_MAP: Record<string, string> = {};
 SUBDEFECT_NAMES.forEach((name, idx) => {
   if (SUBDEFECT_NAMES_ZH[idx]) SUBDEFECT_ZH_MAP[name] = SUBDEFECT_NAMES_ZH[idx];
 });
+
+/** Lookup zh RCA content for a given sub-defect name. Returns null if no zh template found. */
+function getZhTemplate(subDefectName: string) {
+  return SUBDEFECT_ACTION_TEMPLATES_ZH[subDefectName] || null;
+}
+
+/**
+ * Replace 5 RCA content fields with zh template content (if available).
+ * Used when isZhMode to show Mandarin content for auto-generated actions.
+ */
+function applyZhContent(action: ActionRow): ActionRow {
+  const primarySub = action.sub_defects?.[0];
+  if (!primarySub) return action;
+  const zh = getZhTemplate(primarySub);
+  if (!zh) return action;
+  return {
+    ...action,
+    root_cause: zh.root_cause,
+    impact: zh.impact,
+    process: zh.process,
+    corrective_action: zh.corrective_action,
+    preventive_action: zh.preventive_action,
+  };
+}
 
 const BT_COLORS: Record<string, string> = {
   PTOEM: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -364,16 +389,21 @@ export default function FQCRCAPage() {
           for (const draft of data.draft_rcas) {
             const key = draft.draft_id;
             if (draft.actions && draft.actions.length > 0 && !actionEdits[key]) {
+              let actions = draft.actions.map((a: any) => ({
+                rank: a.rank, category: a.category || '', sub_defects: a.sub_defects || [],
+                defect_qty: a.defect_qty || 0, style_codes: a.style_codes || [],
+                root_cause: a.root_cause || '', impact: a.impact || '', process: a.process || '',
+                corrective_action: a.corrective_action || '', preventive_action: a.preventive_action || '',
+                responsible: a.responsible || '', due_date: a.due_date || '',
+                status: a.status || 'pending', photo_before: a.photo_before || '', photo_after: a.photo_after || '',
+              }));
+              // Ensure zh content for Mandarin users
+              if (isZhMode) {
+                actions = actions.map(applyZhContent);
+              }
               setActionEdits(prev => ({
                 ...prev,
-                [key]: draft.actions.map((a: any) => ({
-                  rank: a.rank, category: a.category || '', sub_defects: a.sub_defects || [],
-                  defect_qty: a.defect_qty || 0, style_codes: a.style_codes || [],
-                  root_cause: a.root_cause || '', impact: a.impact || '', process: a.process || '',
-                  corrective_action: a.corrective_action || '', preventive_action: a.preventive_action || '',
-                  responsible: a.responsible || '', due_date: a.due_date || '',
-                  status: a.status || 'pending', photo_before: a.photo_before || '', photo_after: a.photo_after || '',
-                })),
+                [key]: actions,
               }));
             }
           }
@@ -398,7 +428,7 @@ export default function FQCRCAPage() {
 
     // For saved RCAs, load from DB actions
     if (!isDraft(rca) && rca.rca_actions && rca.rca_actions.length > 0) {
-      const existing = rca.rca_actions.map((a: any) => ({
+      let existing = rca.rca_actions.map((a: any) => ({
         rank: a.rank, category: a.category || '', sub_defects: a.sub_defects || [],
         defect_qty: a.defect_qty || 0, style_codes: a.style_codes || [],
         root_cause: a.root_cause || '', impact: a.impact || '', process: a.process || '',
@@ -406,6 +436,10 @@ export default function FQCRCAPage() {
         responsible: a.responsible || '', due_date: a.due_date || '',
         status: a.status || 'pending', photo_before: a.photo_before || '', photo_after: a.photo_after || '',
       }));
+      // When zh mode, replace content fields with Mandarin template content
+      if (isZhMode) {
+        existing = existing.map(applyZhContent);
+      }
       setActionEdits(prev => ({ ...prev, [key]: existing }));
       return existing;
     }
