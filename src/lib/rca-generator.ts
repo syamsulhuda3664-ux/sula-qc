@@ -1,4 +1,7 @@
 import { SUBDEFECT_ACTION_TEMPLATES } from './rca-subdefect-templates';
+import { SUBDEFECT_ACTION_TEMPLATES_ZH } from './rca-subdefect-templates-zh';
+
+type RCALang = 'id' | 'zh';
 
 export interface RCACategory {
   category: string;
@@ -282,12 +285,14 @@ function filterRecordsByDateRange(
  * @param weekStart - Start date of the week
  * @param weekEnd - End date of the week
  * @param fqcRecords - All FQC records (will be filtered by date range)
+ * @param lang - Language for action templates: 'id' (Indonesian) or 'zh' (Mandarin)
  * @returns RCAWeekly report
  */
 export function generateWeeklyRCA(
   weekStart: Date,
   weekEnd: Date,
-  fqcRecords: any[]
+  fqcRecords: any[],
+  lang: RCALang = 'id'
 ): RCAWeekly {
   const filteredRecords = filterRecordsByDateRange(fqcRecords, weekStart, weekEnd);
 
@@ -415,9 +420,15 @@ export function generateWeeklyRCA(
     }));
 
   // Auto-generate action items for top 3 SUB-DEFECTS using sub-defect kamus
+  const zhTemplates = lang === 'zh' ? SUBDEFECT_ACTION_TEMPLATES_ZH : null;
+  const idTemplates = SUBDEFECT_ACTION_TEMPLATES;
+
   const actions: RCAAction[] = topSubDefects.map((sub, i) => {
-    // Priority: sub-defect specific kamus > category template > Other fallback
-    const template = SUBDEFECT_ACTION_TEMPLATES[sub.subDefect]
+    // Priority: sub-defect specific kamus (lang) > category template > Other fallback
+    const subTemplate = zhTemplates
+      ? (zhTemplates[sub.subDefect] || SUBDEFECT_ACTION_TEMPLATES[sub.subDefect])
+      : (idTemplates[sub.subDefect]);
+    const template = subTemplate
       || ACTION_TEMPLATES[sub.category]
       || ACTION_TEMPLATES['Other'];
     // Get other sub-defects from the same category for reference
@@ -461,4 +472,4 @@ export function generateWeeklyRCA(
   };
 }
 
-export { DEFECT_CATEGORIES, SUBDEFECT_NAMES, getSubDefectCategory, ACTION_TEMPLATES };
+export { DEFECT_CATEGORIES, SUBDEFECT_NAMES, getSubDefectCategory, ACTION_TEMPLATES, type RCALang };
