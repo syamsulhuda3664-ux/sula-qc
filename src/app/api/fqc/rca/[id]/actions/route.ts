@@ -6,8 +6,14 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await authenticateRequest(request, 'full');
+  const auth = await authenticateRequest(request, 'view');
   if (auth.error) return auth.error;
+
+  // Only staff_qa, manager_qc, and manager_umum can edit RCA actions
+  const role = auth.user?.role;
+  if (role !== 'staff_qa' && role !== 'manager_qc' && role !== 'manager_umum') {
+    return NextResponse.json({ error: 'Insufficient access rights to edit RCA' }, { status: 403 });
+  }
 
   try {
     const { id } = await params;

@@ -131,8 +131,12 @@ export async function POST(request: NextRequest) {
 
     // ═══════════════════════════════════════════════════════════
     // AUTO-GENERATE — produces draft data, does NOT save to DB
+    // Only staff_qa can generate RCA
     // ═══════════════════════════════════════════════════════════
     if (action === 'auto-generate') {
+      if (userRole !== 'staff_qa') {
+        return NextResponse.json({ error: 'Only staff QA can generate RCA' }, { status: 403 });
+      }
       const { date_from, date_to, business_type: bt } = body;
 
       const typesToGenerate = bt && bt !== 'ALL' ? [bt] : BUSINESS_TYPES;

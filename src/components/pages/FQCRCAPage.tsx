@@ -274,7 +274,9 @@ function EyeIcon({ className }: { className?: string }) {
 export default function FQCRCAPage() {
   const { t, lang } = useI18n();
   const isZhMode = lang === 'zh';
-  const { isFullAccess } = useAuth();
+  const { isFullAccess, user } = useAuth();
+  const isStaffQA = user?.role === 'staff_qa';
+  const canEditRCA = isStaffQA || user?.role === 'manager_qc' || user?.role === 'manager_umum';
   const { effectiveType, isLocked } = useBusinessTypeLock();
   const monthNames = lang === 'zh' ? MONTH_NAMES_ID.map((m, i) => `${i + 1}月`) : MONTH_NAMES_EN;
 
@@ -301,7 +303,7 @@ export default function FQCRCAPage() {
   const getRcaKey = (r: any) => r.is_draft ? r.draft_id : r.id;
   const isDraft = (r: any) => !!r.is_draft;
 
-  // Combined list for display
+  // Combined list for display — sorted by week_start then business_type
   const allRcas = useMemo(() => {
     const saved = savedRecords.map(r => ({ ...r, _key: r.id }));
     const drafts = draftRcas.filter(d => {
@@ -309,7 +311,12 @@ export default function FQCRCAPage() {
       const ws = d.week_start || '';
       return ws.startsWith(selectedMonth);
     }).map(r => ({ ...r, _key: r.draft_id }));
-    return [...drafts, ...saved];
+    const combined = [...drafts, ...saved];
+    combined.sort((a, b) => {
+      if (a.week_start !== b.week_start) return (a.week_start || '').localeCompare(b.week_start || '');
+      return (a.business_type || '').localeCompare(b.business_type || '');
+    });
+    return combined;
   }, [savedRecords, draftRcas, selectedMonth]);
 
   // Saved RCA map for quick lookup
@@ -397,6 +404,8 @@ export default function FQCRCAPage() {
                 responsible: a.responsible || '', due_date: a.due_date || '',
                 status: a.status || 'pending', photo_before: a.photo_before || '', photo_after: a.photo_after || '',
               }));
+              // Sort actions by rank to ensure correct order
+              actions.sort((a, b) => a.rank - b.rank);
               // Ensure zh content for Mandarin users
               if (isZhMode) {
                 actions = actions.map(applyZhContent);
@@ -436,6 +445,8 @@ export default function FQCRCAPage() {
         responsible: a.responsible || '', due_date: a.due_date || '',
         status: a.status || 'pending', photo_before: a.photo_before || '', photo_after: a.photo_after || '',
       }));
+      // Sort actions by rank to ensure correct order
+      existing.sort((a, b) => a.rank - b.rank);
       // When zh mode, replace content fields with Mandarin template content
       if (isZhMode) {
         existing = existing.map(applyZhContent);
@@ -612,7 +623,7 @@ export default function FQCRCAPage() {
               </Select>
             </div>
             <div className="flex-1" />
-            {isFullAccess && (
+            {isStaffQA && (
               <Button onClick={handleAutoGenerate} disabled={generating} size="sm" className="h-9 bg-slate-900 hover:bg-slate-800">
                 {generating
                   ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> {t('rca.generating')}</>
@@ -747,11 +758,11 @@ export default function FQCRCAPage() {
                                 )}
 
                                 {/* Action Items */}
-                                {isFullAccess && (
+                                {canEditRCA && (
                                   <div>
                                     <div className="flex items-center justify-between mb-2">
                                       <h4 className="text-xs font-semibold text-slate-600">{t('rca.actionItems')}</h4>
-                                      {!editing && !isDraft(rca) && (
+                                      {canEditRCA && !editing && !isDraft(rca) && (
                                         <Button
                                           variant="outline"
                                           size="sm"
