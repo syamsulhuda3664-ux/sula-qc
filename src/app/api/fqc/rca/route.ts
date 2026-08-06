@@ -1,10 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
-import { generateWeeklyRCA, type RCALang } from '@/lib/rca-generator';
+import { generateWeeklyRCA, type RCALang, type RCAAction } from '@/lib/rca-generator';
 import { mapInspectionRow } from '@/lib/db-schema';
 
 const BUSINESS_TYPES = ['PTOEM', 'PTB2C', 'PTGH'];
+
+/**
+ * Merge hot issues (manually entered) with auto-generated RCA actions.
+ * Hot issues take priority as the first N items in top 3.
+ * Remaining slots (3 - N) are filled by auto-generated actions,
+ * excluding categories already covered by hot issues.
+ */
+function mergeHotIssuesWithAutoActions(
+  hotIssues: Record<string, unknown>[],
+  autoActions: RCAAction[],
+  topStyles: { style: string; defectCount: number; inspectionCount: number; defectRate: number; rank: number }[],
+  lang: RCALang
+): RCAAction[] {
+  const MAX_ACTIONS = 3;
+  const result: RCAAction[] = [];
+  const usedCategories = new Set<string>();
+
+  // 1. Convert hot issues to RCA actions (priority)
+  const hotActions: RCAAction[] = hotIssues.map((hi, i) => ({
+    rank: i + 1,
+    category: (hi.category as string) || '',
+    sub_defects: [(hi.sub_defect as string)],
+    defect_qty: (hi.defect_qty as number) || 0,
+    style_codes: (hi.style_codes as string[]) || [],
+    root_cause: (hi.root_cause as string) || '',
+    impact: (hi.impact as string) || '',
+    process: (hi.process as string) || '',
+    corrective_action: (hi.corrective_action as string) || '',
+    preventive_action: (hi.preventive_action as string) || '',
+    responsible: (hi.responsible as string) || '',
+    due_date: (hi.due_date as string) || '',
+    status: (hi.status as string) || 'pending',
+    photo_before: (hi.photo_before as string) || '',
+    photo_after: (hi.photo_after as string) || '',
+  }));
+
+  // Take up to MAX_ACTIONS from hot issues
+  const hotCount = Math.min(hotActions.length, MAX_ACTIONS);
+  for (let i = 0; i < hotCount; i++) {
+    result.push(hotActions[i]);
+    if (hotActions[i].category) usedCategories.add(hotActions[i].category);
+  }
+
+  // 2. Fill remaining slots from auto-generated actions
+  if (result.length < MAX_ACTIONS) {
+    const remaining = autoActions.filter(a => !usedCategories.has(a.category));
+    const needed = MAX_ACTIONS - result.length;
+    for (let i = 0; i < Math.min(needed, remaining.length); i++) {
+      result.push({ ...remaining[i], rank: result.length + 1 });
+    }
+  }
+
+  // 3. Re-rank all actions
+  return result.map((a, i) => ({ ...a, rank: i + 1 }));
+}
 
 const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -176,6 +231,14 @@ export async function POST(request: NextRequest) {
 
         for (const week of weeks) {
           for (const btKey of typesToGenerate) {
+            // Fetch hot issues for this week period + business type
+            const { data: hotIssues } = await adminClient
+              .from('rca_hot_issues')
+              .select('*')
+              .gte('issue_date', week.start)
+              .lte('issue_date', week.end)
+              .eq('business_type', btKey);
+
             // Generate with user's language for templates
             const { data: fqcRecords } = await adminClient
               .from('fqc_inspections')
@@ -191,6 +254,15 @@ export async function POST(request: NextRequest) {
 
             if (rca.totalInspected === 0) continue;
 
+            // Merge hot issues into actions (hot issues take priority)
+            const hotIssuesList = (hotIssues || []).sort((a: any, b: any) => a.issue_date.localeCompare(b.issue_date));
+            const mergedActions = mergeHotIssuesWithAutoActions(
+              hotIssuesList,
+              rca.actions,
+              rca.topStyles,
+              lang
+            );
+
             draftRcas.push({
               draft_id: `${week.start}__${btKey}`,
               week_start: week.start,
@@ -204,7 +276,7 @@ export async function POST(request: NextRequest) {
               top_categories: rca.topCategories,
               top_sub_defects: rca.subDefects,
               top_styles: rca.topStyles,
-              actions: rca.actions,
+              actions: mergedActions,
               status: 'draft',
               is_draft: true,
             });

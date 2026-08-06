@@ -26,6 +26,7 @@ import {
   Package,
   FileText,
   Activity,
+  Flame,
   Users,
   LogOut,
   Menu,
@@ -38,6 +39,7 @@ import DashboardPage from '@/components/pages/DashboardPage';
 import FQCDailyPage from '@/components/pages/FQCDailyPage';
 import FQCAnalysisPage from '@/components/pages/FQCAnalysisPage';
 import FQCRCAPage from '@/components/pages/FQCRCAPage';
+import HotIssuePage from '@/components/pages/HotIssuePage';
 import FQCUploadPage from '@/components/pages/FQCUploadPage';
 import OQCLotsPage from '@/components/pages/OQCLotsPage';
 import OQCRekapPage from '@/components/pages/OQCRekapPage';
@@ -50,6 +52,7 @@ type PageKey =
   | 'fqc-daily'
   | 'fqc-analysis'
   | 'fqc-rca'
+  | 'hot-issue'
   | 'fqc-upload'
   | 'oqc-lots'
   | 'oqc-rekap'
@@ -70,6 +73,7 @@ const menuItems: MenuItem[] = [
   { key: 'fqc-daily', icon: <FileSpreadsheet className="h-5 w-5" />, labelKey: 'menu.fqc.dailyDetail' },
   { key: 'fqc-analysis', icon: <BarChart3 className="h-5 w-5" />, labelKey: 'menu.fqc.defectAnalysis' },
   { key: 'fqc-rca', icon: <Search className="h-5 w-5" />, labelKey: 'menu.fqc.rca', badge: true },
+  { key: 'hot-issue', icon: <Flame className="h-5 w-5" />, labelKey: 'menu.fqc.hotIssue', roles: ['staff_qa', 'manager_qc', 'manager_umum'] },
   { key: 'fqc-upload', icon: <Upload className="h-5 w-5" />, labelKey: 'menu.fqc.upload', roles: ['staff_qa'] },
   { key: 'oqc-lots', icon: <Package className="h-5 w-5" />, labelKey: 'menu.oqc.dailyLots' },
   { key: 'oqc-rekap', icon: <FileText className="h-5 w-5" />, labelKey: 'menu.oqc.rekap' },
@@ -88,6 +92,8 @@ function getPageComponent(key: PageKey, isFullAccess: boolean): ReactNode {
       return <FQCAnalysisPage />;
     case 'fqc-rca':
       return <FQCRCAPage />;
+    case 'hot-issue':
+      return <HotIssuePage />;
     case 'fqc-upload':
       return isFullAccess ? <FQCUploadPage /> : null;
     case 'oqc-lots':

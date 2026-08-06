@@ -11,6 +11,7 @@ const MANAGEABLE_TABLES = [
   { key: 'oqc_defects', label: 'OQC Defects', labelZh: 'OQC 缺陷', icon: 'alert-triangle', protect: false },
   { key: 'rca_weekly', label: 'RCA Weekly', labelZh: 'RCA 周报', icon: 'search', protect: false },
   { key: 'rca_actions', label: 'RCA Actions', labelZh: 'RCA 行动项', icon: 'check-square', protect: false },
+  { key: 'rca_hot_issues', label: 'Hot Issues', labelZh: 'Hot Issue 热点问题', icon: 'flame', protect: false },
   { key: 'users', label: 'Users', labelZh: '用户', icon: 'users', protect: true },
 ];
 
