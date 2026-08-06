@@ -778,61 +778,61 @@ export default function FQCRCAPage() {
                                     {editing ? (
                                       <>
                                         {/* EDIT MODE */}
-                                        <div className="overflow-x-auto rounded-lg border">
-                                          <Table>
-                                            <TableHeader className="bg-slate-50">
-                                              <TableRow>
-                                                <TableHead className="text-xs w-8">#</TableHead>
-                                                <TableHead className="text-xs min-w-[120px]">{t('rca.rootCause')}</TableHead>
-                                                <TableHead className="text-xs min-w-[90px]">{t('rca.impact')}</TableHead>
-                                                <TableHead className="text-xs min-w-[80px]">{t('rca.process')}</TableHead>
-                                                <TableHead className="text-xs min-w-[120px]">{t('rca.correctiveAction')}</TableHead>
-                                                <TableHead className="text-xs min-w-[120px]">{t('rca.preventiveAction')}</TableHead>
-                                                <TableHead className="text-xs min-w-[80px]">{t('rca.responsible')}</TableHead>
-                                                <TableHead className="text-xs w-28">{t('rca.deadline')}</TableHead>
-                                                <TableHead className="text-xs w-[88px]">{t('rca.photoBefore')}</TableHead>
-                                                <TableHead className="text-xs w-[88px]">{t('rca.photoAfter')}</TableHead>
+                                        <div className="rounded-lg border overflow-hidden">
+                                        <Table className="[&_td]:whitespace-normal [&_td]:break-words [&_th]:whitespace-normal" style={{ tableLayout: 'fixed', minWidth: '760px' }}>
+                                          <TableHeader className="bg-slate-50">
+                                            <TableRow>
+                                              <TableHead className="text-[10px] w-[4%]">#</TableHead>
+                                              <TableHead className="text-[10px] w-[15%]">{t('rca.rootCause')}</TableHead>
+                                              <TableHead className="text-[10px] w-[12%]">{t('rca.impact')}</TableHead>
+                                              <TableHead className="text-[10px] w-[8%]">{t('rca.process')}</TableHead>
+                                              <TableHead className="text-[10px] w-[15%]">{t('rca.correctiveAction')}</TableHead>
+                                              <TableHead className="text-[10px] w-[15%]">{t('rca.preventiveAction')}</TableHead>
+                                              <TableHead className="text-[10px] w-[7%]">{t('rca.responsible')}</TableHead>
+                                              <TableHead className="text-[10px] w-[8%]">{t('rca.deadline')}</TableHead>
+                                              <TableHead className="text-[10px] w-[8%] text-center">{t('rca.photoBefore')}</TableHead>
+                                              <TableHead className="text-[10px] w-[8%] text-center">{t('rca.photoAfter')}</TableHead>
+                                            </TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                            {getActionEdits(rca).map((action) => (
+                                              <TableRow key={action.rank}>
+                                                <TableCell className="text-[11px] font-bold text-slate-500">
+                                                  <div className="flex flex-col items-center">
+                                                    <span>{action.rank}</span>
+                                                    <span className="text-[8px] text-slate-400 normal-case">{zhCategory(action.category)}</span>
+                                                  </div>
+                                                </TableCell>
+                                                <TableCell className="text-[11px]"><Textarea className="min-h-[34px] text-[11px] p-1.5 leading-snug resize-y" value={action.root_cause} onChange={(e) => updateActionField(key, action.rank, 'root_cause', e.target.value)} /></TableCell>
+                                                <TableCell className="text-[11px]"><Textarea className="min-h-[34px] text-[11px] p-1.5 leading-snug resize-y" value={action.impact} onChange={(e) => updateActionField(key, action.rank, 'impact', e.target.value)} /></TableCell>
+                                                <TableCell className="text-[11px]"><Input className="h-7 text-[11px]" value={action.process} onChange={(e) => updateActionField(key, action.rank, 'process', e.target.value)} /></TableCell>
+                                                <TableCell className="text-[11px]"><Textarea className="min-h-[34px] text-[11px] p-1.5 leading-snug resize-y" value={action.corrective_action} onChange={(e) => updateActionField(key, action.rank, 'corrective_action', e.target.value)} /></TableCell>
+                                                <TableCell className="text-[11px]"><Textarea className="min-h-[34px] text-[11px] p-1.5 leading-snug resize-y" value={action.preventive_action} onChange={(e) => updateActionField(key, action.rank, 'preventive_action', e.target.value)} /></TableCell>
+                                                <TableCell className="text-[11px]"><Input className="h-7 text-[11px]" value={action.responsible} onChange={(e) => updateActionField(key, action.rank, 'responsible', e.target.value)} /></TableCell>
+                                                <TableCell className="text-[11px]"><Input type="date" className="h-7 text-[11px]" value={action.due_date} onChange={(e) => updateActionField(key, action.rank, 'due_date', e.target.value)} /></TableCell>
+                                                <TableCell className="text-[11px]">
+                                                  <PhotoCell
+                                                    value={action.photo_before}
+                                                    onUpload={(file) => handlePhotoUpload(key, action.rank, 'photo_before', file)}
+                                                    onRemove={() => updateActionField(key, action.rank, 'photo_before', '')}
+                                                  />
+                                                </TableCell>
+                                                <TableCell className="text-[11px]">
+                                                  <PhotoCell
+                                                    value={action.photo_after}
+                                                    onUpload={(file) => handlePhotoUpload(key, action.rank, 'photo_after', file)}
+                                                    onRemove={() => updateActionField(key, action.rank, 'photo_after', '')}
+                                                  />
+                                                </TableCell>
                                               </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                              {getActionEdits(rca).map((action) => (
-                                                <TableRow key={action.rank}>
-                                                  <TableCell className="text-xs font-bold text-slate-500">
-                                                    <div className="flex flex-col items-center">
-                                                      <span>{action.rank}</span>
-                                                      <span className="text-[9px] text-slate-400 normal-case max-w-[60px] truncate">{zhCategory(action.category)}</span>
-                                                    </div>
-                                                  </TableCell>
-                                                  <TableCell className="text-xs"><Textarea className="min-h-[36px] text-xs p-1.5" value={action.root_cause} onChange={(e) => updateActionField(key, action.rank, 'root_cause', e.target.value)} /></TableCell>
-                                                  <TableCell className="text-xs"><Textarea className="min-h-[36px] text-xs p-1.5" value={action.impact} onChange={(e) => updateActionField(key, action.rank, 'impact', e.target.value)} /></TableCell>
-                                                  <TableCell className="text-xs"><Input className="h-8 text-xs" value={action.process} onChange={(e) => updateActionField(key, action.rank, 'process', e.target.value)} /></TableCell>
-                                                  <TableCell className="text-xs"><Textarea className="min-h-[36px] text-xs p-1.5" value={action.corrective_action} onChange={(e) => updateActionField(key, action.rank, 'corrective_action', e.target.value)} /></TableCell>
-                                                  <TableCell className="text-xs"><Textarea className="min-h-[36px] text-xs p-1.5" value={action.preventive_action} onChange={(e) => updateActionField(key, action.rank, 'preventive_action', e.target.value)} /></TableCell>
-                                                  <TableCell className="text-xs"><Input className="h-8 text-xs" value={action.responsible} onChange={(e) => updateActionField(key, action.rank, 'responsible', e.target.value)} /></TableCell>
-                                                  <TableCell className="text-xs"><Input type="date" className="h-8 text-xs" value={action.due_date} onChange={(e) => updateActionField(key, action.rank, 'due_date', e.target.value)} /></TableCell>
-                                                  <TableCell className="text-xs">
-                                                    <PhotoCell
-                                                      value={action.photo_before}
-                                                      onUpload={(file) => handlePhotoUpload(key, action.rank, 'photo_before', file)}
-                                                      onRemove={() => updateActionField(key, action.rank, 'photo_before', '')}
-                                                    />
-                                                  </TableCell>
-                                                  <TableCell className="text-xs">
-                                                    <PhotoCell
-                                                      value={action.photo_after}
-                                                      onUpload={(file) => handlePhotoUpload(key, action.rank, 'photo_after', file)}
-                                                      onRemove={() => updateActionField(key, action.rank, 'photo_after', '')}
-                                                    />
-                                                  </TableCell>
-                                                </TableRow>
-                                              ))}
-                                              {getActionEdits(rca).length === 0 && (
-                                                <TableRow>
-                                                  <TableCell colSpan={10} className="text-center py-4 text-xs text-slate-400">{t('rca.noActionItems')}</TableCell>
-                                                </TableRow>
-                                              )}
-                                            </TableBody>
-                                          </Table>
+                                            ))}
+                                            {getActionEdits(rca).length === 0 && (
+                                              <TableRow>
+                                                <TableCell colSpan={10} className="text-center py-4 text-[11px] text-slate-400">{t('rca.noActionItems')}</TableCell>
+                                              </TableRow>
+                                            )}
+                                          </TableBody>
+                                        </Table>
                                         </div>
                                         <div className="mt-3 flex justify-end">
                                           <Button onClick={() => handleSave(rca)} disabled={savingId === key} size="sm" className="bg-slate-900 hover:bg-slate-800">
@@ -846,58 +846,58 @@ export default function FQCRCAPage() {
                                       <>
                                         {/* LOCK MODE (read-only) */}
                                         {getActionEdits(rca).length > 0 ? (
-                                          <div className="overflow-x-auto rounded-lg border bg-slate-50/30">
-                                            <Table>
-                                              <TableHeader className="bg-slate-100/60">
-                                                <TableRow>
-                                                  <TableHead className="text-xs w-8">#</TableHead>
-                                                  <TableHead className="text-xs min-w-[120px]">{t('rca.rootCause')}</TableHead>
-                                                  <TableHead className="text-xs min-w-[90px]">{t('rca.impact')}</TableHead>
-                                                  <TableHead className="text-xs min-w-[80px]">{t('rca.process')}</TableHead>
-                                                  <TableHead className="text-xs min-w-[120px]">{t('rca.correctiveAction')}</TableHead>
-                                                  <TableHead className="text-xs min-w-[120px]">{t('rca.preventiveAction')}</TableHead>
-                                                  <TableHead className="text-xs min-w-[80px]">{t('rca.responsible')}</TableHead>
-                                                  <TableHead className="text-xs w-28">{t('rca.deadline')}</TableHead>
-                                                  <TableHead className="text-xs w-[88px]">{t('rca.photoBefore')}</TableHead>
-                                                  <TableHead className="text-xs w-[88px]">{t('rca.photoAfter')}</TableHead>
+                                          <div className="rounded-lg border border-slate-200 overflow-hidden bg-slate-50/30">
+                                          <Table className="[&_td]:whitespace-normal [&_td]:break-words [&_th]:whitespace-normal" style={{ tableLayout: 'fixed', minWidth: '760px' }}>
+                                            <TableHeader className="bg-slate-100/60">
+                                              <TableRow>
+                                                <TableHead className="text-[10px] w-[4%]">#</TableHead>
+                                                <TableHead className="text-[10px] w-[15%]">{t('rca.rootCause')}</TableHead>
+                                                <TableHead className="text-[10px] w-[12%]">{t('rca.impact')}</TableHead>
+                                                <TableHead className="text-[10px] w-[8%]">{t('rca.process')}</TableHead>
+                                                <TableHead className="text-[10px] w-[15%]">{t('rca.correctiveAction')}</TableHead>
+                                                <TableHead className="text-[10px] w-[15%]">{t('rca.preventiveAction')}</TableHead>
+                                                <TableHead className="text-[10px] w-[7%]">{t('rca.responsible')}</TableHead>
+                                                <TableHead className="text-[10px] w-[8%]">{t('rca.deadline')}</TableHead>
+                                                <TableHead className="text-[10px] w-[8%] text-center">{t('rca.photoBefore')}</TableHead>
+                                                <TableHead className="text-[10px] w-[8%] text-center">{t('rca.photoAfter')}</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {getActionEdits(rca).map((action) => (
+                                                <TableRow key={action.rank} className="bg-white">
+                                                  <TableCell className="text-[11px] font-bold text-slate-500">
+                                                    <div className="flex flex-col items-center">
+                                                      <span>{action.rank}</span>
+                                                      <span className="text-[8px] text-slate-400 normal-case">{zhCategory(action.category)}</span>
+                                                    </div>
+                                                  </TableCell>
+                                                  <TableCell className="text-[11px] text-slate-700 leading-snug">{action.root_cause || '-'}</TableCell>
+                                                  <TableCell className="text-[11px] text-slate-700 leading-snug">{action.impact || '-'}</TableCell>
+                                                  <TableCell className="text-[11px] text-slate-700">{action.process || '-'}</TableCell>
+                                                  <TableCell className="text-[11px] text-slate-700 leading-snug">{action.corrective_action || '-'}</TableCell>
+                                                  <TableCell className="text-[11px] text-slate-700 leading-snug">{action.preventive_action || '-'}</TableCell>
+                                                  <TableCell className="text-[11px] text-slate-700">{action.responsible || '-'}</TableCell>
+                                                  <TableCell className="text-[11px] text-slate-700">{action.due_date || '-'}</TableCell>
+                                                  <TableCell className="text-[11px]">
+                                                    <PhotoCell
+                                                      value={action.photo_before}
+                                                      onUpload={() => {}}
+                                                      onRemove={() => {}}
+                                                      disabled
+                                                    />
+                                                  </TableCell>
+                                                  <TableCell className="text-[11px]">
+                                                    <PhotoCell
+                                                      value={action.photo_after}
+                                                      onUpload={() => {}}
+                                                      onRemove={() => {}}
+                                                      disabled
+                                                    />
+                                                  </TableCell>
                                                 </TableRow>
-                                              </TableHeader>
-                                              <TableBody>
-                                                {getActionEdits(rca).map((action) => (
-                                                  <TableRow key={action.rank} className="bg-white">
-                                                    <TableCell className="text-xs font-bold text-slate-500">
-                                                      <div className="flex flex-col items-center">
-                                                        <span>{action.rank}</span>
-                                                        <span className="text-[9px] text-slate-400 normal-case max-w-[60px] truncate">{zhCategory(action.category)}</span>
-                                                      </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-xs text-slate-700 leading-relaxed">{action.root_cause || '-'}</TableCell>
-                                                    <TableCell className="text-xs text-slate-700 leading-relaxed">{action.impact || '-'}</TableCell>
-                                                    <TableCell className="text-xs text-slate-700">{action.process || '-'}</TableCell>
-                                                    <TableCell className="text-xs text-slate-700 leading-relaxed">{action.corrective_action || '-'}</TableCell>
-                                                    <TableCell className="text-xs text-slate-700 leading-relaxed">{action.preventive_action || '-'}</TableCell>
-                                                    <TableCell className="text-xs text-slate-700">{action.responsible || '-'}</TableCell>
-                                                    <TableCell className="text-xs text-slate-700">{action.due_date || '-'}</TableCell>
-                                                    <TableCell className="text-xs">
-                                                      <PhotoCell
-                                                        value={action.photo_before}
-                                                        onUpload={() => {}}
-                                                        onRemove={() => {}}
-                                                        disabled
-                                                      />
-                                                    </TableCell>
-                                                    <TableCell className="text-xs">
-                                                      <PhotoCell
-                                                        value={action.photo_after}
-                                                        onUpload={() => {}}
-                                                        onRemove={() => {}}
-                                                        disabled
-                                                      />
-                                                    </TableCell>
-                                                  </TableRow>
-                                                ))}
-                                              </TableBody>
-                                            </Table>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
                                           </div>
                                         ) : (
                                           <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/30 px-4 py-6 text-center">
