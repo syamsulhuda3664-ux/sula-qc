@@ -129,3 +129,26 @@ Stage Summary:
 - RCA generation uses correct language from hot issues
 - Hot issues now visible in FQC Analysis (Section D)
 - Files changed: HotIssuePage.tsx, FQCAnalysisPage.tsx, hot-issues/route.ts, hot-issues/[id]/route.ts, rca/route.ts, i18n.ts
+---
+Task ID: 1
+Agent: main
+Task: Hot Issue - bilingual support, combobox style/order, DB migration
+
+Work Log:
+- Ran DB migration: added order_no + 6 _zh columns to rca_hot_issues table
+- Changed Style & Order No from Select dropdowns to combobox inputs (manual type + dropdown suggestion from daily FQC data)
+- Added visible Style & Order No columns to hot issues main table
+- Redesigned bilingual form fields with clear Indonesia (blue border) / Mandarin (red border) color coding
+- Added bilingual section divider header in form dialog
+- Fixed FQCAnalysisPage Section D TS1005 parse error (rewrote nested ternary to separate && blocks)
+- Added missing Badge import to FQCAnalysisPage
+- Added categoryZh to SUBDEFECT_OPTIONS type definition
+- Verified RCA merge function already handles bilingual via pick() function
+- Git committed all changes
+
+Stage Summary:
+- DB: rca_hot_issues now has order_no, root_cause_zh, impact_zh, process_zh, corrective_action_zh, preventive_action_zh, responsible_zh columns
+- HotIssuePage: Style/Order No are combobox (type manual or pick from FQC daily data), all text fields have ID+ZH dual input with color coding
+- Hot issues table now shows Style and Order No columns
+- FQCAnalysisPage Section D shows hot issues with bilingual root cause/corrective/responsible
+- TypeScript compiles clean for modified files

@@ -643,11 +643,12 @@ export default function HotIssuePage() {
               <label className="text-[10px] font-semibold text-red-700 mb-1 block">{t('rca.responsible')} — 中文</label>
               <Input className="h-9 text-sm bg-white" value={form.responsible_zh} onChange={(e) => setForm(p => ({ ...p, responsible_zh: e.target.value }))} />
             </div>
-            <div>
+            {/* Deadline — full width */}
+            <div className="col-span-2">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('rca.deadline')}</label>
-              <Input type="date" className="h-9 text-sm" value={form.due_date} onChange={(e) => setForm(p => ({ ...p, due_date: e.target.value }))} />
+              <Input type="date" className="h-9 text-sm w-48" value={form.due_date} onChange={(e) => setForm(p => ({ ...p, due_date: e.target.value }))} />
             </div>
-            {/* Row 10: Photos */}
+            {/* Photos — side by side below deadline */}
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('rca.photoBefore')}</label>
               <PhotoThumbnail value={form.photo_before} onUpload={(f) => handlePhotoUpload('photo_before', f)} onRemove={() => setForm(p => ({ ...p, photo_before: '' }))} />

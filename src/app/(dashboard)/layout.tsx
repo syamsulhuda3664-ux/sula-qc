@@ -135,13 +135,13 @@ function SidebarNav({ items, activePage, onItemClick, collapsed, rcaPending, use
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-4">
+      <ScrollArea className="flex-1 min-h-0 px-3 py-4">
         <nav className="space-y-1">
           {items.map((item) => (
             <button
               key={item.key}
               onClick={() => onItemClick(item.key)}
-              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-left ${
+              className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left ${
                 activePage === item.key
                   ? 'bg-white/15 text-white'
                   : 'text-slate-300 hover:bg-white/10 hover:text-white'
@@ -161,21 +161,21 @@ function SidebarNav({ items, activePage, onItemClick, collapsed, rcaPending, use
       </ScrollArea>
 
       {/* User info at bottom */}
-      <div className="border-t border-slate-700/50 p-4">
+      <div className="border-t border-slate-700/50 px-4 py-3">
         {!collapsed && (
-          <div className="mb-3">
-            <p className="text-sm font-medium text-white truncate">{userName}</p>
-            <p className="text-xs text-slate-400">{t(`role.${userRole}`)}</p>
+          <div className="mb-2">
+            <p className="text-xs font-medium text-white truncate">{userName}</p>
+            <p className="text-[10px] text-slate-400">{t(`role.${userRole}`)}</p>
           </div>
         )}
         <Button
           variant="ghost"
           size="sm"
           onClick={onLogout}
-          className="w-full justify-start text-slate-400 hover:text-white hover:bg-white/10"
+          className="w-full justify-start text-slate-400 hover:text-white hover:bg-white/10 h-8"
         >
-          <LogOut className="h-4 w-4 mr-2" />
-          {!collapsed && t('common.logout')}
+          <LogOut className="h-3.5 w-3.5 mr-2" />
+          {!collapsed && <span className="text-xs">{t('common.logout')}</span>}
         </Button>
       </div>
     </div>
@@ -266,7 +266,7 @@ export default function DashboardLayout() {
     <div className="flex h-screen bg-slate-50">
       {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col border-r border-slate-200 bg-slate-900 transition-all duration-300 ${
+        className={`hidden lg:flex flex-col overflow-hidden border-r border-slate-200 bg-slate-900 transition-all duration-300 ${
           sidebarCollapsed ? 'w-16' : 'w-64'
         }`}
       >
