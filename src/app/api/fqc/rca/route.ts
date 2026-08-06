@@ -23,18 +23,22 @@ function mergeHotIssuesWithAutoActions(
   const usedCategories = new Set<string>();
 
   // 1. Convert hot issues to RCA actions (priority)
+  // Use _zh fields when lang is 'zh', fallback to base field
+  const pick = (base: unknown, zh: unknown) => 
+    lang === 'zh' && zh ? String(zh) : (base ? String(base) : '');
+
   const hotActions: RCAAction[] = hotIssues.map((hi, i) => ({
     rank: i + 1,
     category: (hi.category as string) || '',
     sub_defects: [(hi.sub_defect as string)],
     defect_qty: (hi.defect_qty as number) || 0,
     style_codes: (hi.style_codes as string[]) || [],
-    root_cause: (hi.root_cause as string) || '',
-    impact: (hi.impact as string) || '',
-    process: (hi.process as string) || '',
-    corrective_action: (hi.corrective_action as string) || '',
-    preventive_action: (hi.preventive_action as string) || '',
-    responsible: (hi.responsible as string) || '',
+    root_cause: pick(hi.root_cause, hi.root_cause_zh),
+    impact: pick(hi.impact, hi.impact_zh),
+    process: pick(hi.process, hi.process_zh),
+    corrective_action: pick(hi.corrective_action, hi.corrective_action_zh),
+    preventive_action: pick(hi.preventive_action, hi.preventive_action_zh),
+    responsible: pick(hi.responsible, hi.responsible_zh),
     due_date: (hi.due_date as string) || '',
     status: (hi.status as string) || 'pending',
     photo_before: (hi.photo_before as string) || '',

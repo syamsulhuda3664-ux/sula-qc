@@ -1,6 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
+import { SUBDEFECT_NAMES } from '@/lib/rca-generator';
+import { SUBDEFECT_DB_COLUMNS } from '@/lib/db-schema';
+
+/**
+ * Sync defect qty from a hot issue to fqc_inspections table.
+ * Finds matching inspection row(s) by date + BT + style (+ optional order_no),
+ * then adds `delta` to the specific sub_defect column, category column, and ng_qty.
+ */
+async function syncDefectToFqcInspection(
+  issueDate: string,
+  businessType: string,
+  styleCode: string,
+  orderNo: string | null,
+  subDefect: string,
+  categoryKey: string,
+  delta: number
+) {
+  if (!subDefect || delta === 0) return;
+
+  // Find the sub-defect DB column name
+  const subIdx = SUBDEFECT_NAMES.indexOf(subDefect);
+  const subCol = subIdx >= 0 ? SUBDEFECT_DB_COLUMNS[subIdx] : null;
+  if (!subCol) return;
+
+  // Build query to find matching fqc_inspections row(s)
+  let query = adminClient
+    .from('fqc_inspections')
+    .select('id, ng_qty')
+    .eq('inspection_date', issueDate)
+    .eq('business_type', businessType)
+    .eq('style_code', styleCode);
+
+  if (orderNo) query = query.eq('order_no', orderNo);
+
+  const { data: rows, error: fetchErr } = await query;
+  if (fetchErr || !rows || rows.length === 0) {
+    console.log(`[Hot Issue Sync] No matching fqc_inspections row found for ${issueDate} / ${businessType} / ${styleCode} / ${orderNo || 'any'}`);
+    return;
+  }
+
+  // Update each matching row
+  for (const row of rows) {
+    const updates: Record<string, unknown> = {
+      // Increment the specific sub-defect column
+      [subCol]: (Number((row as any)[subCol]) || 0) + delta,
+      // Increment the category column
+      [categoryKey]: (Number((row as any)[categoryKey]) || 0) + delta,
+      // Increment ng_qty
+      ng_qty: (Number(row.ng_qty) || 0) + delta,
+    };
+
+    const { error: updateErr } = await adminClient
+      .from('fqc_inspections')
+      .update(updates)
+      .eq('id', row.id);
+
+    if (updateErr) {
+      console.error(`[Hot Issue Sync] Failed to update inspection ${row.id}:`, updateErr.message);
+    } else {
+      console.log(`[Hot Issue Sync] Updated inspection ${row.id}: ${subCol} += ${delta}, ${categoryKey} += ${delta}`);
+    }
+  }
+}
 
 // ═══════════════════════════════════════════════════════════
 // GET — list hot issues (all authenticated users can view)
@@ -62,13 +125,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { issue_date, business_type, category, sub_defect, defect_qty, style_codes,
-      root_cause, impact, process, corrective_action, preventive_action,
-      responsible, due_date, photo_before, photo_after } = body;
+    const { issue_date, business_type, category, sub_defect, defect_qty, style_codes, order_no,
+      root_cause, root_cause_zh, impact, impact_zh, process, process_zh,
+      corrective_action, corrective_action_zh, preventive_action, preventive_action_zh,
+      responsible, responsible_zh, due_date, photo_before, photo_after } = body;
 
     if (!issue_date || !business_type || !sub_defect) {
       return NextResponse.json({ error: 'issue_date, business_type, and sub_defect are required' }, { status: 400 });
     }
+
+    const styleCode = (style_codes && style_codes.length > 0) ? style_codes[0] : '';
 
     const { data, error } = await adminClient
       .from('rca_hot_issues')
@@ -79,12 +145,19 @@ export async function POST(request: NextRequest) {
         sub_defect,
         defect_qty: defect_qty || 0,
         style_codes: style_codes || [],
+        order_no: order_no || null,
         root_cause: root_cause || null,
+        root_cause_zh: root_cause_zh || null,
         impact: impact || null,
+        impact_zh: impact_zh || null,
         process: process || null,
+        process_zh: process_zh || null,
         corrective_action: corrective_action || null,
+        corrective_action_zh: corrective_action_zh || null,
         preventive_action: preventive_action || null,
+        preventive_action_zh: preventive_action_zh || null,
         responsible: responsible || null,
+        responsible_zh: responsible_zh || null,
         due_date: due_date || null,
         photo_before: photo_before || null,
         photo_after: photo_after || null,
@@ -96,6 +169,14 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Create hot issue error:', error);
       return NextResponse.json({ error: 'Failed to create hot issue' }, { status: 500 });
+    }
+
+    // Sync defect qty to fqc_inspections
+    if (styleCode && category && defect_qty > 0) {
+      await syncDefectToFqcInspection(
+        issue_date, business_type, styleCode, order_no || null,
+        sub_defect, category, defect_qty
+      );
     }
 
     return NextResponse.json({ record: data, message: 'Hot issue created' });

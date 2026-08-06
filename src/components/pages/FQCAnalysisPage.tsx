@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Download, Loader2, Info } from 'lucide-react';
+import { RefreshCw, Download, Loader2, Info, Flame } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { CATEGORY_ZH, SUBDEFECT_NAMES_ZH, SUBDEFECT_NAMES } from '@/lib/rca-generator';
 
 /** Lookup: English sub-defect name → Mandarin */
@@ -153,11 +154,29 @@ export default function FQCAnalysisPage() {
   const zhSubDefect = (sub: string) => (isZhMode ? (SUBDEFECT_ZH_MAP[sub] || sub) : sub);
   const { effectiveType, isLocked } = useBusinessTypeLock();
   const [data, setData] = useState<any>(null);
+  const [hotIssues, setHotIssues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hotLoading, setHotLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
   const { dateFrom, dateTo, setDateFrom, setDateTo, clearDates } = useDateFilter();
   const [businessType, setBusinessType] = useState('ALL');
+
+  const fetchHotIssues = useCallback(async () => {
+    setHotLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
+      const bt = effectiveType || businessType;
+      if (bt !== 'ALL') params.set('business_type', bt);
+      const res = await fetch(`/api/fqc/hot-issues?${params}`);
+      if (res.ok) {
+        const json = await res.json();
+        setHotIssues(json.records || []);
+      }
+    } catch {} finally { setHotLoading(false); }
+  }, [dateFrom, dateTo, businessType, effectiveType]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -182,7 +201,7 @@ export default function FQCAnalysisPage() {
     }
   }, [dateFrom, dateTo, businessType, effectiveType]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); fetchHotIssues(); }, [fetchData, fetchHotIssues]);
 
   const categorySummary = data?.section_a?.category_summary || [];
   const topSubDefects = data?.section_b?.top_sub_defects || [];
@@ -462,6 +481,74 @@ export default function FQCAnalysisPage() {
               </Table>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Section D: Hot Issues */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <Flame className="h-4 w-4 text-orange-500" />
+            {isZhMode ? 'D. Hot Issue 热点问题' : 'D. Hot Issues'}
+          </CardTitle>
+          <p className="text-xs text-slate-500">
+            {isZhMode
+              ? '手动录入的关键问题，将优先进入 RCA Top 3'
+              : 'Manually entered critical issues, prioritized in RCA Top 3'}
+          </p>
+        </CardHeader>
+        <CardContent className="px-4 pb-4">
+          <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-orange-50 border border-orange-100">
+            <Flame className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-orange-700 leading-relaxed">
+              {isZhMode
+                ? 'Hot Issue 是由 QA 团队手动标记的关键缺陷问题。这些条目在生成 RCA 时会自动占据 Top 3 的优先位置。'
+                : 'Hot Issues are critical defects manually flagged by QA team. These entries automatically take priority slots in the Top 3 RCA.'}
+            </p>
+          </div>
+          {hotLoading && (<div className="space-y-2"><Skeleton className="h-16 w-full rounded-lg" /><Skeleton className="h-16 w-full rounded-lg" /></div>)}
+          {!hotLoading && hotIssues.length === 0 && (
+            <div className="rounded-lg border border-dashed border-orange-200 bg-orange-50/20 px-4 py-8 text-center">
+              <Flame className="h-6 w-6 text-orange-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">{isZhMode ? '该期间暂无 Hot Issue' : 'No hot issues for this period'}</p>
+            </div>
+          )}
+          {!hotLoading && hotIssues.length > 0 && (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-orange-50/50">
+                  <TableRow>
+                    <TableHead className="text-xs w-10">#</TableHead>
+                    <TableHead className="text-xs">{t('common.date')}</TableHead>
+                    <TableHead className="text-xs">BT</TableHead>
+                    <TableHead className="text-xs">{isZhMode ? '子缺陷' : 'Sub-Defect'}</TableHead>
+                    <TableHead className="text-xs text-right">Qty</TableHead>
+                    <TableHead className="text-xs">{t('rca.rootCause')}</TableHead>
+                    <TableHead className="text-xs">{t('rca.correctiveAction')}</TableHead>
+                    <TableHead className="text-xs">{t('rca.responsible')}</TableHead>
+                    <TableHead className="text-xs">{t('analysis.category')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {hotIssues.map((hi: any, i: number) => (
+                    <TableRow key={hi.id} className="hover:bg-orange-50/30">
+                      <TableCell className="text-xs font-medium text-orange-500">{i + 1}</TableCell>
+                      <TableCell className="text-xs">{hi.issue_date}</TableCell>
+                      <TableCell className="text-xs">
+                        <Badge variant="outline" className="text-[9px]">{(hi.business_type || '').replace('PT', '')}</Badge>
+                      </TableCell>
+                      <TableCell className="text-xs font-medium">{zhSubDefect(hi.sub_defect)}</TableCell>
+                      <TableCell className="text-xs text-right font-bold text-red-600">{hi.defect_qty || 0}</TableCell>
+                      <TableCell className="text-xs text-slate-600 leading-snug max-w-[200px]">{isZhMode ? (hi.root_cause_zh || hi.root_cause || '-') : (hi.root_cause || '-')}</TableCell>
+                      <TableCell className="text-xs text-slate-600 leading-snug max-w-[200px]">{isZhMode ? (hi.corrective_action_zh || hi.corrective_action || '-') : (hi.corrective_action || '-')}</TableCell>
+                      <TableCell className="text-xs">{isZhMode ? (hi.responsible_zh || hi.responsible || '-') : (hi.responsible || '-')}</TableCell>
+                      <TableCell className="text-xs text-slate-500">{zhCategory(hi.category || '')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

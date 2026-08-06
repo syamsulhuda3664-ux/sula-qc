@@ -92,3 +92,40 @@ Work Log:
 Stage Summary:
 - GitHub: https://github.com/syamsulhuda3664-ux/sula-qc
 - Live: https://sula-qc.vercel.app
+
+---
+Task ID: 7
+Agent: Main Coordinator
+Task: RCA week ordering fix + role-based generate restriction
+
+Work Log:
+- Fixed RCA actions sorting: added .sort((a, b) => a.rank - b.rank) in both draft and DB loading paths
+- Fixed allRcas sorting by week_start ascending
+- Changed Generate RCA button from isFullAccess to isStaffQA only
+- Changed RCA actions edit from isFullAccess to canEditRCA (staff_qa + manager_qc + manager_umum)
+- Added role check in RCA POST route for auto-generate (staff_qa only)
+- Updated RCA actions PUT route with manual role check
+
+Stage Summary:
+- RCA week 2 actions now display in correct 1,2,3 order
+- Only staff QA can generate RCA; managers can only edit
+
+---
+Task ID: 8
+Agent: Main Coordinator
+Task: Hot Issue bilingual feature + FQC Analysis integration
+
+Work Log:
+- Added 6 bilingual columns to rca_hot_issues: root_cause_zh, impact_zh, process_zh, corrective_action_zh, preventive_action_zh, responsible_zh
+- Updated HotIssuePage.tsx: bilingual form with paired ID/ZH inputs, language-aware table display
+- Updated hot issues API routes (POST/PUT) to handle bilingual fields
+- Updated mergeHotIssuesWithAutoActions in RCA route with language-aware field picker (lang='zh' uses _zh fields)
+- Added Section D: Hot Issues to FQC Analysis page with bilingual display
+- Added i18n translations for hot issue labels
+
+Stage Summary:
+- Hot issue input is bilingual: every text field has ID + ZH pair
+- Display auto-switches based on user role language
+- RCA generation uses correct language from hot issues
+- Hot issues now visible in FQC Analysis (Section D)
+- Files changed: HotIssuePage.tsx, FQCAnalysisPage.tsx, hot-issues/route.ts, hot-issues/[id]/route.ts, rca/route.ts, i18n.ts
