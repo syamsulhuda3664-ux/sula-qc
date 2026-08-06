@@ -1,6 +1,8 @@
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { extractLineSortKey } from './utils';
+import { SUBDEFECT_DB_COLUMNS } from './db-schema';
+import { SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, getSubDefectCategory, CATEGORY_ZH } from './rca-generator';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -528,7 +530,7 @@ export async function exportFQCDailyExcel(
   const sortedData = [...data].sort((a, b) => {
     const da = String(a.inspection_date || '');
     const db = String(b.inspection_date || '');
-    const dateComp = da.localeCompare(db);
+    const dateComp = db.localeCompare(da); // DESC — match web page
     if (dateComp !== 0) return dateComp;
     const la = extractLineSortKey(String(a.line || a.production_line || ''));
     const lb = extractLineSortKey(String(b.line || b.production_line || ''));
@@ -537,7 +539,7 @@ export async function exportFQCDailyExcel(
 
   const dateGroups: Record<string, Record<string, unknown>[]> = {};
   for (const record of sortedData) {
-    const dKey = String(record.inspection_date || 'unknown');
+    const dKey = String((record.inspection_date || 'unknown').toString().split('T')[0]);
     if (!dateGroups[dKey]) dateGroups[dKey] = [];
     dateGroups[dKey].push(record);
   }
@@ -550,7 +552,7 @@ export async function exportFQCDailyExcel(
   };
   let rowNum = 1;
 
-  const dates = Object.keys(dateGroups).sort();
+  const dates = Object.keys(dateGroups).sort((a, b) => b.localeCompare(a)); // DESC
 
   // Number columns (1-indexed): No(1), Order Qty(7), Inspected(8), OK(9), NG(10), Rate(11), defects(12-20)
   const numberColSet = new Set<number>([1, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
@@ -878,87 +880,21 @@ export function exportFQCAnalysisExcel(
   // Reuse the same default names list for display.
   const subDefectCounts: Record<string, { count: number; category: string }> = {};
   const SUBDEFECT_DEFAULT_NAMES: { name: string; category: string }[] = [
-    // Stitching (15)
-    { name: '跳针 Skip stitch', category: '针车问题 / Stitching' },
-    { name: '断线 Thread break', category: '针车问题 / Stitching' },
-    { name: '浮线 Loose thread', category: '针车问题 / Stitching' },
-    { name: '断针 Needle break', category: '针车问题 / Stitching' },
-    { name: '针迹不均 Uneven stitch', category: '针车问题 / Stitching' },
-    { name: '起皱 Puckering', category: '针车问题 / Stitching' },
-    { name: '线头 Thread tail', category: '针车问题 / Stitching' },
-    { name: '重针 Double stitch', category: '针车问题 / Stitching' },
-    { name: '漏针 Missing stitch', category: '针车问题 / Stitching' },
-    { name: '反线 Wrong thread', category: '针车问题 / Stitching' },
-    { name: '针距不对 Wrong pitch', category: '针车问题 / Stitching' },
-    { name: '线迹歪斜 Crooked stitch', category: '针车问题 / Stitching' },
-    { name: '缝合不良 Poor sewing', category: '针车问题 / Stitching' },
-    { name: '接线不良 Joint issue', category: '针车问题 / Stitching' },
-    { name: '爆线 Seam burst', category: '针车问题 / Stitching' },
-    // Logo (4)
-    { name: 'Logo歪斜 Logo misaligned', category: 'LOGO问题 / Logo' },
-    { name: 'Logo脱落 Logo peeling', category: 'LOGO问题 / Logo' },
-    { name: 'Logo变色 Logo discolored', category: 'LOGO问题 / Logo' },
-    { name: 'Logo缺件 Logo missing', category: 'LOGO问题 / Logo' },
-    // Material (5)
-    { name: '色差 Color deviation', category: '面料问题 / Material' },
-    { name: '破洞 Hole', category: '面料问题 / Material' },
-    { name: '污渍 Stain', category: '面料问题 / Material' },
-    { name: '起毛 Pilling', category: '面料问题 / Material' },
-    { name: '面料错误 Wrong material', category: '面料问题 / Material' },
-    // Hardware (3)
-    { name: '拉链不良 Zipper defect', category: '五金问题 / Hardware' },
-    { name: '五金缺失 Hardware missing', category: '五金问题 / Hardware' },
-    { name: '五金松动 Hardware loose', category: '五金问题 / Hardware' },
-    // Appearance (5)
-    { name: '刮伤 Scratch', category: '外观问题 / Appearance' },
-    { name: '变形 Deformation', category: '外观问题 / Appearance' },
-    { name: '褶皱 Wrinkle', category: '外观问题 / Appearance' },
-    { name: '色斑 Color spot', category: '外观问题 / Appearance' },
-    { name: '尺寸不对 Wrong size', category: '外观问题 / Appearance' },
-    // Zipper (4)
-    { name: '拉链卡顿 Zipper stuck', category: '拉链问题 / Zipper' },
-    { name: '拉链头缺失 Puller missing', category: '拉链问题 / Zipper' },
-    { name: '拉链脱色 Zipper faded', category: '拉链问题 / Zipper' },
-    { name: '拉链断裂 Zipper broken', category: '拉链问题 / Zipper' },
-    // Webbing (2)
-    { name: '织带不良 Webbing defect', category: '织带问题 / Webbing' },
-    { name: '织带错色 Wrong webbing color', category: '织带问题 / Webbing' },
-    // Other (6)
-    { name: '尺寸不符 Dimension mismatch', category: '其它问题 / Other' },
-    { name: '重量不符 Weight mismatch', category: '其它问题 / Other' },
-    { name: '异味 Odor', category: '其它问题 / Other' },
-    { name: '标签问题 Label issue', category: '其它问题 / Other' },
-    { name: '包装问题 Packaging issue', category: '其它问题 / Other' },
-    { name: '其他 Other', category: '其它问题 / Other' },
-    // Preparation (16)
-    { name: '备料错误 Wrong preparation', category: '备料问题 / Preparation' },
-    { name: '物料缺失 Material missing', category: '备料问题 / Preparation' },
-    { name: '物料混料 Material mixed', category: '备料问题 / Preparation' },
-    { name: '裁剪不良 Cutting defect', category: '备料问题 / Preparation' },
-    { name: '排料不当 Layout error', category: '备料问题 / Preparation' },
-    { name: '数量不足 Qty shortage', category: '备料问题 / Preparation' },
-    { name: '规格不符 Spec mismatch', category: '备料问题 / Preparation' },
-    { name: '色号错误 Color code wrong', category: '备料问题 / Preparation' },
-    { name: '批次错误 Batch error', category: '备料问题 / Preparation' },
-    { name: '配件错误 Accessory wrong', category: '备料问题 / Preparation' },
-    { name: '超期物料 Expired material', category: '备料问题 / Preparation' },
-    { name: '物料破损 Material damaged', category: '备料问题 / Preparation' },
-    { name: '物料脏污 Material dirty', category: '备料问题 / Preparation' },
-    { name: '物料色差 Material color diff', category: '备料问题 / Preparation' },
-    { name: '备料延迟 Prep delayed', category: '备料问题 / Preparation' },
-    { name: '余料管理 Scrap issue', category: '备料问题 / Preparation' },
-    // Merged from Stitch Defect into Stitching
-    { name: '车缝不良 Sewing defect', category: '针车问题 / Stitching' },
+    ...SUBDEFECT_DB_COLUMNS.map((col, i) => {
+      const cat = getSubDefectCategory(i);
+      const nameEn = SUBDEFECT_NAMES[i] || col;
+      const nameZh = SUBDEFECT_NAMES_ZH[i] || col;
+      const catZh = CATEGORY_ZH[cat.category] || cat.category;
+      return { name: `${nameZh} / ${nameEn}`, category: `${catZh}问题 / ${cat.category}` };
+    }),
   ];
 
   for (const r of data) {
     // DB rows have individual sub_* columns — iterate SUBDEFECT_DB_COLUMNS
     // We import the column names inline here to avoid a top-level import
     // that would bloat the already large file.
-    const subCols = [
-      'sub_float_fold_skip','sub_missing_loose_stitch','sub_not_stitched','sub_needle_hole','sub_missing_bartack','sub_presser_mark','sub_backtack_off','sub_wrong_panel','sub_end_unfolded','sub_asymmetric','sub_triangle_uneven','sub_thread_bleed','sub_thread_ends','sub_foam_misaligned','sub_stitch_offcenter','sub_logo_crooked','sub_logo_inverted','sub_logo_defective','sub_logo_detached','sub_color_diff','sub_yarn_pull','sub_wrinkle','sub_damaged','sub_seam_open','sub_scratched','sub_poor_function','sub_missing_accessory','sub_dirty_oily','sub_bone_uneven','sub_bag_crooked','sub_handle_misaligned','sub_missing_rivet','sub_sharp_stuck','sub_zipper_wave','sub_zipper_head_reversed','sub_wrong_color_zipper','sub_webbing_twisted','sub_webbing_misplaced','sub_wash_label_reversed','sub_wash_label_wrong','sub_woven_label_reversed','sub_woven_label_missing','sub_lining_reversed','sub_plastic_defective','sub_rivet_defective','sub_accessory_crooked','sub_paint_off','sub_bartack_misaligned','sub_bartack_nonstandard','sub_logo_tilted','sub_velcro_tilted','sub_velcro_loose','sub_trolley_cover_tilted','sub_trolley_cover_short','sub_webbing_height_off','sub_stitch_margin_inconsistent','sub_loose_thread','sub_float_skip2','sub_pattern_stitch_inconsistent','sub_elastic_tilted','sub_logo_text_detached','sub_logo_scratched','sub_triangle_reversed',
-    ];
-    for (let i = 0; i < Math.min(subCols.length, SUBDEFECT_DEFAULT_NAMES.length); i++) {
+    const subCols = SUBDEFECT_DB_COLUMNS;
+    for (let i = 0; i < subCols.length; i++) {
       const count = Number(r[subCols[i]]) || 0;
       if (count > 0) {
         const info = SUBDEFECT_DEFAULT_NAMES[i];
@@ -1508,76 +1444,20 @@ function buildFQCAnalysisSheet(
   currentRow++;
 
   // Aggregate sub-defects
-  const subCols = [
-    'sub_float_fold_skip','sub_missing_loose_stitch','sub_not_stitched','sub_needle_hole','sub_missing_bartack','sub_presser_mark','sub_backtack_off','sub_wrong_panel','sub_end_unfolded','sub_asymmetric','sub_triangle_uneven','sub_thread_bleed','sub_thread_ends','sub_foam_misaligned','sub_stitch_offcenter','sub_logo_crooked','sub_logo_inverted','sub_logo_defective','sub_logo_detached','sub_color_diff','sub_yarn_pull','sub_wrinkle','sub_damaged','sub_seam_open','sub_scratched','sub_poor_function','sub_missing_accessory','sub_dirty_oily','sub_bone_uneven','sub_bag_crooked','sub_handle_misaligned','sub_missing_rivet','sub_sharp_stuck','sub_zipper_wave','sub_zipper_head_reversed','sub_wrong_color_zipper','sub_webbing_twisted','sub_webbing_misplaced','sub_wash_label_reversed','sub_wash_label_wrong','sub_woven_label_reversed','sub_woven_label_missing','sub_lining_reversed','sub_plastic_defective','sub_rivet_defective','sub_accessory_crooked','sub_paint_off','sub_bartack_misaligned','sub_bartack_nonstandard','sub_logo_tilted','sub_velcro_tilted','sub_velcro_loose','sub_trolley_cover_tilted','sub_trolley_cover_short','sub_webbing_height_off','sub_stitch_margin_inconsistent','sub_loose_thread','sub_float_skip2','sub_pattern_stitch_inconsistent','sub_elastic_tilted','sub_logo_text_detached','sub_logo_scratched','sub_triangle_reversed',
-  ];
-  const SUBDEFECT_DEFAULT_NAMES: { name: string; category: string }[] = [
-    { name: '跳针 Skip stitch', category: '针车问题 / Stitching' },
-    { name: '断线 Thread break', category: '针车问题 / Stitching' },
-    { name: '浮线 Loose thread', category: '针车问题 / Stitching' },
-    { name: '断针 Needle break', category: '针车问题 / Stitching' },
-    { name: '针迹不均 Uneven stitch', category: '针车问题 / Stitching' },
-    { name: '起皱 Puckering', category: '针车问题 / Stitching' },
-    { name: '线头 Thread tail', category: '针车问题 / Stitching' },
-    { name: '重针 Double stitch', category: '针车问题 / Stitching' },
-    { name: '漏针 Missing stitch', category: '针车问题 / Stitching' },
-    { name: '反线 Wrong thread', category: '针车问题 / Stitching' },
-    { name: '针距不对 Wrong pitch', category: '针车问题 / Stitching' },
-    { name: '线迹歪斜 Crooked stitch', category: '针车问题 / Stitching' },
-    { name: '缝合不良 Poor sewing', category: '针车问题 / Stitching' },
-    { name: '接线不良 Joint issue', category: '针车问题 / Stitching' },
-    { name: '爆线 Seam burst', category: '针车问题 / Stitching' },
-    { name: 'Logo歪斜 Logo misaligned', category: 'LOGO问题 / Logo' },
-    { name: 'Logo脱落 Logo peeling', category: 'LOGO问题 / Logo' },
-    { name: 'Logo变色 Logo discolored', category: 'LOGO问题 / Logo' },
-    { name: 'Logo缺件 Logo missing', category: 'LOGO问题 / Logo' },
-    { name: '色差 Color deviation', category: '面料问题 / Material' },
-    { name: '破洞 Hole', category: '面料问题 / Material' },
-    { name: '污渍 Stain', category: '面料问题 / Material' },
-    { name: '起毛 Pilling', category: '面料问题 / Material' },
-    { name: '面料错误 Wrong material', category: '面料问题 / Material' },
-    { name: '拉链不良 Zipper defect', category: '五金问题 / Hardware' },
-    { name: '五金缺失 Hardware missing', category: '五金问题 / Hardware' },
-    { name: '五金松动 Hardware loose', category: '五金问题 / Hardware' },
-    { name: '刮伤 Scratch', category: '外观问题 / Appearance' },
-    { name: '变形 Deformation', category: '外观问题 / Appearance' },
-    { name: '褶皱 Wrinkle', category: '外观问题 / Appearance' },
-    { name: '色斑 Color spot', category: '外观问题 / Appearance' },
-    { name: '尺寸不对 Wrong size', category: '外观问题 / Appearance' },
-    { name: '拉链卡顿 Zipper stuck', category: '拉链问题 / Zipper' },
-    { name: '拉链头缺失 Puller missing', category: '拉链问题 / Zipper' },
-    { name: '拉链脱色 Zipper faded', category: '拉链问题 / Zipper' },
-    { name: '拉链断裂 Zipper broken', category: '拉链问题 / Zipper' },
-    { name: '织带不良 Webbing defect', category: '织带问题 / Webbing' },
-    { name: '织带错色 Wrong webbing color', category: '织带问题 / Webbing' },
-    { name: '尺寸不符 Dimension mismatch', category: '其它问题 / Other' },
-    { name: '重量不符 Weight mismatch', category: '其它问题 / Other' },
-    { name: '异味 Odor', category: '其它问题 / Other' },
-    { name: '标签问题 Label issue', category: '其它问题 / Other' },
-    { name: '包装问题 Packaging issue', category: '其它问题 / Other' },
-    { name: '其他 Other', category: '其它问题 / Other' },
-    { name: '备料错误 Wrong preparation', category: '备料问题 / Preparation' },
-    { name: '物料缺失 Material missing', category: '备料问题 / Preparation' },
-    { name: '物料混料 Material mixed', category: '备料问题 / Preparation' },
-    { name: '裁剪不良 Cutting defect', category: '备料问题 / Preparation' },
-    { name: '排料不当 Layout error', category: '备料问题 / Preparation' },
-    { name: '数量不足 Qty shortage', category: '备料问题 / Preparation' },
-    { name: '规格不符 Spec mismatch', category: '备料问题 / Preparation' },
-    { name: '色号错误 Color code wrong', category: '备料问题 / Preparation' },
-    { name: '批次错误 Batch error', category: '备料问题 / Preparation' },
-    { name: '配件错误 Accessory wrong', category: '备料问题 / Preparation' },
-    { name: '超期物料 Expired material', category: '备料问题 / Preparation' },
-    { name: '物料破损 Material damaged', category: '备料问题 / Preparation' },
-    { name: '物料脏污 Material dirty', category: '备料问题 / Preparation' },
-    { name: '物料色差 Material color diff', category: '备料问题 / Preparation' },
-    { name: '备料延迟 Prep delayed', category: '备料问题 / Preparation' },
-    { name: '余料管理 Scrap issue', category: '备料问题 / Preparation' },
-    { name: '车缝不良 Sewing defect', category: '针车问题 / Stitching' },
-  ];
+  // Use authoritative 64-column list from db-schema
+  const subCols = SUBDEFECT_DB_COLUMNS;
+  const SUBDEFECT_DEFAULT_NAMES: { name: string; category: string }[] =
+    SUBDEFECT_DB_COLUMNS.map((col, i) => {
+      const cat = getSubDefectCategory(i);
+      const nameEn = SUBDEFECT_NAMES[i] || col;
+      const nameZh = SUBDEFECT_NAMES_ZH[i] || col;
+      const catZh = CATEGORY_ZH[cat.category] || cat.category;
+      return { name: `${nameZh} / ${nameEn}`, category: `${catZh}问题 / ${cat.category}` };
+    });
 
   const subDefectCounts: Record<string, { count: number; category: string }> = {};
   for (const r of data) {
-    for (let i = 0; i < Math.min(subCols.length, SUBDEFECT_DEFAULT_NAMES.length); i++) {
+    for (let i = 0; i < subCols.length; i++) {
       const count = Number(r[subCols[i]]) || 0;
       if (count > 0) {
         const info = SUBDEFECT_DEFAULT_NAMES[i];

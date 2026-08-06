@@ -128,9 +128,13 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.defectCount - a.defectCount)
       .slice(0, 15);
 
+    // Compute total inspected qty for PPM calculation
+    const totalInspectedQty = allRecords.reduce((sum: number, r: any) => sum + (Number(r.inspected_qty) || 0), 0);
+
     return NextResponse.json({
       filters: { date_from: dateFrom, date_to: dateTo, business_type: businessType },
       total_records: allRecords.length,
+      total_inspected_qty: totalInspectedQty,
       grand_total_defects: grandTotalDefects,
       section_a: { category_summary: categorySummary },
       section_b: { top_sub_defects: subDefectList },

@@ -331,8 +331,8 @@ export default function FQCAnalysisPage() {
                   {loading ? Array.from({ length: 9 }).map((_, i) => (
                     <TableRow key={i}><TableCell colSpan={5}><Skeleton className="h-5 w-full" /></TableCell></TableRow>
                   )) : categorySummary.length > 0 ? categorySummary.map((c: any, i: number) => {
-                    const inspectedTotal = data?.total_records;
-                    const ppm = inspectedTotal > 0 ? Math.round((c.defectCount / (inspectedTotal * 100)) * 1000000) : 0;
+                    const inspectedTotal = data?.total_inspected_qty || 0;
+                    const ppm = inspectedTotal > 0 ? Math.round((c.defectCount / inspectedTotal) * 1_000_000) : 0;
                     return (
                       <TableRow key={i} className="hover:bg-slate-50">
                         <TableCell className="text-xs font-medium text-slate-500">{i + 1}</TableCell>
