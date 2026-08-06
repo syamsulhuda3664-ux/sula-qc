@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,8 +38,7 @@ export default function IPQCPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const { dateFrom, dateTo, setDateFrom, setDateTo, clearDates } = useDateFilter();
   const [businessType, setBusinessType] = useState('ALL');
   const [line, setLine] = useState('');
   const [stage, setStage] = useState('ALL');
@@ -113,7 +113,7 @@ export default function IPQCPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); setBusinessType('ALL'); setLine(''); setStage('ALL'); setPage(1); }} className="h-9">
+            <Button variant="outline" size="sm" onClick={() => { clearDates(); setBusinessType('ALL'); setLine(''); setStage('ALL'); setPage(1); }} className="h-9">
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('action.reset')}
             </Button>
           </div>

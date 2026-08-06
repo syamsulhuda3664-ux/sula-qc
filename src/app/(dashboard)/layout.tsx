@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useI18n } from '@/hooks/useI18n';
 import { useBusinessTypeLock, BUSINESS_TYPES, type BusinessType } from '@/contexts/BusinessTypeContext';
 import { BusinessTypeProvider } from '@/contexts/BusinessTypeContext';
+import { DateFilterProvider } from '@/contexts/DateFilterContext';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -255,6 +256,7 @@ export default function DashboardLayout() {
 
   return (
     <BusinessTypeProvider>
+    <DateFilterProvider>
     <div className="flex h-screen bg-slate-50">
       {/* Desktop sidebar */}
       <aside
@@ -320,6 +322,7 @@ export default function DashboardLayout() {
         </main>
       </div>
     </div>
+    </DateFilterProvider>
     </BusinessTypeProvider>
   );
 }

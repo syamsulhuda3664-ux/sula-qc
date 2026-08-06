@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,8 +42,7 @@ export default function FQCDailyPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const { dateFrom, dateTo, setDateFrom, setDateTo, clearDates } = useDateFilter();
   const [businessType, setBusinessType] = useState('ALL');
   const [line, setLine] = useState('');
 
@@ -150,7 +150,7 @@ export default function FQCDailyPage() {
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('fqc.line')}</label>
               <Input value={line} onChange={(e) => { setLine(e.target.value); setPage(1); }} placeholder={t('fqc.line')} className="h-9" />
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); setBusinessType('ALL'); setLine(''); setPage(1); }} className="h-9">
+            <Button variant="outline" size="sm" onClick={() => { clearDates(); setBusinessType('ALL'); setLine(''); setPage(1); }} className="h-9">
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('action.reset')}
             </Button>
             <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting} className="h-9">

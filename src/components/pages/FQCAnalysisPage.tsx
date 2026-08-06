@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useI18n } from '@/hooks/useI18n';
 import { useBusinessTypeLock } from '@/contexts/BusinessTypeContext';
+import { useDateFilter } from '@/contexts/DateFilterContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -155,8 +156,7 @@ export default function FQCAnalysisPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const { dateFrom, dateTo, setDateFrom, setDateTo, clearDates } = useDateFilter();
   const [businessType, setBusinessType] = useState('ALL');
 
   const fetchData = useCallback(async () => {
@@ -282,7 +282,7 @@ export default function FQCAnalysisPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); setBusinessType('ALL'); }} className="h-9">
+            <Button variant="outline" size="sm" onClick={() => { clearDates(); setBusinessType('ALL'); }} className="h-9">
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('action.reset')}
             </Button>
             <Button size="sm" onClick={handleExport} disabled={exporting || loading} className="h-9 bg-blue-600 hover:bg-blue-700 text-white">
