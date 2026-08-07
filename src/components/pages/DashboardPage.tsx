@@ -326,7 +326,7 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85}
-                    paddingAngle={2} dataKey="count"
+                    paddingAngle={2} dataKey="count" nameKey="category"
                     label={({ name, percent, count }: { name?: string; percent?: number; count?: number }) => `${name || ''} (${count || 0})`}
                     labelLine={true} fontSize={9}>
                     {pieData.map((_, index) => (

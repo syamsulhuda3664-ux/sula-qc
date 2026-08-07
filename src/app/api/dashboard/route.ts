@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 import { SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, getSubDefectCategory } from '@/lib/rca-generator';
+import { collapseSubDefects } from '@/lib/db-schema';
 
 // ── Date range helper (mirrors FQC inspections) ──
 function getDateRange(period: string) {
@@ -227,15 +228,14 @@ export async function GET(request: NextRequest) {
     });
 
     // ═══════════════════════════════════════════════════
-    // 6. Top Sub-Defects (from sub_defects JSON array)
+    // 6. Top Sub-Defects (collapse DB sub_* columns → array)
     // ═══════════════════════════════════════════════════
     const subDefectCounts: number[] = new Array(SUBDEFECT_NAMES.length).fill(0);
 
     for (const r of fqc) {
-      if (Array.isArray(r.sub_defects)) {
-        for (let i = 0; i < Math.min(r.sub_defects.length, subDefectCounts.length); i++) {
-          subDefectCounts[i] += Number(r.sub_defects[i]) || 0;
-        }
+      const subs = collapseSubDefects(r as Record<string, unknown>);
+      for (let i = 0; i < Math.min(subs.length, subDefectCounts.length); i++) {
+        subDefectCounts[i] += subs[i] || 0;
       }
     }
 
