@@ -456,7 +456,7 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
     minorDefects,
     totalDefects,
     sampleOk,
-    passRate: Math.round(passRate * 10000) / 10000,
+    passRate: Math.round(passRate * 10000) / 100,
     disposition,
     releaseQty,
     reworkQty,
