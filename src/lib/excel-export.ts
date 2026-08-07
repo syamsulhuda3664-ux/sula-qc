@@ -1586,7 +1586,7 @@ export function exportFQCOQCExcel(
 ): ExcelExportResult {
   const wb = createBook();
   const ws: XLSX.WorkSheet = {};
-  const totalCols = 14;
+  const totalCols = 15;
 
   let row = writeTitle(ws, 'SULA-QC 出货品质检验报告\nOQC Outgoing Quality Control Report', 0, totalCols - 1);
 
@@ -1615,7 +1615,7 @@ export function exportFQCOQCExcel(
   ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
   row++;
 
-  // Summary KPIs in two rows of 7 columns each
+  // Summary KPIs in two rows
   let totalLotSize = 0, totalSampled = 0, totalSampleOk = 0, totalDefects = 0;
   let criticalDefects = 0, majorDefects = 0, minorDefects = 0;
   let releaseLots = 0, reworkLots = 0, holdLots = 0;
@@ -1646,7 +1646,7 @@ export function exportFQCOQCExcel(
     '合格数 / Sample OK', totalSampleOk,
     '合格率 / Pass Rate', fmtPct(overallPassRate, true),
     '总缺陷 / Total Defects', totalDefects,
-    '', '',
+    '', '', '', '',
   ];
   const kpiRow2 = [
     '严重缺陷 / Critical', criticalDefects,
@@ -1655,7 +1655,7 @@ export function exportFQCOQCExcel(
     '放行 / Release', `${releaseLots} (${releaseQty.toLocaleString()})`,
     '返工 / Rework', `${reworkLots} (${reworkQty.toLocaleString()})`,
     '扣留 / Hold', `${holdLots} (${holdQty.toLocaleString()})`,
-    '', '',
+    '', '', '', '',
   ];
 
   writeRow(ws, row, 0, kpiRow1, SUBTOTAL_STYLE);
@@ -1674,6 +1674,7 @@ export function exportFQCOQCExcel(
   const dailyHeaders = [
     'No',
     '日期 / Date',
+    '业务类型 / BT',
     '批次总量 / Lot Size',
     'AQL代码 / Code',
     '抽样数 / Sample',
@@ -1690,65 +1691,46 @@ export function exportFQCOQCExcel(
   writeRow(ws, row, 0, dailyHeaders, HEADER_STYLE);
   row++;
 
-  // Group by date
-  const sortedLots = [...data].sort((a, b) =>
-    String(a.lot_date || '').localeCompare(String(b.lot_date || ''))
-  );
-
-  const dailyMap: Record<string, Record<string, unknown>[]> = {};
-  for (const lot of sortedLots) {
-    const d = String(lot.lot_date || 'unknown');
-    if (!dailyMap[d]) dailyMap[d] = [];
-    dailyMap[d].push(lot);
-  }
+  // Sort lots by date then business type
+  const sortedLots = [...data].sort((a, b) => {
+    const dateCmp = String(a.lot_date || '').localeCompare(String(b.lot_date || ''));
+    if (dateCmp !== 0) return dateCmp;
+    return String(a.business_type || '').localeCompare(String(b.business_type || ''));
+  });
 
   let num = 1;
-  for (const [date, lots] of Object.entries(dailyMap).sort(([a], [b]) => a.localeCompare(b))) {
-    let dayLotSize = 0, daySample = 0, daySampleOk = 0, dayDefects = 0;
-    let dayCritical = 0, dayMajor = 0, dayMinor = 0;
-    let dispositions: string[] = [];
-
-    for (const lot of lots) {
-      dayLotSize += Number(lot.lot_size) || 0;
-      daySample += Number(lot.sample_size) || 0;
-      daySampleOk += Number(lot.sample_ok) || 0;
-      dayDefects += Number(lot.total_defects) || 0;
-      dayCritical += Number(lot.critical_defects) || 0;
-      dayMajor += Number(lot.major_defects) || 0;
-      dayMinor += Number(lot.minor_defects) || 0;
-      dispositions.push(String(lot.disposition || ''));
-    }
-
+  for (const lot of sortedLots) {
+    const dayLotSize = Number(lot.lot_size) || 0;
+    const daySample = Number(lot.sample_size) || 0;
+    const daySampleOk = Number(lot.sample_ok) || 0;
+    const dayDefects = Number(lot.total_defects) || 0;
     const dayPassRate = daySample > 0 ? daySampleOk / daySample : 0;
-    const primaryDisp = dispositions.includes('HOLD')
-      ? 'HOLD'
-      : dispositions.includes('REWORK')
-        ? 'REWORK'
-        : 'RELEASE';
 
     writeRow(ws, row, 0, [
       num++,
-      date,
+      String(lot.lot_date || ''),
+      String(lot.business_type || ''),
       dayLotSize,
-      '-',
+      String(lot.aql_code || '-'),
       daySample,
-      '-',
-      '-',
-      dayCritical,
-      dayMajor,
-      dayMinor,
+      Number(lot.ac) || '-',
+      Number(lot.re) || '-',
+      Number(lot.critical_defects) || 0,
+      Number(lot.major_defects) || 0,
+      Number(lot.minor_defects) || 0,
       dayDefects,
       fmtPct(dayPassRate, true),
-      primaryDisp,
-      lots.length > 1 ? `${lots.length} lots` : '',
+      String(lot.disposition || ''),
+      String(lot.remarks || ''),
     ], DATA_STYLE);
     row++;
   }
 
-  // Grand total row for daily breakdown
+  // Grand total row
   writeRow(ws, row, 0, [
     '',
     '合计 / Grand Total',
+    '',
     totalLotSize,
     '', totalSampled, '', '',
     criticalDefects, majorDefects, minorDefects,
@@ -1780,8 +1762,6 @@ export function exportFQCOQCExcel(
   writeRow(ws, row, 0, catHeaders, HEADER_STYLE);
   row++;
 
-  // Aggregate defects from the nested oqc_defects array if present
-  // DB columns: defect_category (not category), defect_count (not count)
   const oqcCatTotals: Record<string, { count: number; critical: number; major: number; minor: number }> = {};
   const OQC_CATEGORIES = ['Packaging', 'Label', 'Accessory', 'Appearance', 'Hardware', 'Stitching', 'Other'];
 
@@ -1828,9 +1808,104 @@ export function exportFQCOQCExcel(
     font: { name: 'Arial', sz: 8, italic: true, color: { rgb: 'AAAAAA' } },
   });
 
-  setColWidths(ws, [6, 14, 14, 10, 10, 8, 8, 10, 10, 10, 12, 12, 14, 20]);
+  setColWidths(ws, [6, 14, 10, 14, 10, 10, 8, 8, 10, 10, 10, 12, 12, 14, 20]);
   ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: totalCols - 1 } });
   XLSX.utils.book_append_sheet(wb, ws, '总览 Rekap');
+
+  // =========================================================================
+  // SHEET 2: Detail Lot — order numbers and styles per lot
+  // =========================================================================
+  const ws2: XLSX.WorkSheet = {};
+  const detailCols = 7;
+  let r2 = writeTitle(ws2, 'SULA-QC OQC 批次明细\nOQC Lot Detail — Order Numbers & Styles', 0, detailCols - 1);
+
+  if (filterParts.length > 0) {
+    writeRow(ws2, r2, 0, [filterParts.join('   |   ')], {
+      font: { name: 'Arial', sz: 9, italic: true, color: { rgb: '666666' } },
+    });
+    ws2['!merges'] = ws2['!merges'] || [];
+    ws2['!merges'].push({ s: { r: r2, c: 0 }, e: { r: r2, c: detailCols - 1 } });
+    r2 += 2;
+  } else {
+    r2 += 2;
+  }
+
+  const detailHeaders = [
+    'No',
+    '日期 / Date',
+    '业务类型 / BT',
+    '订单号 / Order No.',
+    '款号 / Style',
+    '订单数 / Order Qty',
+    'FQC合格数 / FQC OK Qty',
+  ];
+  writeRow(ws2, r2, 0, detailHeaders, HEADER_STYLE);
+  r2++;
+
+  let detailNum = 1;
+  let detailTotalOrders = 0;
+  let detailTotalOkQty = 0;
+
+  for (const lot of sortedLots) {
+    const orders = lot.oqc_lot_orders;
+    const lotDate = String(lot.lot_date || '');
+    const lotBt = String(lot.business_type || '');
+    const lotDisp = String(lot.disposition || '');
+
+    if (Array.isArray(orders) && orders.length > 0) {
+      for (const order of orders) {
+        const orderQty = Number(order.order_qty) || 0;
+        const okQty = Number(order.fqc_ok_qty) || 0;
+        detailTotalOrders += orderQty;
+        detailTotalOkQty += okQty;
+
+        writeRow(ws2, r2, 0, [
+          detailNum++,
+          lotDate,
+          lotBt,
+          String(order.order_no || ''),
+          String(order.style_code || ''),
+          orderQty,
+          okQty,
+        ], DATA_STYLE);
+        r2++;
+      }
+    } else {
+      // No detail orders — write lot summary row
+      writeRow(ws2, r2, 0, [
+        detailNum++,
+        lotDate,
+        lotBt,
+        '-',
+        '-',
+        Number(lot.lot_size) || 0,
+        '-',
+      ], DATA_STYLE);
+      r2++;
+    }
+  }
+
+  // Grand total for detail sheet
+  writeRow(ws2, r2, 0, [
+    '',
+    '合计 / Grand Total',
+    '',
+    `${detailNum - 1} orders`,
+    '',
+    detailTotalOrders,
+    detailTotalOkQty,
+  ], GRAND_TOTAL_STYLE);
+  r2++;
+
+  // Footer
+  r2 += 1;
+  writeRow(ws2, r2, 0, [`Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`], {
+    font: { name: 'Arial', sz: 8, italic: true, color: { rgb: 'AAAAAA' } },
+  });
+
+  setColWidths(ws2, [6, 14, 10, 24, 20, 14, 16]);
+  ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r2, c: detailCols - 1 } });
+  XLSX.utils.book_append_sheet(wb, ws2, '批次明细 Detail Lot');
 
   const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
   const period = filters.period || (filters.dateFrom ? `${filters.dateFrom}_${filters.dateTo || 'all'}` : 'All');

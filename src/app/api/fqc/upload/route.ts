@@ -33,26 +33,28 @@ export async function POST(request: NextRequest) {
     }
 
     const errors: string[] = [];
-    const sheetResults: { date: string; sheetName: string; recordCount: number; oqcGenerated: boolean }[] = [];
+    const sheetResults: { date: string; sheetName: string; recordCount: number; oqcLots: number }[] = [];
     let totalInspectionCount = 0;
 
     for (const parsed of sheets) {
       const dateStr = parsed.dateStr;
-      const bt = parsed.businessType;
 
       if (parsed.records.length === 0) {
         errors.push(`Sheet "${parsed.sheetName}": no valid records`);
-        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcGenerated: false });
+        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcLots: 0 });
         continue;
       }
 
       // ── Upsert FQC inspections ──
-      // First delete existing records for this date + business_type to avoid duplicates
-      await adminClient
-        .from('fqc_inspections')
-        .delete()
-        .eq('inspection_date', dateStr)
-        .eq('business_type', bt);
+      // Delete existing FQC records for this date (all business types from this sheet)
+      const sheetBts = [...new Set(parsed.records.map(r => r.business_type))];
+      for (const sheetBt of sheetBts) {
+        await adminClient
+          .from('fqc_inspections')
+          .delete()
+          .eq('inspection_date', dateStr)
+          .eq('business_type', sheetBt);
+      }
 
       const dbRows = parsed.records.map(r => {
         const row = mapInspectionToDb({
@@ -70,101 +72,169 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         console.error(`Insert error for ${dateStr}:`, insertError);
         errors.push(`Sheet "${parsed.sheetName}" (${dateStr}): DB insert failed - ${insertError.message}`);
-        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcGenerated: false });
+        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcLots: 0 });
         continue;
       }
 
       totalInspectionCount += parsed.records.length;
 
-      // ── Generate OQC lot for this date ──
-      let oqcGenerated = false;
-      try {
-        const oqcLot = generateOQCLot(parsed.date, parsed.records.map(r => ({
-          ...r,
-          ok_qty: r.ok_qty,
-          ng_qty: r.ng_qty,
-          defect_stitching: r.defect_stitching,
-          defect_stitch_defect: r.defect_stitch_defect,
-          defect_logo: r.defect_logo,
-          defect_material: r.defect_material,
-          defect_hardware: r.defect_hardware,
-          defect_appearance: r.defect_appearance,
-          defect_zipper: r.defect_zipper,
-          defect_webbing: r.defect_webbing,
-          defect_other: r.defect_other,
-          defect_preparation: r.defect_preparation,
-        })));
+      // ── Group FQC records by business_type ──
+      const groupedByBt: Record<string, typeof parsed.records> = {};
+      for (const r of parsed.records) {
+        const bt = r.business_type || 'OTHER';
+        if (!groupedByBt[bt]) groupedByBt[bt] = [];
+        groupedByBt[bt].push(r);
+      }
 
-        // Check hold-per-quarter constraint
-        if (oqcLot.disposition === 'HOLD') {
-          const quarter = Math.ceil((parsed.date.getMonth() + 1) / 3);
-          const year = parsed.date.getFullYear();
-          const qStart = `${year}-${String((quarter - 1) * 3 + 1).padStart(2, '0')}-01`;
-          const qEnd = `${year}-${String(quarter * 3).padStart(2, '0')}-31`;
+      // ── Generate OQC lot PER business type ──
+      let oqcLotsCount = 0;
 
-          const { count: existingHoldCount } = await adminClient
-            .from('oqc_daily_lots')
-            .select('*', { count: 'exact', head: true })
-            .eq('disposition', 'HOLD')
-            .eq('business_type', oqcLot.businessType)
-            .gte('lot_date', qStart)
-            .lte('lot_date', qEnd);
+      for (const [bt, btRecords] of Object.entries(groupedByBt)) {
+        try {
+          const oqcLot = generateOQCLot(parsed.date, btRecords.map(r => ({
+            ...r,
+            ok_qty: r.ok_qty,
+            ng_qty: r.ng_qty,
+            defect_stitching: r.defect_stitching,
+            defect_stitch_defect: r.defect_stitch_defect,
+            defect_logo: r.defect_logo,
+            defect_material: r.defect_material,
+            defect_hardware: r.defect_hardware,
+            defect_appearance: r.defect_appearance,
+            defect_zipper: r.defect_zipper,
+            defect_webbing: r.defect_webbing,
+            defect_other: r.defect_other,
+            defect_preparation: r.defect_preparation,
+          })));
 
-          if ((existingHoldCount || 0) > 0) {
-            // Downgrade HOLD to REWORK (only 1 HOLD per quarter per BT)
-            oqcLot.disposition = 'REWORK';
-            oqcLot.reworkQty = oqcLot.lotSize;
-            oqcLot.holdQty = 0;
-            oqcLot.remarks = oqcLot.remarks.replace('HOLD:', 'DOWNGRADED from HOLD to REWORK (quarterly limit reached):');
+          // Check hold-per-quarter constraint
+          if (oqcLot.disposition === 'HOLD') {
+            const quarter = Math.ceil((parsed.date.getMonth() + 1) / 3);
+            const year = parsed.date.getFullYear();
+            const qStart = `${year}-${String((quarter - 1) * 3 + 1).padStart(2, '0')}-01`;
+            const qEnd = `${year}-${String(quarter * 3).padStart(2, '0')}-31`;
+
+            const { count: existingHoldCount } = await adminClient
+              .from('oqc_daily_lots')
+              .select('*', { count: 'exact', head: true })
+              .eq('disposition', 'HOLD')
+              .eq('business_type', bt)
+              .gte('lot_date', qStart)
+              .lte('lot_date', qEnd);
+
+            if ((existingHoldCount || 0) > 0) {
+              oqcLot.disposition = 'REWORK';
+              oqcLot.reworkQty = oqcLot.lotSize;
+              oqcLot.holdQty = 0;
+              oqcLot.remarks = oqcLot.remarks.replace('HOLD:', 'DOWNGRADED from HOLD to REWORK (quarterly limit reached):');
+            }
           }
+
+          // Delete existing OQC lot + its orders for this date + BT
+          const { data: existingLot } = await adminClient
+            .from('oqc_daily_lots')
+            .select('id')
+            .eq('lot_date', dateStr)
+            .eq('business_type', bt);
+
+          if (existingLot && existingLot.length > 0) {
+            // Delete lot_orders and defects first (cascade should handle, but be safe)
+            for (const lot of existingLot) {
+              await adminClient.from('oqc_lot_orders').delete().eq('lot_id', lot.id);
+              await adminClient.from('oqc_defects').delete().eq('lot_id', lot.id);
+            }
+            await adminClient
+              .from('oqc_daily_lots')
+              .delete()
+              .eq('lot_date', dateStr)
+              .eq('business_type', bt);
+          }
+
+          // Insert OQC lot
+          const { data: newLot, error: oqcInsertError } = await adminClient
+            .from('oqc_daily_lots')
+            .insert({
+              lot_date: dateStr,
+              business_type: bt,
+              total_orders: oqcLot.totalOrders,
+              lot_size: oqcLot.lotSize,
+              aql_code: oqcLot.aqlCode,
+              sample_size: oqcLot.sampleSize,
+              ac: oqcLot.ac,
+              re: oqcLot.re,
+              critical_defects: oqcLot.criticalDefects,
+              major_defects: oqcLot.majorDefects,
+              minor_defects: oqcLot.minorDefects,
+              total_defects: oqcLot.totalDefects,
+              sample_ok: oqcLot.sampleOk,
+              pass_rate: oqcLot.passRate,
+              disposition: oqcLot.disposition,
+              release_qty: oqcLot.releaseQty,
+              rework_qty: oqcLot.reworkQty,
+              hold_qty: oqcLot.holdQty,
+              remarks: oqcLot.remarks,
+            })
+            .select('id')
+            .single();
+
+          if (oqcInsertError) {
+            console.error(`OQC insert error for ${dateStr} [${bt}]:`, oqcInsertError);
+            errors.push(`OQC insert failed for ${dateStr} [${bt}]: ${oqcInsertError.message}`);
+            continue;
+          }
+
+          // ── Save OQC lot orders ──
+          if (newLot && oqcLot.orders.length > 0) {
+            const lotOrderRows = oqcLot.orders.map(order => ({
+              lot_id: newLot.id,
+              order_no: order.orderNo,
+              style_code: order.style,
+              order_qty: order.orderQty,
+              fqc_ok_qty: order.okQty,
+              disposition: oqcLot.disposition,
+            }));
+
+            const { error: orderInsertError } = await adminClient
+              .from('oqc_lot_orders')
+              .insert(lotOrderRows);
+
+            if (orderInsertError) {
+              console.error(`OQC lot orders insert error for ${dateStr} [${bt}]:`, orderInsertError);
+              // Non-fatal — lot is still saved
+            }
+          }
+
+          // ── Save OQC defects ──
+          if (newLot && oqcLot.defects.length > 0) {
+            const defectRows = oqcLot.defects.map(defect => ({
+              lot_id: newLot.id,
+              defect_category: defect.category,
+              defect_count: defect.count,
+              severity: defect.severity,
+            }));
+
+            const { error: defectInsertError } = await adminClient
+              .from('oqc_defects')
+              .insert(defectRows);
+
+            if (defectInsertError) {
+              console.error(`OQC defects insert error for ${dateStr} [${bt}]:`, defectInsertError);
+              // Non-fatal — lot is still saved
+            }
+          }
+
+          oqcLotsCount++;
+        } catch (oqcErr) {
+          console.error(`OQC generation error for ${dateStr} [${bt}]:`, oqcErr);
+          errors.push(`OQC generation error for ${dateStr} [${bt}]: ${oqcErr instanceof Error ? oqcErr.message : String(oqcErr)}`);
         }
-
-        // Delete existing OQC lot for this date + BT
-        await adminClient
-          .from('oqc_daily_lots')
-          .delete()
-          .eq('lot_date', dateStr)
-          .eq('business_type', bt);
-
-        // Insert OQC lot
-        const { error: oqcInsertError } = await adminClient
-          .from('oqc_daily_lots')
-          .insert({
-            lot_date: dateStr,
-            business_type: oqcLot.businessType,
-            total_orders: oqcLot.totalOrders,
-            lot_size: oqcLot.lotSize,
-            aql_code: oqcLot.aqlCode,
-            sample_size: oqcLot.sampleSize,
-            ac: oqcLot.ac,
-            re: oqcLot.re,
-            critical_defects: oqcLot.criticalDefects,
-            major_defects: oqcLot.majorDefects,
-            minor_defects: oqcLot.minorDefects,
-            total_defects: oqcLot.totalDefects,
-            sample_ok: oqcLot.sampleOk,
-            pass_rate: oqcLot.passRate,
-            disposition: oqcLot.disposition,
-            release_qty: oqcLot.releaseQty,
-            rework_qty: oqcLot.reworkQty,
-            hold_qty: oqcLot.holdQty,
-            remarks: oqcLot.remarks,
-          });
-
-        if (!oqcInsertError) {
-          oqcGenerated = true;
-        } else {
-          console.error(`OQC insert error for ${dateStr}:`, oqcInsertError);
-        }
-      } catch (oqcErr) {
-        console.error(`OQC generation error for ${dateStr}:`, oqcErr);
       }
 
       sheetResults.push({
         date: dateStr,
         sheetName: parsed.sheetName,
         recordCount: parsed.records.length,
-        oqcGenerated,
+        oqcLots: oqcLotsCount,
       });
     }
 

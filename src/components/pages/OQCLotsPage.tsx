@@ -162,6 +162,7 @@ export default function OQCLotsPage() {
               <TableHeader className="sticky top-0 z-10 bg-slate-50">
                 <TableRow>
                   <TableHead className="text-xs">{t('common.date')}</TableHead>
+                  <TableHead className="text-xs">{t('fqc.businessType')}</TableHead>
                   <TableHead className="text-xs">{t('oqc.lotSize')}</TableHead>
                   <TableHead className="text-xs">{t('oqc.aqlCode')}</TableHead>
                   <TableHead className="text-xs text-right">{t('oqc.sampleSize')}</TableHead>
@@ -180,7 +181,7 @@ export default function OQCLotsPage() {
               <TableBody>
                 {loading ? (
                   Array.from({ length: 8 }).map((_, i) => (
-                    <TableRow key={i}>{Array.from({ length: 14 }).map((_, j) => (
+                    <TableRow key={i}>{Array.from({ length: 15 }).map((_, j) => (
                       <TableCell key={j}><Skeleton className="h-4 w-10" /></TableCell>
                     ))}</TableRow>
                   ))
@@ -188,6 +189,7 @@ export default function OQCLotsPage() {
                   lots.map((lot: any, i: number) => (
                     <TableRow key={i} className="hover:bg-slate-50">
                       <TableCell className="text-xs">{lot.lot_date?.split('T')[0]}</TableCell>
+                      <TableCell className="text-xs"><Badge variant="outline" className="text-[10px]">{lot.business_type || '-'}</Badge></TableCell>
                       <TableCell className="text-xs">{lot.lot_size}</TableCell>
                       <TableCell className="text-xs font-mono">{lot.aql_code}</TableCell>
                       <TableCell className="text-xs text-right">{lot.sample_size}</TableCell>
@@ -211,7 +213,7 @@ export default function OQCLotsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-12 text-sm text-slate-400">{t('common.noData')}</TableCell>
+                    <TableCell colSpan={15} className="text-center py-12 text-sm text-slate-400">{t('common.noData')}</TableCell>
                   </TableRow>
                 )}
               </TableBody>
