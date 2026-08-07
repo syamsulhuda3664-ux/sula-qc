@@ -12,7 +12,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, Legend,
 } from 'recharts';
-import { SUBDEFECT_NAMES_ZH, CATEGORY_ZH } from '@/lib/rca-generator';
+import { SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, CATEGORY_ZH } from '@/lib/rca-generator';
 
 const PERIODS = ['day', 'week', 'month', 'quarter', 'year'] as const;
 const BUSINESS_TYPES = ['ALL', 'PTOEM', 'PTB2C', 'PTGH'] as const;
@@ -71,7 +71,7 @@ export default function DashboardPage() {
 
   const barData = useMemo(() =>
     (data?.topDefects || []).slice(0, 8).map((d) => {
-      const idx = SUBDEFECT_NAMES_ZH.indexOf(d.name);
+      const idx = SUBDEFECT_NAMES.indexOf(d.name);
       return { name: isZhMode && idx >= 0 ? SUBDEFECT_NAMES_ZH[idx] : d.name, count: d.count };
     }),
     [data, isZhMode]
