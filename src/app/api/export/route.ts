@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
       }
       data = (records as Record<string, unknown>[]) || [];
 
-      const result = exportFQCOQCExcel(data, exportFilters, lang);
+      const result = await exportFQCOQCExcel(data, exportFilters, lang);
 
       return new NextResponse(Buffer.from(result.buffer), {
         status: 200,

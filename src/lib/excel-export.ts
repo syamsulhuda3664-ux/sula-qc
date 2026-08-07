@@ -1576,46 +1576,69 @@ function buildFQCAnalysisSheet(
 }
 
 // ---------------------------------------------------------------------------
-// 3. OQC Rekap Excel
+// 3. OQC Rekap Excel — ExcelJS (professional theme matching FQC)
 // ---------------------------------------------------------------------------
 
-export function exportFQCOQCExcel(
+const OQC_REKAP_HEADERS = [
+  'No',
+  '日期 / Date',
+  '业务类型 / BT',
+  '批次总量 / Lot Size',
+  'AQL代码 / Code',
+  '抽样数 / Sample',
+  'Ac',
+  'Re',
+  '严重 / Critical',
+  '主要 / Major',
+  '次要 / Minor',
+  '总缺陷 / Total Defects',
+  '合格率 / Pass Rate',
+  '处置 / Disposition',
+  '备注 / Remarks',
+];
+
+const OQC_DETAIL_HEADERS = [
+  'No',
+  '日期 / Date',
+  '业务类型 / BT',
+  '订单号 / Order No.',
+  '款号 / Style',
+  '订单数 / Order Qty',
+  'FQC合格数 / FQC OK Qty',
+];
+
+/** Thin border shared across FQC & OQC sheets */
+const oqcThinBorder: Partial<ExcelJS.Borders> = {
+  top:    { style: 'thin', color: { argb: 'FFB0B0B0' } },
+  left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
+  bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+  right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
+};
+
+export async function exportFQCOQCExcel(
   data: Record<string, unknown>[],
   filters: ExportFilters,
   _lang: ExportLang,
-): ExcelExportResult {
-  const wb = createBook();
-  const ws: XLSX.WorkSheet = {};
-  const totalCols = 15;
+): Promise<ExcelExportResult> {
+  const wb = new ExcelJS.Workbook();
 
-  let row = writeTitle(ws, 'SULA-QC 出货品质检验报告\nOQC Outgoing Quality Control Report', 0, totalCols - 1);
+  // ── FQC Theme color constants (identical to FQC Daily) ──
+  const MED_BLUE    = 'FF2B5F8A';
+  const HEADER_BG   = 'FF1F4E79';
+  const PALE_BLUE   = 'FFEDF2F9';
+  const LIGHT_BLUE  = 'FFD6E4F0';
+  const WHITE_ARGB  = 'FFFFFFFF';
+  const GRAY_FOOTER = 'FF999999';
+  const FILTER_TEXT = 'FF4A6FA5';
 
-  // Filter info
-  const filterParts: string[] = [];
-  if (filters.dateFrom) filterParts.push(`From: ${filters.dateFrom}`);
-  if (filters.dateTo) filterParts.push(`To: ${filters.dateTo}`);
-  if (filters.period) filterParts.push(`Period: ${filters.period}`);
-  if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
-  if (filterParts.length > 0) {
-    writeRow(ws, row, 0, [filterParts.join('   |   ')], {
-      font: { name: 'Arial', sz: 9, italic: true, color: { rgb: '666666' } },
-    });
-    ws['!merges'] = ws['!merges'] || [];
-    ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
-    row += 2;
-  } else {
-    row += 2;
-  }
-
-  // ---- Summary Section ----
-  writeRow(ws, row, 0, ['总览 Summary / Rekap'], {
-    font: { name: 'Arial', sz: 12, bold: true, color: { rgb: '333333' } },
+  // ── Sort lots by date then business type ──
+  const sortedLots = [...data].sort((a, b) => {
+    const dateCmp = String(a.lot_date || '').localeCompare(String(b.lot_date || ''));
+    if (dateCmp !== 0) return dateCmp;
+    return String(a.business_type || '').localeCompare(String(b.business_type || ''));
   });
-  ws['!merges'] = ws['!merges'] || [];
-  ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
-  row++;
 
-  // Summary KPIs in two rows
+  // ── Aggregate summary ──
   let totalLotSize = 0, totalSampled = 0, totalSampleOk = 0, totalDefects = 0;
   let criticalDefects = 0, majorDefects = 0, minorDefects = 0;
   let releaseLots = 0, reworkLots = 0, holdLots = 0;
@@ -1639,129 +1662,225 @@ export function exportFQCOQCExcel(
 
   const overallPassRate = totalSampled > 0 ? totalSampleOk / totalSampled : 0;
 
-  const kpiRow1 = [
-    '批次总数 / Total Lots', data.length,
-    '批次总量 / Lot Size', totalLotSize,
-    '抽样总数 / Sampled', totalSampled,
-    '合格数 / Sample OK', totalSampleOk,
+  // =========================================================================
+  // SHEET 1: Rekap Summary
+  // =========================================================================
+  const ws1 = wb.addWorksheet('总览 Rekap');
+  const totalCols = OQC_REKAP_HEADERS.length; // 15
+
+  // ── Row 1: Title (height 63, bg MED_BLUE) ──
+  const row1 = ws1.getRow(1);
+  row1.height = 63;
+  ws1.mergeCells(1, 1, 1, totalCols);
+  const titleCell = row1.getCell(1);
+  titleCell.value = '厦门市欣维发实业有限公司品质检验表\nOQC Outgoing Quality Control Report';
+  titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: WHITE_ARGB } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  // ── Row 2-3: Spacers ──
+  ws1.getRow(2).height = 4;
+  ws1.getRow(3).height = 3;
+
+  // ── Row 4: Filter info ──
+  let currentRow = 4;
+  const filterParts: string[] = [];
+  if (filters.dateFrom) filterParts.push(`From: ${filters.dateFrom}`);
+  if (filters.dateTo) filterParts.push(`To: ${filters.dateTo}`);
+  if (filters.period) filterParts.push(`Period: ${filters.period}`);
+  if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
+
+  if (filterParts.length > 0) {
+    const filterRow = ws1.getRow(currentRow);
+    filterRow.height = 13.4;
+    ws1.mergeCells(currentRow, 1, currentRow, totalCols);
+    const fCell = filterRow.getCell(1);
+    fCell.value = filterParts.join('   |   ');
+    fCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: FILTER_TEXT } };
+    fCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+    fCell.alignment = { vertical: 'middle' };
+  }
+  currentRow++;
+
+  // ── Row 5: Section title “总览 Summary / Rekap” ──
+  const sectionRow = ws1.getRow(currentRow);
+  sectionRow.height = 22;
+  ws1.mergeCells(currentRow, 1, currentRow, totalCols);
+  const sectionCell = sectionRow.getCell(1);
+  sectionCell.value = '总览 Summary / Rekap';
+  sectionCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF333333' } };
+  sectionCell.alignment = { vertical: 'middle' };
+  currentRow++;
+
+  // ── Row 6-7: KPI summary rows (LIGHT_BLUE background) ──
+  const kpiLabels1 = [
+    '批次总数 / Total Lots', String(data.length),
+    '批次总量 / Lot Size', String(totalLotSize.toLocaleString()),
+    '抽样总数 / Sampled', String(totalSampled.toLocaleString()),
+    '合格数 / Sample OK', String(totalSampleOk.toLocaleString()),
     '合格率 / Pass Rate', fmtPct(overallPassRate, true),
-    '总缺陷 / Total Defects', totalDefects,
-    '', '', '', '',
+    '总缺陷 / Total Defects', String(totalDefects),
   ];
-  const kpiRow2 = [
-    '严重缺陷 / Critical', criticalDefects,
-    '主要缺陷 / Major', majorDefects,
-    '次要缺陷 / Minor', minorDefects,
+  const kpiLabels2 = [
+    '严重缺陷 / Critical', String(criticalDefects),
+    '主要缺陷 / Major', String(majorDefects),
+    '次要缺陷 / Minor', String(minorDefects),
     '放行 / Release', `${releaseLots} (${releaseQty.toLocaleString()})`,
     '返工 / Rework', `${reworkLots} (${reworkQty.toLocaleString()})`,
     '扣留 / Hold', `${holdLots} (${holdQty.toLocaleString()})`,
-    '', '', '', '',
   ];
 
-  writeRow(ws, row, 0, kpiRow1, SUBTOTAL_STYLE);
-  row++;
-  writeRow(ws, row, 0, kpiRow2, SUBTOTAL_STYLE);
-  row += 2;
+  for (const kpiRow of [kpiLabels1, kpiLabels2]) {
+    const kpiExcelRow = ws1.getRow(currentRow);
+    kpiExcelRow.height = 22;
+    ws1.mergeCells(currentRow, 1, currentRow, totalCols);
+    const kpiCell = kpiExcelRow.getCell(1);
+    kpiCell.value = kpiRow.join('    |    ');
+    kpiCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+    kpiCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+    kpiCell.alignment = { vertical: 'middle', indent: 1 };
+    kpiCell.border = oqcThinBorder;
+    currentRow++;
+  }
+  currentRow++; // blank spacer
 
-  // ---- Daily Breakdown Table ----
-  writeRow(ws, row, 0, ['每日明细 / Daily Breakdown'], {
-    font: { name: 'Arial', sz: 12, bold: true, color: { rgb: '333333' } },
-  });
-  ws['!merges'] = ws['!merges'] || [];
-  ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
-  row++;
+  // ── Section: Daily Breakdown ──
+  const dailyTitleRow = ws1.getRow(currentRow);
+  dailyTitleRow.height = 22;
+  ws1.mergeCells(currentRow, 1, currentRow, totalCols);
+  const dailyTitleCell = dailyTitleRow.getCell(1);
+  dailyTitleCell.value = '每日明细 / Daily Breakdown';
+  dailyTitleCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF333333' } };
+  dailyTitleCell.alignment = { vertical: 'middle' };
+  currentRow++;
 
-  const dailyHeaders = [
-    'No',
-    '日期 / Date',
-    '业务类型 / BT',
-    '批次总量 / Lot Size',
-    'AQL代码 / Code',
-    '抽样数 / Sample',
-    'Ac',
-    'Re',
-    '严重 / Critical',
-    '主要 / Major',
-    '次要 / Minor',
-    '总缺陷 / Total Defects',
-    '合格率 / Pass Rate',
-    '处置 / Disposition',
-    '备注 / Remarks',
-  ];
-  writeRow(ws, row, 0, dailyHeaders, HEADER_STYLE);
-  row++;
+  // ── Header row ──
+  const headerExcelRow = ws1.getRow(currentRow);
+  headerExcelRow.height = 43.5;
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = headerExcelRow.getCell(c);
+    cell.value = OQC_REKAP_HEADERS[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = oqcThinBorder;
+  }
+  currentRow++;
 
-  // Sort lots by date then business type
-  const sortedLots = [...data].sort((a, b) => {
-    const dateCmp = String(a.lot_date || '').localeCompare(String(b.lot_date || ''));
-    if (dateCmp !== 0) return dateCmp;
-    return String(a.business_type || '').localeCompare(String(b.business_type || ''));
-  });
+  // ── Data rows with alternating colors ──
+  // Number columns (1-indexed): Lot Size(4), Sample(6), Critical(9), Major(10), Minor(11), Total Defects(12)
+  const numberColSet = new Set<number>([1, 4, 6, 7, 8, 9, 10, 11, 12]);
+  let rowNum = 1;
 
-  let num = 1;
   for (const lot of sortedLots) {
     const dayLotSize = Number(lot.lot_size) || 0;
     const daySample = Number(lot.sample_size) || 0;
     const daySampleOk = Number(lot.sample_ok) || 0;
-    const dayDefects = Number(lot.total_defects) || 0;
-    const dayPassRate = daySample > 0 ? daySampleOk / daySample : 0;
+    const dayTotalDefects = Number(lot.total_defects) || 0;
+    // pass_rate is stored as percentage (0-100) in DB
+    const dayPassRateRaw = Number(lot.pass_rate) || 0;
+    // Use stored pass_rate if > 0, otherwise recalculate from sample_size/total_defects
+    const dayPassRate = dayPassRateRaw > 0
+      ? dayPassRateRaw / 100
+      : (daySample > 0 ? Math.max(0, daySample - dayTotalDefects) / daySample : 1);
 
-    writeRow(ws, row, 0, [
-      num++,
-      String(lot.lot_date || ''),
+    const bgColor = rowNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
+    const excelRow = ws1.getRow(currentRow);
+    excelRow.height = 20;
+
+    const vals: (string | number)[] = [
+      rowNum,
+      String(lot.lot_date || '').split('T')[0],
       String(lot.business_type || ''),
       dayLotSize,
       String(lot.aql_code || '-'),
       daySample,
-      Number(lot.ac) || '-',
-      Number(lot.re) || '-',
+      Number(lot.ac) ?? '-',
+      Number(lot.re) ?? '-',
       Number(lot.critical_defects) || 0,
       Number(lot.major_defects) || 0,
       Number(lot.minor_defects) || 0,
-      dayDefects,
+      dayTotalDefects,
       fmtPct(dayPassRate, true),
       String(lot.disposition || ''),
       String(lot.remarks || ''),
-    ], DATA_STYLE);
-    row++;
+    ];
+
+    for (let c = 1; c <= totalCols; c++) {
+      const cell = excelRow.getCell(c);
+      const val = vals[c - 1];
+      cell.value = typeof val === 'number' ? val : String(val);
+      cell.font = { name: 'Arial', size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.alignment = numberColSet.has(c)
+        ? { horizontal: 'right', vertical: 'middle' }
+        : { horizontal: 'left', vertical: 'middle' };
+      cell.border = oqcThinBorder;
+    }
+    currentRow++;
+    rowNum++;
   }
 
-  // Grand total row
-  writeRow(ws, row, 0, [
+  // ── Grand total row (HEADER_BG, white text) ──
+  const grandExcelRow = ws1.getRow(currentRow);
+  grandExcelRow.height = 25;
+  ws1.mergeCells(currentRow, 2, currentRow, 3);
+  const grandVals: (string | number)[] = [
     '',
-    '合计 / Grand Total',
+    '合计 GRAND TOTAL',
     '',
     totalLotSize,
-    '', totalSampled, '', '',
-    criticalDefects, majorDefects, minorDefects,
-    totalDefects,
+    '',
+    totalSampled,
+    '',
+    '',
+    criticalDefects,
+    majorDefects,
+    minorDefects,
+  totalDefects,
     fmtPct(overallPassRate, true),
     '',
     '',
-  ], GRAND_TOTAL_STYLE);
-  row++;
-
-  // ---- Defect Category Summary ----
-  row += 1;
-  writeRow(ws, row, 0, ['缺陷类别汇总 / Defect Category Summary'], {
-    font: { name: 'Arial', sz: 12, bold: true, color: { rgb: '333333' } },
-  });
-  ws['!merges'] = ws['!merges'] || [];
-  ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: 6 } });
-  row++;
-
-  const catHeaders = [
-    '排名 / Rank',
-    '缺陷类别 / Category',
-    '缺陷数 / Count',
-    '占比 / Percentage',
-    '严重 / Critical',
-    '主要 / Major',
-    '次要 / Minor',
   ];
-  writeRow(ws, row, 0, catHeaders, HEADER_STYLE);
-  row++;
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = grandExcelRow.getCell(c);
+    const val = grandVals[c - 1];
+    cell.value = typeof val === 'number' ? val : String(val);
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = numberColSet.has(c)
+      ? { horizontal: 'right', vertical: 'middle' }
+      : { horizontal: 'left', vertical: 'middle' };
+    cell.border = oqcThinBorder;
+  }
+  currentRow++;
 
+  // ── Defect Category Summary ──
+  currentRow++;
+  const catTitleRow = ws1.getRow(currentRow);
+  catTitleRow.height = 22;
+  ws1.mergeCells(currentRow, 1, currentRow, totalCols);
+  const catTitleCell = catTitleRow.getCell(1);
+  catTitleCell.value = '缺陷类别汇总 / Defect Category Summary';
+  catTitleCell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FF333333' } };
+  catTitleCell.alignment = { vertical: 'middle' };
+  currentRow++;
+
+  const catHeaders = ['排名 / Rank', '缺陷类别 / Category', '缺陷数 / Count', '占比 / Percentage', '严重 / Critical', '主要 / Major', '次要 / Minor', '备注 / Remark'];
+  const catTotalCols = catHeaders.length;
+  const catHeaderRow = ws1.getRow(currentRow);
+  catHeaderRow.height = 28;
+  for (let c = 1; c <= catTotalCols; c++) {
+    const cell = catHeaderRow.getCell(c);
+    cell.value = catHeaders[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = oqcThinBorder;
+  }
+  currentRow++;
+
+  // Aggregate defects from oqc_defects relation
   const oqcCatTotals: Record<string, { count: number; critical: number; major: number; minor: number }> = {};
   const OQC_CATEGORIES = ['Packaging', 'Label', 'Accessory', 'Appearance', 'Hardware', 'Stitching', 'Other'];
 
@@ -1784,73 +1903,112 @@ export function exportFQCOQCExcel(
   }
 
   const sortedOqcCats = OQC_CATEGORIES
-    .map((cat) => ({ category: cat, ...oqcCatTotals[cat] }))
+    .map((cat) => ({ category: cat, ...(oqcCatTotals[cat] || { count: 0, critical: 0, major: 0, minor: 0 }) }))
     .sort((a, b) => b.count - a.count);
 
   for (let i = 0; i < sortedOqcCats.length; i++) {
     const cat = sortedOqcCats[i];
     const pct = totalDefects > 0 ? `${((cat.count / totalDefects) * 100).toFixed(2)}%` : '0.00%';
-    writeRow(ws, row, 0, [
-      i + 1,
-      cat.category,
-      cat.count,
-      pct,
-      cat.critical,
-      cat.major,
-      cat.minor,
-    ], DATA_STYLE);
-    row++;
+    const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
+    const excelRow = ws1.getRow(currentRow);
+    excelRow.height = 20;
+    const catVals: (string | number)[] = [i + 1, cat.category, cat.count, pct, cat.critical, cat.major, cat.minor, ''];
+    for (let c = 1; c <= catTotalCols; c++) {
+      const cell = excelRow.getCell(c);
+      const val = catVals[c - 1];
+      cell.value = typeof val === 'number' ? val : String(val);
+      cell.font = { name: 'Arial', size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+      cell.alignment = c >= 3 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+      cell.border = oqcThinBorder;
+    }
+    currentRow++;
   }
 
-  // Footer
-  row += 1;
-  writeRow(ws, row, 0, [`Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`], {
-    font: { name: 'Arial', sz: 8, italic: true, color: { rgb: 'AAAAAA' } },
-  });
+  // Category total row
+  const catTotalRow = ws1.getRow(currentRow);
+  catTotalRow.height = 22;
+  const catTotalVals: (string | number)[] = ['', '合计 / Total', totalDefects, '100.00%', '', '', '', ''];
+  for (let c = 1; c <= catTotalCols; c++) {
+    const cell = catTotalRow.getCell(c);
+    const val = catTotalVals[c - 1];
+    cell.value = typeof val === 'number' ? val : String(val);
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+    cell.border = oqcThinBorder;
+  }
+  currentRow++;
 
-  setColWidths(ws, [6, 14, 10, 14, 10, 10, 8, 8, 10, 10, 10, 12, 12, 14, 20]);
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: totalCols - 1 } });
-  XLSX.utils.book_append_sheet(wb, ws, '总览 Rekap');
+  // ── Footer ──
+  currentRow += 2;
+  const footerRow = ws1.getRow(currentRow);
+  ws1.mergeCells(currentRow, 1, currentRow, totalCols);
+  const footerCell = footerRow.getCell(1);
+  footerCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
+  footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
+
+  // ── Column widths ──
+  const rekapWidths = [5, 12.5, 10, 13, 10, 10, 6, 6, 10, 10, 10, 12, 12, 12, 26];
+  for (let c = 0; c < totalCols; c++) {
+    ws1.getColumn(c + 1).width = rekapWidths[c] || 10;
+  }
 
   // =========================================================================
   // SHEET 2: Detail Lot — order numbers and styles per lot
   // =========================================================================
-  const ws2: XLSX.WorkSheet = {};
-  const detailCols = 7;
-  let r2 = writeTitle(ws2, 'SULA-QC OQC 批次明细\nOQC Lot Detail — Order Numbers & Styles', 0, detailCols - 1);
+  const ws2 = wb.addWorksheet('批次明细 Detail Lot');
+  const detailCols = OQC_DETAIL_HEADERS.length; // 7
 
+  // ── Title ──
+  const dRow1 = ws2.getRow(1);
+  dRow1.height = 63;
+  ws2.mergeCells(1, 1, 1, detailCols);
+  const dTitleCell = dRow1.getCell(1);
+  dTitleCell.value = '厦门市欣维发实业有限公司品质检验表\nOQC Lot Detail — Order Numbers & Styles';
+  dTitleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: WHITE_ARGB } };
+  dTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+  dTitleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  ws2.getRow(2).height = 4;
+  ws2.getRow(3).height = 3;
+
+  let dCurrentRow = 4;
   if (filterParts.length > 0) {
-    writeRow(ws2, r2, 0, [filterParts.join('   |   ')], {
-      font: { name: 'Arial', sz: 9, italic: true, color: { rgb: '666666' } },
-    });
-    ws2['!merges'] = ws2['!merges'] || [];
-    ws2['!merges'].push({ s: { r: r2, c: 0 }, e: { r: r2, c: detailCols - 1 } });
-    r2 += 2;
-  } else {
-    r2 += 2;
+    const dFilterRow = ws2.getRow(dCurrentRow);
+    dFilterRow.height = 13.4;
+    ws2.mergeCells(dCurrentRow, 1, dCurrentRow, detailCols);
+    const dFCell = dFilterRow.getCell(1);
+    dFCell.value = filterParts.join('   |   ');
+    dFCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: FILTER_TEXT } };
+    dFCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+    dFCell.alignment = { vertical: 'middle' };
+    dCurrentRow++;
   }
+  dCurrentRow++;
 
-  const detailHeaders = [
-    'No',
-    '日期 / Date',
-    '业务类型 / BT',
-    '订单号 / Order No.',
-    '款号 / Style',
-    '订单数 / Order Qty',
-    'FQC合格数 / FQC OK Qty',
-  ];
-  writeRow(ws2, r2, 0, detailHeaders, HEADER_STYLE);
-  r2++;
+  // ── Header ──
+  const dHeaderRow = ws2.getRow(dCurrentRow);
+  dHeaderRow.height = 43.5;
+  for (let c = 1; c <= detailCols; c++) {
+    const cell = dHeaderRow.getCell(c);
+    cell.value = OQC_DETAIL_HEADERS[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = oqcThinBorder;
+  }
+  dCurrentRow++;
 
+  // ── Data rows ──
+  const detailNumColSet = new Set<number>([1, 6, 7]);
   let detailNum = 1;
   let detailTotalOrders = 0;
   let detailTotalOkQty = 0;
 
   for (const lot of sortedLots) {
     const orders = lot.oqc_lot_orders;
-    const lotDate = String(lot.lot_date || '');
+    const lotDate = String(lot.lot_date || '').split('T')[0];
     const lotBt = String(lot.business_type || '');
-    const lotDisp = String(lot.disposition || '');
 
     if (Array.isArray(orders) && orders.length > 0) {
       for (const order of orders) {
@@ -1859,57 +2017,87 @@ export function exportFQCOQCExcel(
         detailTotalOrders += orderQty;
         detailTotalOkQty += okQty;
 
-        writeRow(ws2, r2, 0, [
-          detailNum++,
-          lotDate,
-          lotBt,
+        const bgColor = detailNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
+        const excelRow = ws2.getRow(dCurrentRow);
+        excelRow.height = 20;
+        const vals: (string | number)[] = [
+          detailNum++, lotDate, lotBt,
           String(order.order_no || ''),
           String(order.style_code || ''),
-          orderQty,
-          okQty,
-        ], DATA_STYLE);
-        r2++;
+          orderQty, okQty,
+        ];
+        for (let c = 1; c <= detailCols; c++) {
+          const cell = excelRow.getCell(c);
+          const val = vals[c - 1];
+          cell.value = typeof val === 'number' ? val : String(val);
+          cell.font = { name: 'Arial', size: 10 };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.alignment = detailNumColSet.has(c)
+            ? { horizontal: 'right', vertical: 'middle' }
+            : { horizontal: 'left', vertical: 'middle' };
+          cell.border = oqcThinBorder;
+        }
+        dCurrentRow++;
       }
     } else {
-      // No detail orders — write lot summary row
-      writeRow(ws2, r2, 0, [
-        detailNum++,
-        lotDate,
-        lotBt,
-        '-',
-        '-',
-        Number(lot.lot_size) || 0,
-        '-',
-      ], DATA_STYLE);
-      r2++;
+      const bgColor = detailNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
+      const excelRow = ws2.getRow(dCurrentRow);
+      excelRow.height = 20;
+      const vals: (string | number)[] = [
+        detailNum++, lotDate, lotBt, '-', '-',
+        Number(lot.lot_size) || 0, '-',
+      ];
+      for (let c = 1; c <= detailCols; c++) {
+        const cell = excelRow.getCell(c);
+        const val = vals[c - 1];
+        cell.value = typeof val === 'number' ? val : String(val);
+        cell.font = { name: 'Arial', size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+        cell.alignment = detailNumColSet.has(c)
+          ? { horizontal: 'right', vertical: 'middle' }
+          : { horizontal: 'left', vertical: 'middle' };
+        cell.border = oqcThinBorder;
+      }
+      dCurrentRow++;
     }
   }
 
-  // Grand total for detail sheet
-  writeRow(ws2, r2, 0, [
-    '',
-    '合计 / Grand Total',
-    '',
-    `${detailNum - 1} orders`,
-    '',
-    detailTotalOrders,
-    detailTotalOkQty,
-  ], GRAND_TOTAL_STYLE);
-  r2++;
+  // ── Grand total ──
+  const dGrandRow = ws2.getRow(dCurrentRow);
+  dGrandRow.height = 25;
+  ws2.mergeCells(dCurrentRow, 2, dCurrentRow, 5);
+  const dGrandVals: (string | number)[] = ['', '合计 GRAND TOTAL', '', '', '', `${detailTotalOrders}`, `${detailTotalOkQty}`];
+  for (let c = 1; c <= detailCols; c++) {
+    const cell = dGrandRow.getCell(c);
+    const val = dGrandVals[c - 1];
+    cell.value = typeof val === 'number' ? val : String(val);
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = detailNumColSet.has(c)
+      ? { horizontal: 'right', vertical: 'middle' }
+      : { horizontal: 'left', vertical: 'middle' };
+    cell.border = oqcThinBorder;
+  }
+  dCurrentRow++;
 
-  // Footer
-  r2 += 1;
-  writeRow(ws2, r2, 0, [`Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`], {
-    font: { name: 'Arial', sz: 8, italic: true, color: { rgb: 'AAAAAA' } },
-  });
+  // ── Footer ──
+  dCurrentRow += 2;
+  const dFooterRow = ws2.getRow(dCurrentRow);
+  ws2.mergeCells(dCurrentRow, 1, dCurrentRow, detailCols);
+  const dFooterCell = dFooterRow.getCell(1);
+  dFooterCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
+  dFooterCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
 
-  setColWidths(ws2, [6, 14, 10, 24, 20, 14, 16]);
-  ws2['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r2, c: detailCols - 1 } });
-  XLSX.utils.book_append_sheet(wb, ws2, '批次明细 Detail Lot');
+  // ── Column widths ──
+  const detailWidths = [5, 12.5, 10, 24, 20, 14, 16];
+  for (let c = 0; c < detailCols; c++) {
+    ws2.getColumn(c + 1).width = detailWidths[c] || 10;
+  }
 
-  const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  // ── Generate buffer ──
+  const buffer = await wb.xlsx.writeBuffer();
   const period = filters.period || (filters.dateFrom ? `${filters.dateFrom}_${filters.dateTo || 'all'}` : 'All');
-  return { buffer: new Uint8Array(buffer), fileName: `SULA-QC_OQC_Rekap_${period}.xlsx` };
+  return { buffer: new Uint8Array(buffer as ArrayBuffer), fileName: `SULA-QC_OQC_Rekap_${period}.xlsx` };
 }
 
 // ---------------------------------------------------------------------------

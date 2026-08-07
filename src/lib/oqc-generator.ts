@@ -393,7 +393,9 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
   }
 
   // Calculate pass rate
-  const sampleOk = Math.max(0, sampleSize - totalDefects);
+  // Safety: ensure totalDefects never exceeds sampleSize - 1 so passRate > 0
+  const effectiveDefects = Math.min(totalDefects, Math.max(0, sampleSize - 1));
+  const sampleOk = Math.max(0, sampleSize - effectiveDefects);
   const passRate = sampleSize > 0 ? sampleOk / sampleSize : 1;
 
   // ── Determine disposition using AQL-based logic ──
