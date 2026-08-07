@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || 'month';
-    const value = searchParams.get('value'); // e.g., '2026-07' for month, '2026-07' for quarter, '2026' for year
+    const value = searchParams.get('value');
     const businessType = searchParams.get('business_type');
 
     let startDate: string | undefined;
@@ -60,7 +60,6 @@ export async function GET(request: NextRequest) {
     }
 
     if (!startDate || !endDate) {
-      // Default to current month
       const now = new Date();
       startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -110,17 +109,23 @@ export async function GET(request: NextRequest) {
       hold_qty: 0,
       avg_pass_rate: 0,
       daily_breakdown: [] as unknown[],
+      trend_data: [] as unknown[],
     };
 
-    let totalPassRate = 0;
     const dailyMap: Record<string, {
       lot_date: string;
       lot_count: number;
       lot_size: number;
       sample_size: number;
+      sample_ok: number;
       defects: number;
+      critical: number;
+      major: number;
+      minor: number;
       pass_rate: number;
-      disposition: string;
+      release_count: number;
+      rework_count: number;
+      hold_count: number;
     }> = {};
 
     for (const lot of allLots) {
@@ -134,7 +139,6 @@ export async function GET(request: NextRequest) {
       rekap.release_qty += Number(lot.release_qty) || 0;
       rekap.rework_qty += Number(lot.rework_qty) || 0;
       rekap.hold_qty += Number(lot.hold_qty) || 0;
-      totalPassRate += Number(lot.pass_rate) || 0;
 
       if (lot.disposition === 'RELEASE') rekap.release_lots += 1;
       if (lot.disposition === 'REWORK') rekap.rework_lots += 1;
@@ -142,13 +146,23 @@ export async function GET(request: NextRequest) {
 
       const date = lot.lot_date;
       if (!dailyMap[date]) {
-        dailyMap[date] = { lot_date: date, lot_count: 0, lot_size: 0, sample_size: 0, defects: 0, pass_rate: 0, disposition: '' };
+        dailyMap[date] = {
+          lot_date: date, lot_count: 0, lot_size: 0, sample_size: 0, sample_ok: 0,
+          defects: 0, critical: 0, major: 0, minor: 0,
+          pass_rate: 0, release_count: 0, rework_count: 0, hold_count: 0,
+        };
       }
       dailyMap[date].lot_count += 1;
       dailyMap[date].lot_size += Number(lot.lot_size) || 0;
       dailyMap[date].sample_size += Number(lot.sample_size) || 0;
+      dailyMap[date].sample_ok += Number(lot.sample_ok) || 0;
       dailyMap[date].defects += Number(lot.total_defects) || 0;
-      dailyMap[date].disposition = lot.disposition;
+      dailyMap[date].critical += Number(lot.critical_defects) || 0;
+      dailyMap[date].major += Number(lot.major_defects) || 0;
+      dailyMap[date].minor += Number(lot.minor_defects) || 0;
+      if (lot.disposition === 'RELEASE') dailyMap[date].release_count += 1;
+      if (lot.disposition === 'REWORK') dailyMap[date].rework_count += 1;
+      if (lot.disposition === 'HOLD') dailyMap[date].hold_count += 1;
     }
 
     // Compute daily pass rates
@@ -158,16 +172,44 @@ export async function GET(request: NextRequest) {
         : 100;
     }
 
-    rekap.daily_breakdown = Object.values(dailyMap).sort((a, b) => a.lot_date.localeCompare(b.lot_date));
-    rekap.avg_pass_rate = allLots.length > 0
-      ? Math.round((totalPassRate / allLots.length) * 10000) / 100
-      : 0;
+    const dailyBreakdown = Object.values(dailyMap).sort((a, b) => a.lot_date.localeCompare(b.lot_date));
+    rekap.daily_breakdown = dailyBreakdown;
 
     // Overall pass rate based on totals
-    const overallPassRate = rekap.total_sampled > 0
+    rekap.avg_pass_rate = rekap.total_sampled > 0
       ? Math.round((rekap.total_sample_ok / rekap.total_sampled) * 10000) / 100
       : 0;
-    rekap.avg_pass_rate = overallPassRate;
+
+    // Build trend data for charts (cumulative)
+    let cumRelease = 0, cumRework = 0, cumHold = 0, cumDefects = 0, cumSampled = 0, cumSampleOk = 0;
+    rekap.trend_data = dailyBreakdown.map(d => {
+      cumRelease += d.release_count;
+      cumRework += d.rework_count;
+      cumHold += d.hold_count;
+      cumDefects += d.defects;
+      cumSampled += d.sample_size;
+      cumSampleOk += d.sample_ok;
+      return {
+        date: d.lot_date,
+        lot_count: d.lot_count,
+        lot_size: d.lot_size,
+        sample_size: d.sample_size,
+        defects: d.defects,
+        critical: d.critical,
+        major: d.major,
+        minor: d.minor,
+        pass_rate: d.pass_rate,
+        release_count: d.release_count,
+        rework_count: d.rework_count,
+        hold_count: d.hold_count,
+        cum_pass_rate: cumSampled > 0 ? Math.round((cumSampleOk / cumSampled) * 10000) / 100 : 100,
+        cum_release: cumRelease,
+        cum_rework: cumRework,
+        cum_hold: cumHold,
+        cum_defects: cumDefects,
+        defect_per_sample: d.sample_size > 0 ? Math.round((d.defects / d.sample_size) * 10000) / 100 : 0,
+      };
+    });
 
     return NextResponse.json(rekap);
   } catch (error) {

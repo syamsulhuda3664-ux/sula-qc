@@ -313,8 +313,9 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
 
   const totalFQCDefects = Object.values(fqcDefectProfile).reduce((a, b) => a + b, 0);
 
-  // Apply leakage factor: 5-15% of FQC defects leak through to OQC
-  const leakageFactor = 0.05 + rand() * 0.10;
+  // Apply leakage factor: 2-8% of FQC defects leak through to OQC
+  // Lowered to produce more RELEASE dispositions
+  const leakageFactor = 0.02 + rand() * 0.06;
   const expectedOQCDefects = Math.round(totalFQCDefects * leakageFactor);
 
   // Distribute expected OQC defects across OQC categories based on FQC profile
@@ -337,7 +338,8 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
   }
 
   // Add some base-level OQC defects (packaging/label issues that FQC doesn't catch)
-  const baseOQCDefects = Math.max(0, Math.round(sampleSize * 0.005 * rand()));
+  // Reduced from 0.5% to 0.2% — most lots should pass
+  const baseOQCDefects = Math.max(0, Math.round(sampleSize * 0.002 * rand()));
   oqcDefectDistribution.Packaging += baseOQCDefects * 0.4;
   oqcDefectDistribution.Label += baseOQCDefects * 0.3;
   oqcDefectDistribution.Accessory += baseOQCDefects * 0.3;
@@ -394,20 +396,27 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
   const sampleOk = Math.max(0, sampleSize - totalDefects);
   const passRate = sampleSize > 0 ? sampleOk / sampleSize : 1;
 
-  // Determine disposition
-  // Internal control pass rate target: 98.5%
-  // AQL target pass rate: 97.8%
-  const INTERNAL_CONTROL_RATE = 0.985;
+  // ── Determine disposition using AQL-based logic ──
+  // RELEASE: defects <= Ac (accept number)
+  // REWORK: defects > Ac but below critical threshold
+  // HOLD: critical defects >= 2, or total defects >= Re AND has critical defect
   const hasCriticalDefect = criticalDefects > 0;
 
   let disposition: OQCDisposition;
-  if (totalDefects >= aql.re || hasCriticalDefect) {
-    // Exceeds AQL reject number or has critical defect
-    disposition = hasCriticalDefect && criticalDefects >= 2 ? 'HOLD' : 'REWORK';
-  } else if (passRate < INTERNAL_CONTROL_RATE) {
-    // Below internal control threshold
+  if (totalDefects <= aql.ac && !hasCriticalDefect) {
+    // Within AQL accept limit and no critical defects → RELEASE
+    disposition = 'RELEASE';
+  } else if (hasCriticalDefect && criticalDefects >= 2) {
+    // Multiple critical defects → HOLD
+    disposition = 'HOLD';
+  } else if (totalDefects >= aql.re) {
+    // Exceeds AQL reject number → REWORK
+    disposition = 'REWORK';
+  } else if (hasCriticalDefect) {
+    // Has 1 critical defect but within Ac-Re range → REWORK
     disposition = 'REWORK';
   } else {
+    // Between Ac and Re with no critical defects → RELEASE
     disposition = 'RELEASE';
   }
 
@@ -418,10 +427,13 @@ export function generateOQCLot(date: Date, fqcRecords: any[]): OQCLot {
 
   // Generate remarks
   const remarks: string[] = [];
-  if (disposition === 'REWORK') {
-    remarks.push(`Total defects (${totalDefects}) require rework before shipment`);
+  if (disposition === 'RELEASE') {
+    remarks.push(`Passed OQC inspection (Ac=${aql.ac}, defects=${totalDefects})`);
+  } else if (disposition === 'REWORK') {
+    remarks.push(`Total defects (${totalDefects}) exceed Ac=${aql.ac}. Rework required before shipment`);
+    if (hasCriticalDefect) remarks.push(`Contains ${criticalDefects} critical defect(s)`);
   } else if (disposition === 'HOLD') {
-    remarks.push(`HOLD: Critical defects found. Requires management review`);
+    remarks.push(`HOLD: ${criticalDefects} critical defects found. Requires management review`);
   }
   if (totalDefects > 0) {
     const topDefect = defects.reduce((max, d) => d.count > max.count ? d : max, defects[0]);
