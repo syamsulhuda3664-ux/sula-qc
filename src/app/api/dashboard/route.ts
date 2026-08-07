@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
-import { SUBDEFECT_NAMES, getSubDefectCategory } from '@/lib/rca-generator';
+import { SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, getSubDefectCategory } from '@/lib/rca-generator';
 
 // ── Date range helper (mirrors FQC inspections) ──
 function getDateRange(period: string) {
@@ -11,8 +11,9 @@ function getDateRange(period: string) {
 
   switch (period) {
     case 'day': {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      end = new Date(start); end.setHours(23, 59, 59, 999);
+      // Minimum 7 days for meaningful chart data
+      start = new Date(now); start.setDate(now.getDate() - 6); start.setHours(0, 0, 0, 0);
+      end = new Date(now); end.setHours(23, 59, 59, 999);
       break;
     }
     case 'week': {
@@ -226,25 +227,17 @@ export async function GET(request: NextRequest) {
     });
 
     // ═══════════════════════════════════════════════════
-    // 6. Top Sub-Defects (from individual sub-defect columns)
+    // 6. Top Sub-Defects (from sub_defects JSON array)
     // ═══════════════════════════════════════════════════
-    const SUBDEFECT_DB_COLUMNS = [
-      'sub_skip_stitch','sub_broken_stitch','sub_loose_thread','sub_puckering','sub_wrong_stitch','sub_uneven_stitch','sub_open_seam','sub_wrinkled_seam','sub_wrong_thread_color','sub_tension_issue','sub_other_stitch',
-      'sub_logo_peeling','sub_logo_misalignment','sub_logo_color_off','sub_logo_missing','sub_logo_scratch','sub_logo_crack','sub_other_logo',
-      'sub_color_shade','sub_color_fading','sub_fabric_defect','sub_pilling','sub_shrinking','sub_other_material',
-      'sub_zipper_stuck','sub_zipper_broken','sub_zipper_misaligned','sub_zipper_color_off','sub_other_zipper',
-      'sub_buckle_defect','sub_hook_defect','sub_snap_defect','sub_d_ring_defect','sub_magnet_defect','sub_other_hardware',
-      'sub_scratch','sub_dent','sub_dirty_spot','sub_glue_mark','sub_untrimmed_thread','sub_rubber_mark','sub_other_appearance',
-      'sub_webbing_fraying','sub_webbing_discoloration','sub_webbing_wrong_size','sub_other_webbing',
-      'sub_label_wrong','sub_label_missing','sub_label_misaligned','sub_other_label',
-      'sub_accessory_missing','sub_accessory_wrong','sub_accessory_defective','sub_other_accessory',
-      'sub_packaging_torn','sub_packaging_damaged','sub_packaging_wrong','sub_other_packaging',
-      'sub_other_defect',
-    ];
+    const subDefectCounts: number[] = new Array(SUBDEFECT_NAMES.length).fill(0);
 
-    const subDefectCounts = SUBDEFECT_DB_COLUMNS.map((col) =>
-      fqc.reduce((sum, r) => sum + (Number((r as Record<string, unknown>)[col]) || 0), 0)
-    );
+    for (const r of fqc) {
+      if (Array.isArray(r.sub_defects)) {
+        for (let i = 0; i < Math.min(r.sub_defects.length, subDefectCounts.length); i++) {
+          subDefectCounts[i] += Number(r.sub_defects[i]) || 0;
+        }
+      }
+    }
 
     const topDefects = subDefectCounts
       .map((count, index) => ({

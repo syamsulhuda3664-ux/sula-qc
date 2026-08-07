@@ -66,7 +66,7 @@ export default function DashboardPage() {
   const barData = useMemo(() =>
     (data?.topDefects || []).slice(0, 8).map((d) => {
       const idx = SUBDEFECT_NAMES_ZH.indexOf(d.name);
-      return { name: isZhMode && idx >= 0 ? d.name : d.name, count: d.count };
+      return { name: isZhMode && idx >= 0 ? SUBDEFECT_NAMES_ZH[idx] : d.name, count: d.count };
     }),
     [data, isZhMode]
   );
@@ -99,7 +99,7 @@ export default function DashboardPage() {
   }
 
   const { kpi } = data;
-  const periodLabel = t(`time.${period === 'day' ? 'today' : period === 'week' ? 'thisWeek' : period === 'month' ? 'thisMonth' : period === 'quarter' ? 'thisQuarter' : 'thisYear'}`);
+  const periodLabel = t(`time.${period === 'day' ? 'last7Days' : period === 'week' ? 'thisWeek' : period === 'month' ? 'thisMonth' : period === 'quarter' ? 'thisQuarter' : 'thisYear'}`);
 
   return (
     <div className="space-y-6">
@@ -109,7 +109,7 @@ export default function DashboardPage() {
           <TabsList className="bg-slate-100">
             {PERIODS.map((p) => (
               <TabsTrigger key={p} value={p} className="text-xs sm:text-sm">
-                {t(`time.${p === 'day' ? 'today' : p === 'week' ? 'thisWeek' : p === 'month' ? 'thisMonth' : p === 'quarter' ? 'thisQuarter' : 'thisYear'}`)}
+                {t(`time.${p === 'day' ? 'last7Days' : p === 'week' ? 'thisWeek' : p === 'month' ? 'thisMonth' : p === 'quarter' ? 'thisQuarter' : 'thisYear'}`)}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -323,17 +323,27 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             {pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={280}>
+              <ResponsiveContainer width="100%" height={320}>
                 <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={90}
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85}
                     paddingAngle={2} dataKey="count"
-                    label={({ name, percent }: { name: string; percent?: number }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                    labelLine={false} fontSize={10}>
+                    label={({ name, percent, count }: { name?: string; percent?: number; count?: number }) => `${name || ''} (${count || 0})`}
+                    labelLine={true} fontSize={9}>
                     {pieData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: any, name: any) => [`${value} (${((pieData.find(p => p.category === name) || { percentage: 0 }).percentage)}%)`, name]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: any, entry: any) => {
+                      const item = pieData.find(p => p.category === value);
+                      return `${value}: ${item ? item.count : 0} (${item ? item.percentage : 0}%)`;
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
