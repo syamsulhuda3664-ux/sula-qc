@@ -12,7 +12,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, Legend,
 } from 'recharts';
-import { SUBDEFECT_NAMES_ZH } from '@/lib/rca-generator';
+import { SUBDEFECT_NAMES_ZH, CATEGORY_ZH } from '@/lib/rca-generator';
 
 const PERIODS = ['day', 'week', 'month', 'quarter', 'year'] as const;
 const BUSINESS_TYPES = ['ALL', 'PTOEM', 'PTB2C', 'PTGH'] as const;
@@ -57,10 +57,16 @@ export default function DashboardPage() {
     fetchDashboard();
   }, [period, businessType, effectiveType]);
 
+  // ── Category name helper (EN ↔ ZH) ──
+  const catName = (en: string) => isZhMode ? (CATEGORY_ZH[en] || en) : en;
+
   // ── Derived data ──
   const pieData = useMemo(() =>
-    (data?.defectCategories || []).filter((c) => c.count > 0).slice(0, 6),
-    [data]
+    (data?.defectCategories || []).filter((c) => c.count > 0).slice(0, 6).map((c) => ({
+      ...c,
+      category: catName(c.category),
+    })),
+    [data, isZhMode]
   );
 
   const barData = useMemo(() =>
@@ -220,7 +226,7 @@ export default function DashboardPage() {
                 <Line type="monotone" dataKey="passRate" stroke="#059669" strokeWidth={2.5}
                   dot={{ fill: '#059669', r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="defects" stroke="#ef4444" strokeWidth={1.5}
-                  strokeDasharray="5 5" dot={false} yAxisId={0} />
+                  strokeDasharray="5 5" dot={false} yAxisId={0} name={t('dashboard.defects')} />
               </LineChart>
             </ResponsiveContainer>
           ) : (
@@ -303,7 +309,7 @@ export default function DashboardPage() {
                 <Tooltip />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {['Stitching', 'Appearance', 'Material', 'Hardware', 'Logo', 'Zipper', 'Webbing', 'Other', 'Preparation'].map((cat, i) => (
-                  <Area key={cat} type="monotone" dataKey={cat} stackId="1"
+                  <Area key={cat} type="monotone" dataKey={cat} stackId="1" name={catName(cat)}
                     stroke={DEFECT_TREND_COLORS[i] || '#999'} fill={DEFECT_TREND_COLORS[i] || '#999'}
                     fillOpacity={0.6} />
                 ))}
