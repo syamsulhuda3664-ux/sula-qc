@@ -1765,7 +1765,6 @@ async function buildRCASheet(
         const action = actions[ai];
         const bgColor = ai % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
         const excelRow = ws.getRow(currentRow);
-        excelRow.height = 89;
 
         const rank = ai + 1;
 
@@ -1822,9 +1821,24 @@ async function buildRCASheet(
           bilingual(String(action.preventive_action || ''), 'preventive_action'),
           String(action.responsible || '-'),
           String(action.due_date || '-'),
-          '', // Photo Before — placeholder, image overlaid
-          '', // Photo After — placeholder, image overlaid
+          '', // Photo Before
+          '', // Photo After
         ];
+
+        // --- Dynamic row height: min 89pt (for photos), taller if text needs more ---
+        const LINE_PT = 13;
+        const COL_W = [5.5, 26, 14, 12, 10, 14, 18, 36, 42, 36, 16, 42, 42, 16, 14, 18, 18];
+        let maxLines = 1;
+        for (let ci = 0; ci < vals.length; ci++) {
+          const txt = String(vals[ci] || '');
+          if (!txt || txt === '-') continue;
+          const charsPerLine = Math.max(4, Math.floor((COL_W[ci] || 20) * 1.8));
+          for (const para of txt.split('\n')) {
+            if (!para) continue;
+            maxLines = Math.max(maxLines, Math.ceil(para.length / charsPerLine));
+          }
+        }
+        excelRow.height = Math.max(89, maxLines * LINE_PT + 8);
 
         for (let c = 1; c <= totalCols; c++) {
           const cell = excelRow.getCell(c);
