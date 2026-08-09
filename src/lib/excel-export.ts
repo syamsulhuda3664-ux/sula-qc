@@ -1712,7 +1712,26 @@ async function buildRCASheet(
     return String(a.business_type || '').localeCompare(String(b.business_type || ''));
   });
 
+  let prevWeek = '';
+
   for (const rca of sorted) {
+    // ---- Week separator row ----
+    const curWeek = String(rca.week_start || '');
+    if (curWeek && curWeek !== prevWeek && prevWeek !== '') {
+      const sepRow = ws.getRow(currentRow);
+      sepRow.height = 6;
+      ws.mergeCells(currentRow, 1, currentRow, totalCols);
+      const sepCell = sepRow.getCell(1);
+      sepCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+      // Thin colored line as visual divider
+      for (let c = 1; c <= totalCols; c++) {
+        const cell = sepRow.getCell(c);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+        cell.border = thinBorder;
+      }
+      currentRow++;
+    }
+    prevWeek = curWeek;
     const weekPeriod = `${rca.week_start || ''} ~ ${rca.week_end || ''}`;
     const bt = String(rca.business_type || '');
     const inspected = Number(rca.total_inspected) || 0;
@@ -1828,15 +1847,17 @@ async function buildRCASheet(
         }
 
         // Embed Photo Before (column 16 = 0-indexed col 15)
-        // Use tl+br so image fills the entire cell with no leftover space
+        // Use tl+br with ~8% margin on all sides so image is centered with padding
+        const IMG_MARGIN_COL = 0.08;
+        const IMG_MARGIN_ROW = 0.04;
         const beforeUrl = String(action.photo_before || '');
         if (beforeUrl && photoMap.has(beforeUrl)) {
           const imgData = photoMap.get(beforeUrl);
           if (imgData) {
             const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
             ws.addImage(imgId, {
-              tl: { col: 15.0, row: currentRow - 1 },
-              br: { col: 16.0, row: currentRow },
+              tl: { col: 15 + IMG_MARGIN_COL, row: currentRow - 1 + IMG_MARGIN_ROW },
+              br: { col: 16 - IMG_MARGIN_COL, row: currentRow - IMG_MARGIN_ROW },
             });
           }
         }
@@ -1848,8 +1869,8 @@ async function buildRCASheet(
           if (imgData) {
             const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
             ws.addImage(imgId, {
-              tl: { col: 16.0, row: currentRow - 1 },
-              br: { col: 17.0, row: currentRow },
+              tl: { col: 16 + IMG_MARGIN_COL, row: currentRow - 1 + IMG_MARGIN_ROW },
+              br: { col: 17 - IMG_MARGIN_COL, row: currentRow - IMG_MARGIN_ROW },
             });
           }
         }
