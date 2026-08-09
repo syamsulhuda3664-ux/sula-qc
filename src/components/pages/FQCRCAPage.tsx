@@ -178,6 +178,24 @@ function emptyAction(rank: number, category = '', defectQty = 0): ActionRow {
   };
 }
 
+/** Initialize action edit rows from a draft RCA's actions array */
+function buildActionEditsFromDraft(draft: any, zhMode: boolean): ActionRow[] {
+  if (!draft.actions || draft.actions.length === 0) return [];
+  let actions = draft.actions.map((a: any) => ({
+    rank: a.rank, category: a.category || '', sub_defects: a.sub_defects || [],
+    defect_qty: a.defect_qty || 0, style_codes: a.style_codes || [],
+    root_cause: a.root_cause || '', impact: a.impact || '', process: a.process || '',
+    corrective_action: a.corrective_action || '', preventive_action: a.preventive_action || '',
+    responsible: a.responsible || '', due_date: a.due_date || '',
+    status: a.status || 'pending', photo_before: a.photo_before || '', photo_after: a.photo_after || '',
+  }));
+  actions.sort((a, b) => a.rank - b.rank);
+  if (zhMode) actions = actions.map(applyZhContent);
+  return actions;
+}
+
+const DRAFTS_STORAGE_KEY = 'sula_qc_rca_drafts';
+
 // ═══════════════════════════════════════════════════════════
 // Photo Cell Component
 // ═══════════════════════════════════════════════════════════
@@ -294,6 +312,48 @@ export default function FQCRCAPage() {
   const [actionEdits, setActionEdits] = useState<Record<string, ActionRow[]>>({});
   const [editingRcas, setEditingRcas] = useState<Set<string>>(new Set());
 
+  // ═══════════════════════════════════════════════════════════
+  // Persist drafts across navigation & refresh via sessionStorage
+  // ═══════════════════════════════════════════════════════════
+
+  // Load persisted drafts on first mount
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem(DRAFTS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setDraftRcas(parsed);
+          // Restore action edits from persisted drafts
+          const edits: Record<string, ActionRow[]> = {};
+          for (const draft of parsed) {
+            if (draft.draft_id && draft.actions?.length > 0) {
+              edits[draft.draft_id] = buildActionEditsFromDraft(draft, isZhMode);
+            }
+          }
+          setActionEdits(prev => ({ ...prev, ...edits }));
+          // Auto-expand loaded drafts
+          setExpandedWeeks(prev => {
+            const next = new Set(prev);
+            parsed.forEach((d: any) => { if (d.draft_id) next.add(d.draft_id); });
+            return next;
+          });
+        }
+      }
+    } catch { /* ignore parse errors */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync draft state → sessionStorage whenever drafts change
+  useEffect(() => {
+    try {
+      if (draftRcas.length > 0) {
+        sessionStorage.setItem(DRAFTS_STORAGE_KEY, JSON.stringify(draftRcas));
+      } else {
+        sessionStorage.removeItem(DRAFTS_STORAGE_KEY);
+      }
+    } catch { /* ignore storage quota errors */ }
+  }, [draftRcas]);
+
   const months = useMemo(() => getRecentMonths(6), []);
   const [year, month] = selectedMonth.split('-').map(Number);
   const weekPeriods = useMemo(() => getWeekPeriods(year, month), [year, month]);
@@ -396,23 +456,9 @@ export default function FQCRCAPage() {
           for (const draft of data.draft_rcas) {
             const key = draft.draft_id;
             if (draft.actions && draft.actions.length > 0 && !actionEdits[key]) {
-              let actions = draft.actions.map((a: any) => ({
-                rank: a.rank, category: a.category || '', sub_defects: a.sub_defects || [],
-                defect_qty: a.defect_qty || 0, style_codes: a.style_codes || [],
-                root_cause: a.root_cause || '', impact: a.impact || '', process: a.process || '',
-                corrective_action: a.corrective_action || '', preventive_action: a.preventive_action || '',
-                responsible: a.responsible || '', due_date: a.due_date || '',
-                status: a.status || 'pending', photo_before: a.photo_before || '', photo_after: a.photo_after || '',
-              }));
-              // Sort actions by rank to ensure correct order
-              actions.sort((a, b) => a.rank - b.rank);
-              // Ensure zh content for Mandarin users
-              if (isZhMode) {
-                actions = actions.map(applyZhContent);
-              }
               setActionEdits(prev => ({
                 ...prev,
-                [key]: actions,
+                [key]: buildActionEditsFromDraft(draft, isZhMode),
               }));
             }
           }
