@@ -1747,7 +1747,23 @@ async function buildRCASheet(
         excelRow.height = 80;
 
         const rank = ai + 1;
-        const subDefects = Array.isArray(action.sub_defects) ? (action.sub_defect as string[]).join(', ') : String(action.sub_defects || '-');
+
+        // Bilingual category: "Zipper / 拉链"
+        const catEn = String(action.category || '');
+        const catZh = CATEGORY_ZH[catEn] || '';
+        const catBilingual = catEn && catZh ? `${catEn} / ${catZh}` : (catEn || '-');
+
+        // Bilingual sub-defects: "Skip stitch / 跳针, ..."
+        const rawSubs: string[] = Array.isArray(action.sub_defects)
+          ? (action.sub_defects as unknown[]).map(s => String(s))
+          : [];
+        const subBilingual = rawSubs.length > 0
+          ? rawSubs.map(sub => {
+              const idx = SUBDEFECT_NAMES.indexOf(sub);
+              const zh = idx >= 0 ? (SUBDEFECT_NAMES_ZH[idx] || '') : '';
+              return zh ? `${sub} / ${zh}` : sub;
+            }).join(', ')
+          : '-';
 
         const vals: (string | number)[] = [
           rank,
@@ -1756,8 +1772,8 @@ async function buildRCASheet(
           ai === 0 ? inspected : '',
           ai === 0 ? ng : '',
           ai === 0 ? (passRate > 0 ? passRate.toFixed(2) + '%' : '-') : '',
-          String(action.category || '-'),
-          subDefects,
+          catBilingual,
+          subBilingual,
           String(action.root_cause || '-'),
           String(action.impact || '-'),
           String(action.process || '-'),
@@ -1863,7 +1879,7 @@ async function buildRCASheet(
   ws.getColumn(5).width = 10.0;     // E: NG
   ws.getColumn(6).width = 14.0;     // F: Pass Rate
   ws.getColumn(7).width = 18.0;     // G: Category
-  ws.getColumn(8).width = 22.0;     // H: Sub-Defect
+  ws.getColumn(8).width = 36.0;     // H: Sub-Defect (bilingual)
   ws.getColumn(9).width = 42.0;     // I: Root Cause
   ws.getColumn(10).width = 36.0;    // J: Impact
   ws.getColumn(11).width = 16.0;    // K: Process
