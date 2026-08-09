@@ -1765,7 +1765,7 @@ async function buildRCASheet(
         const action = actions[ai];
         const bgColor = ai % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
         const excelRow = ws.getRow(currentRow);
-        excelRow.height = 89;
+        excelRow.height = 120;
 
         const rank = ai + 1;
 
