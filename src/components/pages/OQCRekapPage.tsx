@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { CheckCircle2, AlertTriangle, XCircle, Package, TrendingUp, FileText } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, XCircle, Package, TrendingUp, FileText, Download } from 'lucide-react';
 
 const OQC_CAT_ZH: Record<string, string> = {
   Packaging: '包装问题 / Packaging',
@@ -39,6 +39,48 @@ export default function OQCRekapPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [businessType, setBusinessType] = useState('ALL');
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      // Compute date range from period/value
+      let dateFrom = '', dateTo = '';
+      if (period === 'month') {
+        const [y, m] = value.split('-').map(Number);
+        dateFrom = `${y}-${String(m).padStart(2, '0')}-01`;
+        const lastDay = new Date(y, m, 0).toISOString().split('T')[0];
+        dateTo = lastDay;
+      } else if (period === 'quarter') {
+        const q = parseInt(value, 10);
+        const y = Math.floor(q / 10);
+        const qNum = q % 10;
+        const startM = (qNum - 1) * 3 + 1;
+        dateFrom = `${y}-${String(startM).padStart(2, '0')}-01`;
+        const endM = startM + 2;
+        dateTo = new Date(y, endM, 0).toISOString().split('T')[0];
+      } else if (period === 'year') {
+        const y = parseInt(value, 10);
+        dateFrom = `${y}-01-01`;
+        dateTo = `${y}-12-31`;
+      }
+      const bt = effectiveType || businessType;
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'oqc-combined', filters: { date_from: dateFrom, date_to: dateTo, business_type: bt === 'ALL' ? '' : bt } }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `SULA-QC_OQC_Report_${dateFrom}_${dateTo}.xlsx`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch { /* ignore */ } finally { setExporting(false); }
+  };
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -103,6 +145,9 @@ export default function OQCRekapPage() {
                 </SelectContent>
               </Select>
             </div>
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting || loading} className="h-9">
+              <Download className="h-3.5 w-3.5 mr-1" /> {exporting ? '...' : t('action.download')}
+            </Button>
           </div>
         </CardContent>
       </Card>

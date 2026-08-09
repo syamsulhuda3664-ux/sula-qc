@@ -59,14 +59,14 @@ export default function OQCLotsPage() {
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'oqc', filters: { date_from: dateFrom, date_to: dateTo, business_type: effectiveType || businessType, disposition } }),
+        body: JSON.stringify({ type: 'oqc-combined', filters: { date_from: dateFrom, date_to: dateTo, business_type: effectiveType || businessType, disposition } }),
       });
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `oqc_lots_${new Date().toISOString().split('T')[0]}.xlsx`;
+        a.download = `SULA-QC_OQC_Report_${dateFrom || 'all'}_${dateTo || 'all'}.xlsx`;
         a.click();
         URL.revokeObjectURL(url);
       }
