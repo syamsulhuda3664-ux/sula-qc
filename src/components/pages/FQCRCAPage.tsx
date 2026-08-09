@@ -226,17 +226,20 @@ function PhotoCell({ value, onUpload, onRemove, disabled }: {
 
   if (value) {
     return (
-      <div className="relative group w-[72px] h-[54px] rounded border border-slate-200 overflow-hidden bg-slate-50">
+      <div
+        className="relative group w-[72px] h-[54px] rounded border border-slate-200 overflow-hidden bg-slate-50 cursor-pointer"
+        onClick={() => window.open(value, '_blank')}
+      >
         <img src={value} alt="" className="w-full h-full object-cover" />
         {!disabled && (
           <button
             onClick={(e) => { e.stopPropagation(); onRemove(value); }}
-            className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10"
           >
             <X className="h-3 w-3" />
           </button>
         )}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 pointer-events-none">
           <EyeIcon className="h-4 w-4 text-white" />
         </div>
       </div>

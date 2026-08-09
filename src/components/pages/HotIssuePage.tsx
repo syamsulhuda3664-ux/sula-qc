@@ -113,7 +113,7 @@ function compressImageClient(file: File, maxDim = 800, quality = 0.6): Promise<F
 }
 
 function PhotoThumbnail({ value, onUpload, onRemove, disabled }: {
-  value: string; onUpload: (file: File) => void; onRemove: () => void; disabled?: boolean;
+  value: string; onUpload: (file: File) => void; onRemove: (url: string) => void; disabled?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
@@ -127,10 +127,13 @@ function PhotoThumbnail({ value, onUpload, onRemove, disabled }: {
 
   if (value) {
     return (
-      <div className="relative group w-[72px] h-[54px] rounded border border-slate-200 overflow-hidden bg-slate-50">
+      <div
+        className="relative group w-[72px] h-[54px] rounded border border-slate-200 overflow-hidden bg-slate-50 cursor-pointer"
+        onClick={() => window.open(value, '_blank')}
+      >
         <img src={value} alt="" className="w-full h-full object-cover" />
         {!disabled && (
-          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={(e) => { e.stopPropagation(); onRemove(value); }} className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <X className="h-3 w-3" />
           </button>
         )}
@@ -671,11 +674,11 @@ export default function HotIssuePage() {
             {/* Photos — side by side below deadline */}
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('rca.photoBefore')}</label>
-              <PhotoThumbnail value={form.photo_before} onUpload={(f) => handlePhotoUpload('photo_before', f)} onRemove={() => setForm(p => ({ ...p, photo_before: '' }))} />
+              <PhotoThumbnail value={form.photo_before} onUpload={(f) => handlePhotoUpload('photo_before', f)} onRemove={(url) => { if (url) fetch(`/api/fqc/rca/upload-photo?url=${encodeURIComponent(url)}`, { method: 'DELETE' }).catch(() => {}); setForm(p => ({ ...p, photo_before: '' })); }} />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('rca.photoAfter')}</label>
-              <PhotoThumbnail value={form.photo_after} onUpload={(f) => handlePhotoUpload('photo_after', f)} onRemove={() => setForm(p => ({ ...p, photo_after: '' }))} />
+              <PhotoThumbnail value={form.photo_after} onUpload={(f) => handlePhotoUpload('photo_after', f)} onRemove={(url) => { if (url) fetch(`/api/fqc/rca/upload-photo?url=${encodeURIComponent(url)}`, { method: 'DELETE' }).catch(() => {}); setForm(p => ({ ...p, photo_after: '' })); }} />
             </div>
           </div>
           {/* Actions */}
