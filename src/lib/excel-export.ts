@@ -1765,7 +1765,7 @@ async function buildRCASheet(
         const action = actions[ai];
         const bgColor = ai % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
         const excelRow = ws.getRow(currentRow);
-        excelRow.height = 120;
+        excelRow.height = 80;
 
         const rank = ai + 1;
 
@@ -1846,28 +1846,34 @@ async function buildRCASheet(
           rateCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFDC2626' } };
         }
 
-        // Embed Photo Before — fill cell with small margin, centered
+        // Embed Photo Before — exact EMU positioning (matches manual Excel layout)
+        const IMG_COL_OFF_FROM = 32000;
+        const IMG_COL_OFF_TO = 1212850;
+        const IMG_ROW_OFF_FROM = 36000;
+        const IMG_ROW_OFF_TO = 977901;
         const beforeUrl = String(action.photo_before || '');
         if (beforeUrl && photoMap.has(beforeUrl)) {
           const imgData = photoMap.get(beforeUrl);
           if (imgData) {
             const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
             ws.addImage(imgId, {
-              tl: { col: 15.05, row: currentRow - 1 + 0.03 },
-              br: { col: 15.95, row: currentRow - 0.03 },
+              tl: { nativeCol: 15, nativeColOff: IMG_COL_OFF_FROM, nativeRow: currentRow - 1, nativeRowOff: IMG_ROW_OFF_FROM },
+              br: { nativeCol: 15, nativeColOff: IMG_COL_OFF_TO, nativeRow: currentRow - 1, nativeRowOff: IMG_ROW_OFF_TO },
+              editAs: 'oneCell',
             });
           }
         }
 
-        // Embed Photo After — fill cell with small margin, centered
+        // Embed Photo After — exact EMU positioning (matches manual Excel layout)
         const afterUrl = String(action.photo_after || '');
         if (afterUrl && photoMap.has(afterUrl)) {
           const imgData = photoMap.get(afterUrl);
           if (imgData) {
             const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
             ws.addImage(imgId, {
-              tl: { col: 16.05, row: currentRow - 1 + 0.03 },
-              br: { col: 16.95, row: currentRow - 0.03 },
+              tl: { nativeCol: 16, nativeColOff: IMG_COL_OFF_FROM, nativeRow: currentRow - 1, nativeRowOff: IMG_ROW_OFF_FROM },
+              br: { nativeCol: 16, nativeColOff: IMG_COL_OFF_TO, nativeRow: currentRow - 1, nativeRowOff: IMG_ROW_OFF_TO },
+              editAs: 'oneCell',
             });
           }
         }
