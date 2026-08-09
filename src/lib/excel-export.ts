@@ -2706,7 +2706,7 @@ export async function exportOQCCombinedExcel(
   s1DataStart += 3;
   writeFooter(ws1, s1DataStart, s1Cols);
 
-  const s1Widths = [5, 12.5, 10, 13, 10, 10, 6, 6, 10, 10, 10, 12, 12, 12, 12, 26];
+  const s1Widths = [5, 12.45, 10, 13, 10, 13, 6, 13, 10, 13, 13, 12, 13, 13, 13, 77.45];
   for (let c = 0; c < s1Cols; c++) ws1.getColumn(c + 1).width = s1Widths[c] || 10;
 
   // =========================================================================
@@ -2766,7 +2766,7 @@ export async function exportOQCCombinedExcel(
   s2DataStart += 3;
   writeFooter(ws2, s2DataStart, s2Cols);
 
-  const s2Widths = [5, 12.5, 10, 24, 20, 14, 16];
+  const s2Widths = [5, 12.45, 10, 24, 20, 14, 16];
   for (let c = 0; c < s2Cols; c++) ws2.getColumn(c + 1).width = s2Widths[c] || 10;
 
   // =========================================================================
@@ -2947,7 +2947,7 @@ export async function exportOQCCombinedExcel(
   catDataStart += 3;
   writeFooter(ws3, catDataStart, s3Cols);
 
-  const s3Widths = [5, 12.5, 10, 13, 10, 10, 6, 6, 10, 10, 10, 12, 12, 12, 26];
+  const s3Widths = [9.27, 22.82, 10, 13, 10, 13, 8.45, 13, 10, 13, 13, 12, 13, 13, 79.82];
   for (let c = 0; c < s3Cols; c++) ws3.getColumn(c + 1).width = s3Widths[c] || 10;
 
   // Generate buffer
