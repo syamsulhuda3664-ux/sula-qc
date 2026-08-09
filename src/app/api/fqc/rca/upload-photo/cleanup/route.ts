@@ -3,25 +3,44 @@ import { adminClient } from '@/lib/supabase-admin';
 
 const BUCKET_NAME = 'rca-photos';
 
+/**
+ * Recursively list ALL files in a Supabase storage bucket.
+ * The built-in list() with recursive:true sometimes only returns folders.
+ * This function walks through each prefix to get actual files.
+ */
+async function listAllFiles(prefix = ''): Promise<{ name: string; size?: number }[]> {
+  const results: { name: string; size?: number }[] = [];
+
+  const { data, error } = await adminClient.storage
+    .from(BUCKET_NAME)
+    .list(prefix, { sortBy: { column: 'name', order: 'asc' } });
+
+  if (error || !data) return results;
+
+  for (const item of data) {
+    if (item.id) {
+      // It's a file (has an ID)
+      results.push({ name: prefix ? `${prefix}/${item.name}` : item.name, size: item.metadata?.size });
+    } else {
+      // It's a folder — recurse into it
+      const subFiles = await listAllFiles(prefix ? `${prefix}/${item.name}` : item.name);
+      results.push(...subFiles);
+    }
+  }
+
+  return results;
+}
+
 // ONE-TIME CLEANUP — no auth required.
 // This file should be deleted after use.
 export async function GET() {
   try {
-    // 1. List all files in the bucket
-    const { data: allFiles, error: listError } = await adminClient.storage
-      .from(BUCKET_NAME)
-      .list('', { recursive: true });
+    // 1. List ALL files recursively
+    const allFiles = await listAllFiles();
 
-    if (listError) {
-      return NextResponse.json({ error: 'Failed to list: ' + String(listError) }, { status: 500 });
-    }
-
-    if (!allFiles || allFiles.length === 0) {
+    if (allFiles.length === 0) {
       return NextResponse.json({ message: 'No files in storage', deleted: 0, total: 0 });
     }
-
-    // Log all files for visibility
-    const fileList = allFiles.map(f => ({ name: f.name, size: f.metadata?.size }));
 
     // 2. Collect all used photo URLs from database
     const usedPaths = new Set<string>();
@@ -75,7 +94,6 @@ export async function GET() {
     // 3. Find orphaned files
     const orphanedPaths: string[] = [];
     for (const file of allFiles) {
-      if (!file.name) continue;
       if (!usedPaths.has(file.name)) {
         orphanedPaths.push(file.name);
       }
@@ -104,7 +122,7 @@ export async function GET() {
       orphaned_files: orphanedPaths.length,
       orphaned_list: orphanedPaths,
       deleted: deletedCount,
-      all_files: fileList,
+      all_files: allFiles.map(f => ({ name: f.name, size: f.size })),
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
