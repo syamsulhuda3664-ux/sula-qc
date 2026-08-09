@@ -7,6 +7,35 @@ import { mapInspectionRow } from '@/lib/db-schema';
 const BUSINESS_TYPES = ['PTOEM', 'PTB2C', 'PTGH'];
 
 /**
+ * Map DB column keys (stored by HotIssuePage) → display names (used by rca-generator).
+ * HotIssuePage stores `defect_zipper` but auto-generated actions use `Zipper`.
+ * Without this, the category-based exclusion in merge fails.
+ */
+const CATEGORY_KEY_TO_NAME: Record<string, string> = {
+  defect_stitching: 'Stitching',
+  defect_logo: 'Logo',
+  defect_material: 'Material',
+  defect_hardware: 'Hardware',
+  defect_appearance: 'Appearance',
+  defect_zipper: 'Zipper',
+  defect_webbing: 'Webbing',
+  defect_other: 'Other',
+  defect_preparation: 'Preparation',
+};
+
+function normalizeCategory(cat: string): string {
+  return CATEGORY_KEY_TO_NAME[cat] || cat;
+}
+
+/** Reverse lookup: display name → DB column key. */
+function categoryToKey(name: string): string {
+  for (const [k, v] of Object.entries(CATEGORY_KEY_TO_NAME)) {
+    if (v === name) return k;
+  }
+  return '';
+}
+
+/**
  * Merge hot issues (manually entered) with auto-generated RCA actions.
  * Hot issues take priority as the first N items in top 3.
  * Remaining slots (3 - N) are filled by auto-generated actions,
@@ -29,7 +58,7 @@ function mergeHotIssuesWithAutoActions(
 
   const hotActions: RCAAction[] = hotIssues.map((hi, i) => ({
     rank: i + 1,
-    category: (hi.category as string) || '',
+    category: normalizeCategory((hi.category as string) || ''),
     sub_defects: [(hi.sub_defect as string)],
     defect_qty: (hi.defect_qty as number) || 0,
     style_codes: (hi.style_codes as string[]) || [],
@@ -267,6 +296,27 @@ export async function POST(request: NextRequest) {
               lang
             );
 
+            // Rebuild top_sub_defects to sync with merged actions.
+            // Without this, top_sub_defects shows FQC-only ranking while actions
+            // include hot issues — causing a visual mismatch (slot kosong).
+            const finalTopSubDefects = mergedActions.map((action, i) => {
+              const primarySub = action.sub_defects?.[0] || '';
+              // Look up the original FQC-based entry for count/categoryKey
+              const originalEntry = (rca.subDefects as any[]).find(
+                (s: any) => s.subDefect === primarySub
+              );
+              return {
+                subDefect: primarySub,
+                category: action.category,
+                categoryKey: originalEntry?.categoryKey || categoryToKey(action.category),
+                // Prefer FQC aggregate count (includes synced hot issue),
+                // fallback to action's own defect_qty for hot issue entries
+                defectCount: originalEntry?.defectCount || action.defect_qty || 0,
+                percentage: originalEntry?.percentage || 0,
+                rank: i + 1,
+              };
+            });
+
             draftRcas.push({
               draft_id: `${week.start}__${btKey}`,
               week_start: week.start,
@@ -278,7 +328,7 @@ export async function POST(request: NextRequest) {
               total_ng: rca.totalNG,
               overall_pass_rate: rca.overallPassRate,
               top_categories: rca.topCategories,
-              top_sub_defects: rca.subDefects,
+              top_sub_defects: finalTopSubDefects,
               top_styles: rca.topStyles,
               actions: mergedActions,
               status: 'draft',
