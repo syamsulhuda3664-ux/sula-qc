@@ -480,7 +480,7 @@ export async function exportFQCDailyExcel(
 
   // ============ Row 1: Title (merged, height 63, bg #2B5F8A) ============
   const row1 = ws.getRow(1);
-  row1.height = 63;
+  row1.height = 42;
   ws.mergeCells(1, 1, 1, totalCols);
   const titleCell = row1.getCell(1);
   titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC Daily Detail Report';
@@ -489,10 +489,10 @@ export async function exportFQCDailyExcel(
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
   // ============ Row 2: Spacer (height 4) ============
-  ws.getRow(2).height = 4;
+  ws.getRow(2).height = 2.65;
 
   // ============ Row 3: Spacer (height ~3) ============
-  ws.getRow(3).height = 3;
+  ws.getRow(3).height = 2;
 
   // ============ Row 4: Filter info (height 13.4) ============
   let currentRow = 4;
@@ -505,7 +505,7 @@ export async function exportFQCDailyExcel(
   const hasFilters = filterParts.length > 0;
   if (hasFilters) {
     const filterRow = ws.getRow(currentRow);
-    filterRow.height = 13.4;
+    filterRow.height = 8.9;
     ws.mergeCells(currentRow, 1, currentRow, totalCols);
     const fCell = filterRow.getCell(1);
     fCell.value = filterParts.join('   |   ');
@@ -517,7 +517,7 @@ export async function exportFQCDailyExcel(
 
   // ============ Header row (height 43.5) ============
   const headerExcelRow = ws.getRow(currentRow);
-  headerExcelRow.height = 43.5;
+  headerExcelRow.height = 29;
   for (let c = 1; c <= totalCols; c++) {
     const cell = headerExcelRow.getCell(c);
     cell.value = FQC_DAILY_HEADERS[c - 1];
@@ -619,7 +619,7 @@ export async function exportFQCDailyExcel(
       const bgColor = rowNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
 
       const excelRow = ws.getRow(currentRow);
-      excelRow.height = 20;
+      excelRow.height = 13.4;
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
         const val = vals[c - 1];
@@ -647,7 +647,7 @@ export async function exportFQCDailyExcel(
     ];
 
     const subtotalExcelRow = ws.getRow(currentRow);
-    subtotalExcelRow.height = 22;
+    subtotalExcelRow.height = 14.65;
     ws.mergeCells(currentRow, 2, currentRow, 6);
     for (let c = 1; c <= totalCols; c++) {
       const cell = subtotalExcelRow.getCell(c);
@@ -688,7 +688,7 @@ export async function exportFQCDailyExcel(
   ];
 
   const grandExcelRow = ws.getRow(currentRow);
-  grandExcelRow.height = 25;
+  grandExcelRow.height = 16.65;
   ws.mergeCells(currentRow, 2, currentRow, 6);
   for (let c = 1; c <= totalCols; c++) {
     const cell = grandExcelRow.getCell(c);
@@ -1035,7 +1035,7 @@ async function buildFQCDailySheet(
 
   // Row 1: Title
   const row1 = ws.getRow(1);
-  row1.height = 63;
+  row1.height = 42;
   ws.mergeCells(1, 1, 1, totalCols);
   const titleCell = row1.getCell(1);
   titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC Daily Detail Report';
@@ -1044,8 +1044,8 @@ async function buildFQCDailySheet(
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
   // Row 2-3: Spacers
-  ws.getRow(2).height = 4;
-  ws.getRow(3).height = 3;
+  ws.getRow(2).height = 2.65;
+  ws.getRow(3).height = 2;
 
   // Row 4: Filter info
   let currentRow = 4;
@@ -1057,7 +1057,7 @@ async function buildFQCDailySheet(
 
   if (filterParts.length > 0) {
     const filterRow = ws.getRow(currentRow);
-    filterRow.height = 13.4;
+    filterRow.height = 8.9;
     ws.mergeCells(currentRow, 1, currentRow, totalCols);
     const fCell = filterRow.getCell(1);
     fCell.value = filterParts.join('   |   ');
@@ -1069,7 +1069,7 @@ async function buildFQCDailySheet(
 
   // Header row
   const headerExcelRow = ws.getRow(currentRow);
-  headerExcelRow.height = 43.5;
+  headerExcelRow.height = 29;
   for (let c = 1; c <= totalCols; c++) {
     const cell = headerExcelRow.getCell(c);
     cell.value = FQC_DAILY_HEADERS[c - 1];
@@ -1160,7 +1160,7 @@ async function buildFQCDailySheet(
 
       const bgColor = rowNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
       const excelRow = ws.getRow(currentRow);
-      excelRow.height = 20;
+      excelRow.height = 13.4;
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
         const val = vals[c - 1];
@@ -1185,7 +1185,7 @@ async function buildFQCDailySheet(
       ...Object.values(dayDefects),
     ];
     const subtotalExcelRow = ws.getRow(currentRow);
-    subtotalExcelRow.height = 22;
+    subtotalExcelRow.height = 14.65;
     ws.mergeCells(currentRow, 2, currentRow, 6);
     for (let c = 1; c <= totalCols; c++) {
       const cell = subtotalExcelRow.getCell(c);
@@ -1223,7 +1223,7 @@ async function buildFQCDailySheet(
     ...Object.values(grandDefects),
   ];
   const grandExcelRow = ws.getRow(currentRow);
-  grandExcelRow.height = 25;
+  grandExcelRow.height = 16.65;
   ws.mergeCells(currentRow, 2, currentRow, 6);
   for (let c = 1; c <= totalCols; c++) {
     const cell = grandExcelRow.getCell(c);
@@ -1303,7 +1303,7 @@ function buildFQCAnalysisSheet(
   // ---- Title ----
   const totalCols = 6;
   const row1 = ws.getRow(1);
-  row1.height = 50;
+  row1.height = 33.4;
   ws.mergeCells(1, 1, 1, totalCols);
   const titleCell = row1.getCell(1);
   titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC Defect Analysis 缺陷分析报告';
@@ -1311,7 +1311,7 @@ function buildFQCAnalysisSheet(
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-  ws.getRow(2).height = 4;
+  ws.getRow(2).height = 2.65;
   let currentRow = 3;
 
   // Filter info
@@ -1321,7 +1321,7 @@ function buildFQCAnalysisSheet(
   if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
   if (filterParts.length > 0) {
     const filterRow = ws.getRow(currentRow);
-    filterRow.height = 13.4;
+    filterRow.height = 8.9;
     ws.mergeCells(currentRow, 1, currentRow, totalCols);
     const fCell = filterRow.getCell(1);
     fCell.value = filterParts.join('   |   ');
@@ -1366,7 +1366,7 @@ function buildFQCAnalysisSheet(
   // ---- Section A: Category Summary ----
   currentRow++;
   const sectionARow = ws.getRow(currentRow);
-  sectionARow.height = 22;
+  sectionARow.height = 14.65;
   ws.mergeCells(currentRow, 1, currentRow, totalCols);
   const sectionACell = sectionARow.getCell(1);
   sectionACell.value = 'A. 缺陷类别汇总 / Defect Category Summary';
@@ -1376,7 +1376,7 @@ function buildFQCAnalysisSheet(
 
   const catHeaders = ['排名 / Rank', '缺陷类别 / Category', '缺陷数 / Defect Count', '占比 / Percentage', 'PPM', '备注 / Remark'];
   const catHeaderRow = ws.getRow(currentRow);
-  catHeaderRow.height = 28;
+  catHeaderRow.height = 18.65;
   for (let c = 1; c <= totalCols; c++) {
     const cell = catHeaderRow.getCell(c);
     cell.value = catHeaders[c - 1];
@@ -1394,7 +1394,7 @@ function buildFQCAnalysisSheet(
     const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
 
     const excelRow = ws.getRow(currentRow);
-    excelRow.height = 20;
+    excelRow.height = 13.4;
     const vals: (string | number)[] = [i + 1, cat.name, cat.count, pct, ppm, ''];
     for (let c = 1; c <= totalCols; c++) {
       const cell = excelRow.getCell(c);
@@ -1410,7 +1410,7 @@ function buildFQCAnalysisSheet(
 
   // Category total
   const catTotalRow = ws.getRow(currentRow);
-  catTotalRow.height = 22;
+  catTotalRow.height = 14.65;
   const catTotalVals = ['', '合计 / Total', grandTotalDefects, '100.00%', '', ''];
   for (let c = 1; c <= totalCols; c++) {
     const cell = catTotalRow.getCell(c);
@@ -1424,7 +1424,7 @@ function buildFQCAnalysisSheet(
   // ---- Section B: Top 20 Sub-defects ----
   currentRow++;
   const sectionBRow = ws.getRow(currentRow);
-  sectionBRow.height = 22;
+  sectionBRow.height = 14.65;
   ws.mergeCells(currentRow, 1, currentRow, totalCols);
   const sectionBCell = sectionBRow.getCell(1);
   sectionBCell.value = 'B. 子缺陷排名TOP20 / Top 20 Sub-Defects';
@@ -1434,7 +1434,7 @@ function buildFQCAnalysisSheet(
 
   const subHeaders = ['排名 / Rank', '子缺陷 / Sub-Defect', '类别 / Category', '数量 / Count', '占比 / Percentage', ''];
   const subHeaderRow = ws.getRow(currentRow);
-  subHeaderRow.height = 28;
+  subHeaderRow.height = 18.65;
   for (let c = 1; c <= totalCols; c++) {
     const cell = subHeaderRow.getCell(c);
     cell.value = subHeaders[c - 1];
@@ -1482,7 +1482,7 @@ function buildFQCAnalysisSheet(
     const pct = grandTotalDefects > 0 ? ((sd.count / grandTotalDefects) * 100).toFixed(2) + '%' : '0.00%';
     const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
     const excelRow = ws.getRow(currentRow);
-    excelRow.height = 20;
+    excelRow.height = 13.4;
     const vals: (string | number)[] = [i + 1, sd.name, sd.category, sd.count, pct, ''];
     for (let c = 1; c <= totalCols; c++) {
       const cell = excelRow.getCell(c);
@@ -1499,7 +1499,7 @@ function buildFQCAnalysisSheet(
   // ---- Section C: Top 15 Styles ----
   currentRow += 2;
   const sectionCRow = ws.getRow(currentRow);
-  sectionCRow.height = 22;
+  sectionCRow.height = 14.65;
   ws.mergeCells(currentRow, 1, currentRow, totalCols);
   const sectionCCell = sectionCRow.getCell(1);
   sectionCCell.value = 'C. 款号缺陷排名TOP15 / Top 15 Styles by Defects';
@@ -1509,7 +1509,7 @@ function buildFQCAnalysisSheet(
 
   const styleHeaders = ['排名 / Rank', '款号 / Style', '缺陷数 / Defect Count', '检验数量 / Inspected Qty', '不良率 / Defect Rate', ''];
   const styleHeaderRow = ws.getRow(currentRow);
-  styleHeaderRow.height = 28;
+  styleHeaderRow.height = 18.65;
   for (let c = 1; c <= totalCols; c++) {
     const cell = styleHeaderRow.getCell(c);
     cell.value = styleHeaders[c - 1];
@@ -1543,7 +1543,7 @@ function buildFQCAnalysisSheet(
     const rate = s.inspected > 0 ? ((s.defects / s.inspected) * 100).toFixed(2) + '%' : '0.00%';
     const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
     const excelRow = ws.getRow(currentRow);
-    excelRow.height = 20;
+    excelRow.height = 13.4;
     const vals: (string | number)[] = [i + 1, s.style, s.defects, s.inspected, rate, ''];
     for (let c = 1; c <= totalCols; c++) {
       const cell = excelRow.getCell(c);
@@ -1643,7 +1643,7 @@ async function buildRCASheet(
 
   // ---- Title ----
   const row1 = ws.getRow(1);
-  row1.height = 55;
+  row1.height = 37;
   ws.mergeCells(1, 1, 1, totalCols);
   const titleCell = row1.getCell(1);
   titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC RCA 根本原因分析报告 / Root Cause Analysis Report';
@@ -1651,7 +1651,7 @@ async function buildRCASheet(
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-  ws.getRow(2).height = 4;
+  ws.getRow(2).height = 2.65;
   let currentRow = 3;
 
   // Filter info
@@ -1661,7 +1661,7 @@ async function buildRCASheet(
   if (_filters.businessType) filterParts.push(`业务类型 / BT: ${_filters.businessType}`);
   if (filterParts.length > 0) {
     const filterRow = ws.getRow(currentRow);
-    filterRow.height = 16;
+    filterRow.height = 10.65;
     ws.mergeCells(currentRow, 1, currentRow, totalCols);
     const fCell = filterRow.getCell(1);
     fCell.value = filterParts.join('   |   ');
@@ -1676,7 +1676,7 @@ async function buildRCASheet(
   // ---- Headers ----
   currentRow++;
   const headerRow = ws.getRow(currentRow);
-  headerRow.height = 36;
+  headerRow.height = 24;
   for (let c = 1; c <= totalCols; c++) {
     const cell = headerRow.getCell(c);
     cell.value = rcaHeaders[c - 1];
@@ -1719,7 +1719,7 @@ async function buildRCASheet(
     const curWeek = String(rca.week_start || '');
     if (curWeek && curWeek !== prevWeek && prevWeek !== '') {
       const sepRow = ws.getRow(currentRow);
-      sepRow.height = 6;
+      sepRow.height = 4;
       ws.mergeCells(currentRow, 1, currentRow, totalCols);
       const sepCell = sepRow.getCell(1);
       sepCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
@@ -1742,7 +1742,7 @@ async function buildRCASheet(
     if (actions.length === 0) {
       const bgColor = PALE_BLUE;
       const excelRow = ws.getRow(currentRow);
-      excelRow.height = 20;
+      excelRow.height = 13.4;
       const vals: (string | number)[] = [
         '', weekPeriod, bt, inspected, ng,
         passRate > 0 ? passRate.toFixed(2) + '%' : '-',
@@ -1906,7 +1906,7 @@ async function buildRCASheet(
     : '-';
 
   const summaryRow = ws.getRow(currentRow);
-  summaryRow.height = 24;
+  summaryRow.height = 16;
   const summaryVals: (string | number)[] = [
     '', '合计 / Grand Total', '', totalInspectedAll, totalNGAll, totalPassRateAll,
     '', '', '', '', '', '', '', '', '', '', '',
@@ -2077,7 +2077,7 @@ export async function exportFQCOQCExcel(
 
   // ── Row 1: Title (height 63, bg MED_BLUE) ──
   const row1 = ws1.getRow(1);
-  row1.height = 63;
+  row1.height = 42;
   ws1.mergeCells(1, 1, 1, totalCols);
   const titleCell = row1.getCell(1);
   titleCell.value = '厦门市欣维发实业有限公司品质检验表\nOQC Outgoing Quality Control Report';
@@ -2086,8 +2086,8 @@ export async function exportFQCOQCExcel(
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
   // ── Row 2-3: Spacers ──
-  ws1.getRow(2).height = 4;
-  ws1.getRow(3).height = 3;
+  ws1.getRow(2).height = 2.65;
+  ws1.getRow(3).height = 2;
 
   // ── Row 4: Filter info ──
   let currentRow = 4;
@@ -2099,7 +2099,7 @@ export async function exportFQCOQCExcel(
 
   if (filterParts.length > 0) {
     const filterRow = ws1.getRow(currentRow);
-    filterRow.height = 13.4;
+    filterRow.height = 8.9;
     ws1.mergeCells(currentRow, 1, currentRow, totalCols);
     const fCell = filterRow.getCell(1);
     fCell.value = filterParts.join('   |   ');
@@ -2111,7 +2111,7 @@ export async function exportFQCOQCExcel(
 
   // ── Row 5: Section title “总览 Summary / Rekap” ──
   const sectionRow = ws1.getRow(currentRow);
-  sectionRow.height = 22;
+  sectionRow.height = 14.65;
   ws1.mergeCells(currentRow, 1, currentRow, totalCols);
   const sectionCell = sectionRow.getCell(1);
   sectionCell.value = '总览 Summary / Rekap';
@@ -2139,7 +2139,7 @@ export async function exportFQCOQCExcel(
 
   for (const kpiRow of [kpiLabels1, kpiLabels2]) {
     const kpiExcelRow = ws1.getRow(currentRow);
-    kpiExcelRow.height = 22;
+    kpiExcelRow.height = 14.65;
     ws1.mergeCells(currentRow, 1, currentRow, totalCols);
     const kpiCell = kpiExcelRow.getCell(1);
     kpiCell.value = kpiRow.join('    |    ');
@@ -2153,7 +2153,7 @@ export async function exportFQCOQCExcel(
 
   // ── Section: Daily Breakdown ──
   const dailyTitleRow = ws1.getRow(currentRow);
-  dailyTitleRow.height = 22;
+  dailyTitleRow.height = 14.65;
   ws1.mergeCells(currentRow, 1, currentRow, totalCols);
   const dailyTitleCell = dailyTitleRow.getCell(1);
   dailyTitleCell.value = '每日明细 / Daily Breakdown';
@@ -2163,7 +2163,7 @@ export async function exportFQCOQCExcel(
 
   // ── Header row ──
   const headerExcelRow = ws1.getRow(currentRow);
-  headerExcelRow.height = 43.5;
+  headerExcelRow.height = 29;
   for (let c = 1; c <= totalCols; c++) {
     const cell = headerExcelRow.getCell(c);
     cell.value = OQC_REKAP_HEADERS[c - 1];
@@ -2193,7 +2193,7 @@ export async function exportFQCOQCExcel(
 
     const bgColor = rowNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
     const excelRow = ws1.getRow(currentRow);
-    excelRow.height = 20;
+    excelRow.height = 13.4;
 
     const vals: (string | number)[] = [
       rowNum,
@@ -2230,7 +2230,7 @@ export async function exportFQCOQCExcel(
 
   // ── Grand total row (HEADER_BG, white text) ──
   const grandExcelRow = ws1.getRow(currentRow);
-  grandExcelRow.height = 25;
+  grandExcelRow.height = 16.65;
   ws1.mergeCells(currentRow, 2, currentRow, 3);
   const grandVals: (string | number)[] = [
     '',
@@ -2265,7 +2265,7 @@ export async function exportFQCOQCExcel(
   // ── Defect Category Summary ──
   currentRow++;
   const catTitleRow = ws1.getRow(currentRow);
-  catTitleRow.height = 22;
+  catTitleRow.height = 14.65;
   ws1.mergeCells(currentRow, 1, currentRow, totalCols);
   const catTitleCell = catTitleRow.getCell(1);
   catTitleCell.value = '缺陷类别汇总 / Defect Category Summary';
@@ -2276,7 +2276,7 @@ export async function exportFQCOQCExcel(
   const catHeaders = ['排名 / Rank', '缺陷类别 / Category', '缺陷数 / Count', '占比 / Percentage', '严重 / Critical', '主要 / Major', '次要 / Minor', '备注 / Remark'];
   const catTotalCols = catHeaders.length;
   const catHeaderRow = ws1.getRow(currentRow);
-  catHeaderRow.height = 28;
+  catHeaderRow.height = 18.65;
   for (let c = 1; c <= catTotalCols; c++) {
     const cell = catHeaderRow.getCell(c);
     cell.value = catHeaders[c - 1];
@@ -2318,7 +2318,7 @@ export async function exportFQCOQCExcel(
     const pct = totalDefects > 0 ? `${((cat.count / totalDefects) * 100).toFixed(2)}%` : '0.00%';
     const bgColor = i % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
     const excelRow = ws1.getRow(currentRow);
-    excelRow.height = 20;
+    excelRow.height = 13.4;
     const catVals: (string | number)[] = [i + 1, cat.category, cat.count, pct, cat.critical, cat.major, cat.minor, ''];
     for (let c = 1; c <= catTotalCols; c++) {
       const cell = excelRow.getCell(c);
@@ -2334,7 +2334,7 @@ export async function exportFQCOQCExcel(
 
   // Category total row
   const catTotalRow = ws1.getRow(currentRow);
-  catTotalRow.height = 22;
+  catTotalRow.height = 14.65;
   const catTotalVals: (string | number)[] = ['', '合计 / Total', totalDefects, '100.00%', '', '', '', ''];
   for (let c = 1; c <= catTotalCols; c++) {
     const cell = catTotalRow.getCell(c);
@@ -2376,13 +2376,13 @@ export async function exportFQCOQCExcel(
   dTitleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
   dTitleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-  ws2.getRow(2).height = 4;
-  ws2.getRow(3).height = 3;
+  ws2.getRow(2).height = 2.65;
+  ws2.getRow(3).height = 2;
 
   let dCurrentRow = 4;
   if (filterParts.length > 0) {
     const dFilterRow = ws2.getRow(dCurrentRow);
-    dFilterRow.height = 13.4;
+    dFilterRow.height = 8.9;
     ws2.mergeCells(dCurrentRow, 1, dCurrentRow, detailCols);
     const dFCell = dFilterRow.getCell(1);
     dFCell.value = filterParts.join('   |   ');
@@ -2395,7 +2395,7 @@ export async function exportFQCOQCExcel(
 
   // ── Header ──
   const dHeaderRow = ws2.getRow(dCurrentRow);
-  dHeaderRow.height = 43.5;
+  dHeaderRow.height = 29;
   for (let c = 1; c <= detailCols; c++) {
     const cell = dHeaderRow.getCell(c);
     cell.value = OQC_DETAIL_HEADERS[c - 1];
@@ -2426,7 +2426,7 @@ export async function exportFQCOQCExcel(
 
         const bgColor = detailNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
         const excelRow = ws2.getRow(dCurrentRow);
-        excelRow.height = 20;
+        excelRow.height = 13.4;
         const vals: (string | number)[] = [
           detailNum++, lotDate, lotBt,
           String(order.order_no || ''),
@@ -2449,7 +2449,7 @@ export async function exportFQCOQCExcel(
     } else {
       const bgColor = detailNum % 2 === 1 ? PALE_BLUE : WHITE_ARGB;
       const excelRow = ws2.getRow(dCurrentRow);
-      excelRow.height = 20;
+      excelRow.height = 13.4;
       const vals: (string | number)[] = [
         detailNum++, lotDate, lotBt, '-', '-',
         Number(lot.lot_size) || 0, '-',
@@ -2471,7 +2471,7 @@ export async function exportFQCOQCExcel(
 
   // ── Grand total ──
   const dGrandRow = ws2.getRow(dCurrentRow);
-  dGrandRow.height = 25;
+  dGrandRow.height = 16.65;
   ws2.mergeCells(dCurrentRow, 2, dCurrentRow, 5);
   const dGrandVals: (string | number)[] = ['', '合计 GRAND TOTAL', '', '', '', `${detailTotalOrders}`, `${detailTotalOkQty}`];
   for (let c = 1; c <= detailCols; c++) {
