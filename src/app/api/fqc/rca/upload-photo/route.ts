@@ -3,9 +3,9 @@ import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 
 const BUCKET_NAME = 'rca-photos';
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB raw limit
-const MAX_DIMENSION = 800;
-const JPEG_QUALITY = 0.65;
+const MAX_FILE_SIZE = 3 * 1024 * 1024; // 3MB raw limit
+const MAX_DIMENSION = 600;
+const JPEG_QUALITY = 0.5;
 
 /**
  * Ensure the rca-photos bucket exists and is public.
@@ -42,11 +42,12 @@ async function compressImage(buffer: Buffer, mimeType: string): Promise<{ data: 
       image = image.resize(MAX_DIMENSION, null, { withoutEnlargement: true });
     }
 
+    // Use WebP for better compression (much smaller than JPEG at similar quality)
     const output = await image
-      .jpeg({ quality: JPEG_QUALITY, mozjpeg: true })
+      .webp({ quality: JPEG_QUALITY })
       .toBuffer();
 
-    return { data: output, contentType: 'image/jpeg' };
+    return { data: output, contentType: 'image/webp' };
   } catch {
     // sharp not available — return original (client should have compressed already)
     return { data: buffer, contentType: mimeType };
@@ -132,7 +133,7 @@ export async function POST(request: NextRequest) {
     const m = String(now.getMonth() + 1).padStart(2, '0');
     const ts = Date.now();
     const rand = Math.random().toString(36).substring(2, 8);
-    const ext = contentType === 'image/png' ? 'png' : 'jpg';
+    const ext = 'webp';
     const filePath = `${prefix}/${y}/${m}/${ts}_${rand}.${ext}`;
 
     // Upload to Supabase Storage

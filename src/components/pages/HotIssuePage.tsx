@@ -90,7 +90,7 @@ function getRecentMonths(count = 6): string[] {
   return months;
 }
 
-function compressImageClient(file: File, maxDim = 800, quality = 0.6): Promise<File> {
+function compressImageClient(file: File, maxDim = 600, quality = 0.45): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {

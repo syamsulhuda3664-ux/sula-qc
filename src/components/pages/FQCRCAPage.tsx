@@ -118,9 +118,10 @@ function getRecentMonths(count = 6): string[] {
 
 /**
  * Client-side image compression using Canvas API.
- * Resizes to max 800px, outputs JPEG at 60% quality.
+ * Resizes to max 600px, outputs JPEG at 45% quality.
+ * Server will further compress to WebP.
  */
-function compressImageClient(file: File, maxDim = 800, quality = 0.6): Promise<File> {
+function compressImageClient(file: File, maxDim = 600, quality = 0.45): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
