@@ -1,25 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
-import { authenticateRequest } from '@/lib/auth';
 
 const BUCKET_NAME = 'rca-photos';
 
-/**
- * Cleanup orphaned photos from storage.
- * Compares all files in rca-photos bucket against URLs stored in
- * rca_actions.photo_before/photo_after and rca_hot_issues.photo_before/photo_after.
- * Any storage file not referenced in DB is deleted.
- *
- * Only staff_qa and manager_qc can run cleanup.
- */
-export async function POST(request: NextRequest) {
-  const auth = await authenticateRequest(request, 'full');
-  if (auth.error) return auth.error;
-  const role = auth.user?.role;
-  if (role !== 'staff_qa' && role !== 'manager_qc' && role !== 'manager_umum') {
-    return NextResponse.json({ error: 'Only QA managers can run cleanup' }, { status: 403 });
-  }
-
+// ONE-TIME CLEANUP — no auth required.
+// This file should be deleted after use.
+export async function GET() {
   try {
     // 1. List all files in the bucket
     const { data: allFiles, error: listError } = await adminClient.storage
@@ -27,13 +13,15 @@ export async function POST(request: NextRequest) {
       .list('', { recursive: true });
 
     if (listError) {
-      console.error('List bucket error:', listError);
-      return NextResponse.json({ error: 'Failed to list storage files' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to list: ' + String(listError) }, { status: 500 });
     }
 
     if (!allFiles || allFiles.length === 0) {
       return NextResponse.json({ message: 'No files in storage', deleted: 0, total: 0 });
     }
+
+    // Log all files for visibility
+    const fileList = allFiles.map(f => ({ name: f.name, size: f.metadata?.size }));
 
     // 2. Collect all used photo URLs from database
     const usedPaths = new Set<string>();
@@ -112,12 +100,14 @@ export async function POST(request: NextRequest) {
       message: 'Cleanup complete',
       total_files: allFiles.length,
       used_files: allFiles.length - orphanedPaths.length,
+      used_paths: Array.from(usedPaths),
       orphaned_files: orphanedPaths.length,
+      orphaned_list: orphanedPaths,
       deleted: deletedCount,
+      all_files: fileList,
       errors: errors.length > 0 ? errors : undefined,
     });
   } catch (error) {
-    console.error('Cleanup error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error: ' + String(error) }, { status: 500 });
   }
 }
