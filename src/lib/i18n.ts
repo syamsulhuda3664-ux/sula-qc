@@ -119,6 +119,9 @@ const translations: Record<Lang, Translations> = {
     'oqc.reworkQty': '返工数量',
     'oqc.holdQty': '扣留数量',
     'oqc.totalOrders': '订单总数',
+    'oqc.rekapMonthlyReport': '检验汇总报表',
+    'oqc.rekapQuarterlyReport': '季度汇总报表',
+    'oqc.rekapAnnualReport': '年度汇总报表',
 
     // IPQC
     'ipqc.title': 'IPQC 过程检验',
@@ -462,6 +465,9 @@ const translations: Record<Lang, Translations> = {
     'oqc.reworkQty': 'Rework Qty',
     'oqc.holdQty': 'Hold Qty',
     'oqc.totalOrders': 'Total Orders',
+    'oqc.rekapMonthlyReport': 'Inspection Recap',
+    'oqc.rekapQuarterlyReport': 'Quarterly Recap',
+    'oqc.rekapAnnualReport': 'Annual Recap',
 
     // IPQC
     'ipqc.title': 'IPQC Inspection',

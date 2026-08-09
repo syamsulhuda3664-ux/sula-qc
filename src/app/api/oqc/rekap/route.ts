@@ -2,6 +2,47 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 
+const OQC_CATEGORIES = [
+  { key: 'Packaging', zh: '包装问题', en: 'Packaging' },
+  { key: 'Label', zh: '标签问题', en: 'Label' },
+  { key: 'Accessory', zh: '配件问题', en: 'Accessory' },
+  { key: 'Appearance', zh: '外观问题', en: 'Appearance' },
+  { key: 'Hardware', zh: '五金问题', en: 'Hardware' },
+  { key: 'Stitching', zh: '缝制问题', en: 'Stitching' },
+  { key: 'Other', zh: '其它问题', en: 'Other' },
+] as const;
+
+const TYPICAL_DEFECTS: Record<string, { zh: string; en: string }> = {
+  Packaging: {
+    zh: '纸箱压扁 Carton crushed corner；封箱不牢 Carton seal weak；胶带起翘 Tape lifting',
+    en: 'Carton crushed corner; Carton seal weak; Tape lifting; Missing polybag; Polybag torn; Incorrect packing method',
+  },
+  Label: {
+    zh: 'SKU标贴错位 SKU label misaligned；条码无法扫描 Barcode unreadable；洗水标反向 Wash label reversed',
+    en: 'Wrong care label; Missing brand label; Label misaligned; Faded print; Wrong barcode',
+  },
+  Accessory: {
+    zh: '吊卡遗漏 Hangtag missing；防尘袋短缺 Dust bag short；说明书缺失 Manual missing',
+    en: 'Missing accessory; Wrong accessory; Loose accessory; Defective accessory; Missing hangtag',
+  },
+  Appearance: {
+    zh: '表面灰尘 Surface dust；线头外露 Thread exposed；轻微刮伤 Minor scratch',
+    en: 'Scratch; Stain; Color deviation; Wrinkle; Deformation; Uneven stitching',
+  },
+  Hardware: {
+    zh: '拉链涩 Zipper sticky；五金氧化 Hardware oxidation；铆钉松 Rivet loose',
+    en: 'Zipper stuck; Zipper missing pull; Buckle defective; Rivet loose; Wheel defect',
+  },
+  Stitching: {
+    zh: '跳针 Skip stitch；浮线 Loose thread；未回针 Missing backtack',
+    en: 'Skip stitch; Thread loose; Open seam; Uneven stitch; Wrong thread color',
+  },
+  Other: {
+    zh: '内包装错配 Wrong inner pack；多余杂物 Foreign object；气味重 Heavy odor',
+    en: 'Dimension out of spec; Weight out of spec; Smell/odor; Other defect',
+  },
+};
+
 function getPeriodRange(period: string, value: string) {
   const [yearStr, monthStr] = value.split('-').map(Number);
   const year = yearStr || new Date().getFullYear();
@@ -66,17 +107,16 @@ export async function GET(request: NextRequest) {
       endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${lastDay}`;
     }
 
-    // Fetch OQC lots for the period
+    // ── Fetch OQC lots ──
     let query = adminClient
       .from('oqc_daily_lots')
       .select('*')
       .gte('lot_date', startDate)
       .lte('lot_date', endDate);
 
-    if (businessType) {
+    if (businessType && businessType !== 'ALL') {
       query = query.eq('business_type', businessType);
     }
-
     query = query.order('lot_date', { ascending: true });
 
     const { data: lots, error } = await query;
@@ -86,132 +126,184 @@ export async function GET(request: NextRequest) {
     }
 
     const allLots = lots || [];
+    const lotIds = allLots.map((l: any) => l.id);
 
-    // Aggregate summary
-    const rekap = {
-      period,
-      value,
-      date_range: { start: startDate, end: endDate },
-      business_type: businessType || 'ALL',
-      total_lots: allLots.length,
-      total_lot_size: 0,
-      total_sampled: 0,
-      total_sample_ok: 0,
-      total_defects: 0,
-      critical_defects: 0,
-      major_defects: 0,
-      minor_defects: 0,
-      release_lots: 0,
-      rework_lots: 0,
-      hold_lots: 0,
-      release_qty: 0,
-      rework_qty: 0,
-      hold_qty: 0,
-      avg_pass_rate: 0,
-      daily_breakdown: [] as unknown[],
-      trend_data: [] as unknown[],
-    };
+    // ── Fetch OQC defects for these lots ──
+    let defectQuery = adminClient
+      .from('oqc_defects')
+      .select('*')
+      .in('lot_id', lotIds);
 
-    const dailyMap: Record<string, {
+    const { data: defectRows } = await defectQuery;
+    const allDefects = defectRows || [];
+
+    // ── Aggregate summary ──
+    let totalLotSize = 0, totalSampled = 0, totalSampleOk = 0, totalDefects = 0;
+    let criticalDefects = 0, majorDefects = 0, minorDefects = 0;
+    let releaseLots = 0, reworkLots = 0, holdLots = 0;
+    let releaseQty = 0, reworkQty = 0, holdQty = 0;
+
+    // Daily breakdown (per-lot detail like the Excel)
+    const dailyBreakdown: Record<string, {
       lot_date: string;
       lot_count: number;
       lot_size: number;
       sample_size: number;
       sample_ok: number;
-      defects: number;
+      ac: number;
+      re_val: number;
       critical: number;
       major: number;
       minor: number;
+      defects: number;
       pass_rate: number;
-      release_count: number;
-      rework_count: number;
-      hold_count: number;
+      release_qty: number;
+      rework_qty: number;
+      hold_qty: number;
+      disposition: string;
+      remarks: string;
     }> = {};
 
     for (const lot of allLots) {
-      rekap.total_lot_size += Number(lot.lot_size) || 0;
-      rekap.total_sampled += Number(lot.sample_size) || 0;
-      rekap.total_sample_ok += Number(lot.sample_ok) || 0;
-      rekap.total_defects += Number(lot.total_defects) || 0;
-      rekap.critical_defects += Number(lot.critical_defects) || 0;
-      rekap.major_defects += Number(lot.major_defects) || 0;
-      rekap.minor_defects += Number(lot.minor_defects) || 0;
-      rekap.release_qty += Number(lot.release_qty) || 0;
-      rekap.rework_qty += Number(lot.rework_qty) || 0;
-      rekap.hold_qty += Number(lot.hold_qty) || 0;
+      const ls = Number(lot.lot_size) || 0;
+      const ss = Number(lot.sample_size) || 0;
+      const so = Number(lot.sample_ok) || 0;
+      const td = Number(lot.total_defects) || 0;
 
-      if (lot.disposition === 'RELEASE') rekap.release_lots += 1;
-      if (lot.disposition === 'REWORK') rekap.rework_lots += 1;
-      if (lot.disposition === 'HOLD') rekap.hold_lots += 1;
+      totalLotSize += ls;
+      totalSampled += ss;
+      totalSampleOk += so;
+      totalDefects += td;
+      criticalDefects += Number(lot.critical_defects) || 0;
+      majorDefects += Number(lot.major_defects) || 0;
+      minorDefects += Number(lot.minor_defects) || 0;
+      releaseQty += Number(lot.release_qty) || 0;
+      reworkQty += Number(lot.rework_qty) || 0;
+      holdQty += Number(lot.hold_qty) || 0;
 
-      const date = lot.lot_date;
-      if (!dailyMap[date]) {
-        dailyMap[date] = {
+      const disp = lot.disposition || '';
+      if (disp === 'RELEASE') releaseLots++;
+      else if (disp === 'REWORK') reworkLots++;
+      else if (disp === 'HOLD') holdLots++;
+
+      const date = (lot.lot_date as string)?.split('T')[0] || '';
+      if (!dailyBreakdown[date]) {
+        dailyBreakdown[date] = {
           lot_date: date, lot_count: 0, lot_size: 0, sample_size: 0, sample_ok: 0,
-          defects: 0, critical: 0, major: 0, minor: 0,
-          pass_rate: 0, release_count: 0, rework_count: 0, hold_count: 0,
+          ac: Number(lot.ac) || 0, re_val: Number(lot.re) || 0,
+          critical: 0, major: 0, minor: 0, defects: 0, pass_rate: 100,
+          release_qty: 0, rework_qty: 0, hold_qty: 0, disposition: '', remarks: '',
         };
       }
-      dailyMap[date].lot_count += 1;
-      dailyMap[date].lot_size += Number(lot.lot_size) || 0;
-      dailyMap[date].sample_size += Number(lot.sample_size) || 0;
-      dailyMap[date].sample_ok += Number(lot.sample_ok) || 0;
-      dailyMap[date].defects += Number(lot.total_defects) || 0;
-      dailyMap[date].critical += Number(lot.critical_defects) || 0;
-      dailyMap[date].major += Number(lot.major_defects) || 0;
-      dailyMap[date].minor += Number(lot.minor_defects) || 0;
-      if (lot.disposition === 'RELEASE') dailyMap[date].release_count += 1;
-      if (lot.disposition === 'REWORK') dailyMap[date].rework_count += 1;
-      if (lot.disposition === 'HOLD') dailyMap[date].hold_count += 1;
+      const d = dailyBreakdown[date];
+      d.lot_count += 1;
+      d.lot_size += ls;
+      d.sample_size += ss;
+      d.sample_ok += so;
+      d.critical += Number(lot.critical_defects) || 0;
+      d.major += Number(lot.major_defects) || 0;
+      d.minor += Number(lot.minor_defects) || 0;
+      d.defects += td;
+      d.release_qty += Number(lot.release_qty) || 0;
+      d.rework_qty += Number(lot.rework_qty) || 0;
+      d.hold_qty += Number(lot.hold_qty) || 0;
+      if (disp) d.disposition = disp;
+      if (lot.remarks) d.remarks = lot.remarks;
     }
 
     // Compute daily pass rates
-    for (const day of Object.values(dailyMap)) {
+    for (const day of Object.values(dailyBreakdown)) {
       day.pass_rate = day.sample_size > 0
         ? Math.round(((day.sample_size - day.defects) / day.sample_size) * 10000) / 100
         : 100;
     }
 
-    const dailyBreakdown = Object.values(dailyMap).sort((a, b) => a.lot_date.localeCompare(b.lot_date));
-    rekap.daily_breakdown = dailyBreakdown;
-
-    // Overall pass rate based on totals
-    rekap.avg_pass_rate = rekap.total_sampled > 0
-      ? Math.round((rekap.total_sample_ok / rekap.total_sampled) * 10000) / 100
+    const overallPassRate = totalSampled > 0
+      ? Math.round((totalSampleOk / totalSampled) * 10000) / 100
       : 0;
 
-    // Build trend data for charts (cumulative)
-    let cumRelease = 0, cumRework = 0, cumHold = 0, cumDefects = 0, cumSampled = 0, cumSampleOk = 0;
-    rekap.trend_data = dailyBreakdown.map(d => {
-      cumRelease += d.release_count;
-      cumRework += d.rework_count;
-      cumHold += d.hold_count;
-      cumDefects += d.defects;
-      cumSampled += d.sample_size;
-      cumSampleOk += d.sample_ok;
-      return {
-        date: d.lot_date,
-        lot_count: d.lot_count,
-        lot_size: d.lot_size,
-        sample_size: d.sample_size,
-        defects: d.defects,
-        critical: d.critical,
-        major: d.major,
-        minor: d.minor,
-        pass_rate: d.pass_rate,
-        release_count: d.release_count,
-        rework_count: d.rework_count,
-        hold_count: d.hold_count,
-        cum_pass_rate: cumSampled > 0 ? Math.round((cumSampleOk / cumSampled) * 10000) / 100 : 100,
-        cum_release: cumRelease,
-        cum_rework: cumRework,
-        cum_hold: cumHold,
-        cum_defects: cumDefects,
-        defect_per_sample: d.sample_size > 0 ? Math.round((d.defects / d.sample_size) * 10000) / 100 : 0,
-      };
-    });
+    // ── Defect category summary (from oqc_defects table) ──
+    const categoryMap: Record<string, { count: number; critical: number; major: number; minor: number }> = {};
+    for (const cat of OQC_CATEGORIES) {
+      categoryMap[cat.key] = { count: 0, critical: 0, major: 0, minor: 0 };
+    }
 
-    return NextResponse.json(rekap);
+    // Build lot-date lookup for monthly breakdown
+    const lotDateMap: Record<string, string> = {};
+    for (const lot of allLots) {
+      lotDateMap[lot.id] = (lot.lot_date as string)?.split('T')[0] || '';
+    }
+
+    // Monthly sub-breakdown for defect categories (for quarter view)
+    const monthCategoryMap: Record<string, Record<string, number>> = {};
+
+    for (const def of allDefects) {
+      const cat = def.defect_category as string;
+      const cnt = Number(def.defect_count) || 0;
+      const sev = def.severity as string;
+
+      if (!categoryMap[cat]) categoryMap[cat] = { count: 0, critical: 0, major: 0, minor: 0 };
+      categoryMap[cat].count += cnt;
+      if (sev === 'Critical') categoryMap[cat].critical += cnt;
+      else if (sev === 'Major') categoryMap[cat].major += cnt;
+      else categoryMap[cat].minor += cnt;
+
+      // Monthly sub-breakdown
+      const lotDate = lotDateMap[def.lot_id] || '';
+      if (lotDate) {
+        const month = lotDate.substring(0, 7); // "2026-04"
+        if (!monthCategoryMap[month]) monthCategoryMap[month] = {};
+        monthCategoryMap[month][cat] = (monthCategoryMap[month][cat] || 0) + cnt;
+      }
+    }
+
+    const defectCategories = OQC_CATEGORIES
+      .map((cat) => ({
+        category: cat.key,
+        count: categoryMap[cat.key]?.count || 0,
+        percentage: totalDefects > 0 ? Math.round(((categoryMap[cat.key]?.count || 0) / totalDefects) * 10000) / 100 : 0,
+        critical: categoryMap[cat.key]?.critical || 0,
+        major: categoryMap[cat.key]?.major || 0,
+        minor: categoryMap[cat.key]?.minor || 0,
+        typical_defects: TYPICAL_DEFECTS[cat.key] || { zh: '', en: '' },
+      }))
+      .filter((c) => c.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+    // Monthly breakdown for the defect categories (for quarter/year views)
+    const months = Object.keys(monthCategoryMap).sort();
+    const categoryMonthlyData: { month: string; categories: Record<string, number> }[] =
+      months.map((month) => ({
+        month,
+        categories: { ...monthCategoryMap[month] },
+      }));
+
+    return NextResponse.json({
+      period,
+      value,
+      date_range: { start: startDate, end: endDate },
+      business_type: businessType || 'ALL',
+      summary: {
+        total_lots: allLots.length,
+        total_lot_size: totalLotSize,
+        total_sampled: totalSampled,
+        total_sample_ok: totalSampleOk,
+        total_defects: totalDefects,
+        critical_defects: criticalDefects,
+        major_defects: majorDefects,
+        minor_defects: minorDefects,
+        pass_rate: overallPassRate,
+        release_lots: releaseLots,
+        rework_lots: reworkLots,
+        hold_lots: holdLots,
+        release_qty: releaseQty,
+        rework_qty: reworkQty,
+        hold_qty: holdQty,
+      },
+      daily_breakdown: Object.values(dailyBreakdown).sort((a, b) => a.lot_date.localeCompare(b.lot_date)),
+      defect_categories: defectCategories,
+      category_monthly_data: categoryMonthlyData,
+    });
   } catch (error) {
     console.error('OQC rekap error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
