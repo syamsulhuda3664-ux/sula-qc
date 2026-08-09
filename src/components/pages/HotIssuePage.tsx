@@ -26,6 +26,9 @@ import {
 import { SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, CATEGORY_ZH, getSubDefectCategory, DEFECT_CATEGORIES } from '@/lib/rca-generator';
 
 // Build sub-defect options with category grouping
+const CATEGORY_KEY_TO_NAME: Record<string, string> = Object.fromEntries(
+  DEFECT_CATEGORIES.map(c => [c.key, c.name])
+);
 const SUBDEFECT_OPTIONS: { value: string; label: string; labelZh: string; category: string; categoryKey: string; categoryZh: string }[] = [];
 SUBDEFECT_NAMES.forEach((name, i) => {
   const cat = getSubDefectCategory(i);
@@ -448,7 +451,10 @@ export default function HotIssuePage() {
                   </TableCell>
                   <TableCell className="text-[11px] font-mono text-slate-700">{r.style_codes && r.style_codes.length > 0 ? r.style_codes[0] : '-'}</TableCell>
                   <TableCell className="text-[11px] font-mono text-slate-500">{r.order_no || '-'}</TableCell>
-                  <TableCell className="text-[11px] text-slate-600">{isZhMode ? (CATEGORY_ZH[r.category || ''] || r.category) : r.category}</TableCell>
+                  <TableCell className="text-[11px] text-slate-600">{(() => {
+                    const catName = CATEGORY_KEY_TO_NAME[r.category || ''] || r.category;
+                    return isZhMode ? (CATEGORY_ZH[catName || ''] || catName) : catName;
+                  })()}</TableCell>
                   <TableCell className="text-[11px] font-medium text-slate-800">
                     {isZhMode ? (SUBDEFECT_ZH_MAP[r.sub_defect] || r.sub_defect) : r.sub_defect}
                   </TableCell>
@@ -559,7 +565,7 @@ export default function HotIssuePage() {
                 <SelectContent>
                   {DEFECT_CATEGORIES.map(cat => (
                     <SelectItem key={cat.key} value={cat.key}>
-                      {isZhMode ? (CATEGORY_ZH[cat.key] || cat.name) : cat.name}
+                      {isZhMode ? (CATEGORY_ZH[cat.name] || cat.name) : cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
