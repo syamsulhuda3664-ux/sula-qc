@@ -332,6 +332,14 @@ export default function HotIssuePage() {
     if (!confirm('Delete this hot issue?')) return;
     setDeletingId(id);
     try {
+      // Delete photos from storage
+      const record = records.find(r => r.id === id);
+      if (record?.photo_before) {
+        fetch(`/api/fqc/rca/upload-photo?url=${encodeURIComponent(record.photo_before)}`, { method: 'DELETE' }).catch(() => {});
+      }
+      if (record?.photo_after) {
+        fetch(`/api/fqc/rca/upload-photo?url=${encodeURIComponent(record.photo_after)}`, { method: 'DELETE' }).catch(() => {});
+      }
       const res = await fetch(`/api/fqc/hot-issues/${id}`, { method: 'DELETE' });
       if (res.ok) { setRecords(prev => prev.filter(r => r.id !== id)); }
     } catch {} finally { setDeletingId(null); }
@@ -339,6 +347,12 @@ export default function HotIssuePage() {
 
   const handlePhotoUpload = async (field: 'photo_before' | 'photo_after', file: File) => {
     try {
+      // Delete old photo from storage before uploading new one
+      const oldUrl = form[field];
+      if (oldUrl) {
+        fetch(`/api/fqc/rca/upload-photo?url=${encodeURIComponent(oldUrl)}`, { method: 'DELETE' }).catch(() => {});
+      }
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('prefix', 'hotissue');

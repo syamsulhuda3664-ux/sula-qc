@@ -202,7 +202,7 @@ const DRAFTS_STORAGE_KEY = 'sula_qc_rca_drafts';
 function PhotoCell({ value, onUpload, onRemove, disabled }: {
   value: string;
   onUpload: (file: File) => void;
-  onRemove: () => void;
+  onRemove: (url: string) => void;
   disabled?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
@@ -230,7 +230,7 @@ function PhotoCell({ value, onUpload, onRemove, disabled }: {
         <img src={value} alt="" className="w-full h-full object-cover" />
         {!disabled && (
           <button
-            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            onClick={(e) => { e.stopPropagation(); onRemove(value); }}
             className="absolute top-0 right-0 bg-red-500 text-white rounded-bl p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <X className="h-3 w-3" />
@@ -578,8 +578,19 @@ export default function FQCRCAPage() {
   // ═══════════════════════════════════════════════════════════
   // Photo upload to Supabase Storage
   // ═══════════════════════════════════════════════════════════
+  const deletePhotoFromStorage = (url: string) => {
+    if (url) {
+      fetch(`/api/fqc/rca/upload-photo?url=${encodeURIComponent(url)}`, { method: 'DELETE' }).catch(() => {});
+    }
+  };
+
   const handlePhotoUpload = async (rcaKey: string, rank: number, field: 'photo_before' | 'photo_after', file: File) => {
     try {
+      // Delete old photo from storage before uploading new one
+      const actions = actionEdits[rcaKey];
+      const oldAction = actions?.find((a: any) => a.rank === rank);
+      if (oldAction?.[field]) deletePhotoFromStorage(oldAction[field]);
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('prefix', 'rca');
@@ -596,6 +607,11 @@ export default function FQCRCAPage() {
     } catch (err) {
       console.error('Photo upload error:', err);
     }
+  };
+
+  const handlePhotoRemove = (rcaKey: string, rank: number, field: 'photo_before' | 'photo_after', currentUrl: string) => {
+    deletePhotoFromStorage(currentUrl);
+    updateActionField(rcaKey, rank, field, '');
   };
 
   // ═══════════════════════════════════════════════════════════
@@ -871,14 +887,14 @@ export default function FQCRCAPage() {
                                                   <PhotoCell
                                                     value={action.photo_before}
                                                     onUpload={(file) => handlePhotoUpload(key, action.rank, 'photo_before', file)}
-                                                    onRemove={() => updateActionField(key, action.rank, 'photo_before', '')}
+                                                    onRemove={(url) => handlePhotoRemove(key, action.rank, 'photo_before', url)}
                                                   />
                                                 </TableCell>
                                                 <TableCell className="text-[11px]">
                                                   <PhotoCell
                                                     value={action.photo_after}
                                                     onUpload={(file) => handlePhotoUpload(key, action.rank, 'photo_after', file)}
-                                                    onRemove={() => updateActionField(key, action.rank, 'photo_after', '')}
+                                                    onRemove={(url) => handlePhotoRemove(key, action.rank, 'photo_after', url)}
                                                   />
                                                 </TableCell>
                                               </TableRow>
@@ -939,7 +955,7 @@ export default function FQCRCAPage() {
                                                     <PhotoCell
                                                       value={action.photo_before}
                                                       onUpload={() => {}}
-                                                      onRemove={() => {}}
+                                                      onRemove={(_url) => {}}
                                                       disabled
                                                     />
                                                   </TableCell>
@@ -947,7 +963,7 @@ export default function FQCRCAPage() {
                                                     <PhotoCell
                                                       value={action.photo_after}
                                                       onUpload={() => {}}
-                                                      onRemove={() => {}}
+                                                      onRemove={(_url) => {}}
                                                       disabled
                                                     />
                                                   </TableCell>

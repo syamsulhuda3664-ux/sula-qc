@@ -53,6 +53,51 @@ async function compressImage(buffer: Buffer, mimeType: string): Promise<{ data: 
   }
 }
 
+export async function DELETE(request: NextRequest) {
+  const auth = await authenticateRequest(request, 'full');
+  if (auth.error) return auth.error;
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const url = searchParams.get('url');
+
+    if (!url) {
+      return NextResponse.json({ error: 'No URL provided' }, { status: 400 });
+    }
+
+    // Extract storage path from public URL
+    // Public URL format: https://<project>.supabase.co/storage/v1/object/public/<bucket>/<path>
+    const urlObj = new URL(url);
+    const segments = urlObj.pathname.split('/');
+    // Find bucket name and path after /object/public/
+    const publicIdx = segments.indexOf('public');
+    if (publicIdx === -1 || publicIdx + 1 >= segments.length) {
+      return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+    }
+    const bucket = segments[publicIdx + 1];
+    const filePath = segments.slice(publicIdx + 2).join('/');
+
+    if (!bucket || !filePath) {
+      return NextResponse.json({ error: 'Could not parse file path' }, { status: 400 });
+    }
+
+    const { error } = await adminClient.storage
+      .from(bucket)
+      .remove([filePath]);
+
+    if (error) {
+      console.error('Delete photo error:', error);
+      // Don't fail the request — old photo deletion is best-effort
+    }
+
+    return NextResponse.json({ message: 'Photo deleted' });
+  } catch (error) {
+    console.error('Delete photo error:', error);
+    // Best-effort — don't block the caller
+    return NextResponse.json({ message: 'Photo deletion attempted' });
+  }
+}
+
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request, 'full');
   if (auth.error) return auth.error;
