@@ -1828,14 +1828,15 @@ async function buildRCASheet(
         }
 
         // Embed Photo Before (column 16 = 0-indexed col 15)
+        // Use tl+br so image fills the entire cell with no leftover space
         const beforeUrl = String(action.photo_before || '');
         if (beforeUrl && photoMap.has(beforeUrl)) {
           const imgData = photoMap.get(beforeUrl);
           if (imgData) {
             const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
             ws.addImage(imgId, {
-              tl: { col: 15, row: currentRow - 1 },
-              ext: { width: 80, height: 60 },
+              tl: { col: 15.0, row: currentRow - 1 },
+              br: { col: 16.0, row: currentRow },
             });
           }
         }
@@ -1847,8 +1848,8 @@ async function buildRCASheet(
           if (imgData) {
             const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
             ws.addImage(imgId, {
-              tl: { col: 16, row: currentRow - 1 },
-              ext: { width: 80, height: 60 },
+              tl: { col: 16.0, row: currentRow - 1 },
+              br: { col: 17.0, row: currentRow },
             });
           }
         }
