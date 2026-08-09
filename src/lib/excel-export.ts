@@ -1765,7 +1765,7 @@ async function buildRCASheet(
         const action = actions[ai];
         const bgColor = ai % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
         const excelRow = ws.getRow(currentRow);
-        excelRow.height = 80;
+        excelRow.height = 89;
 
         const rank = ai + 1;
 
@@ -1850,7 +1850,7 @@ async function buildRCASheet(
         const IMG_COL_OFF_FROM = 32000;
         const IMG_COL_OFF_TO = 1212850;
         const IMG_ROW_OFF_FROM = 36000;
-        const IMG_ROW_OFF_TO = 977901;
+        const IMG_ROW_OFF_TO = 1070000;
         const beforeUrl = String(action.photo_before || '');
         if (beforeUrl && photoMap.has(beforeUrl)) {
           const imgData = photoMap.get(beforeUrl);
