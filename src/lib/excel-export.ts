@@ -1575,12 +1575,31 @@ function buildFQCAnalysisSheet(
   ws.getColumn(6).width = 16.0;     // F: Remark / (empty)
 }
 
-// Helper: build RCA sheet in ExcelJS
-function buildRCASheet(
+/**
+ * Fetch an image from URL and return as base64 buffer + extension.
+ * Returns null on any failure (photo is optional — best effort).
+ */
+async function fetchImageAsBase64(url: string): Promise<{ base64: string; ext: string } | null> {
+  try {
+    if (!url || typeof url !== 'string') return null;
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const ct = res.headers.get('content-type') || '';
+    const ext = ct.includes('png') ? 'png' : 'jpeg';
+    return { base64: buf.toString('base64'), ext };
+  } catch {
+    return null;
+  }
+}
+
+// Helper: build RCA sheet in ExcelJS (async — fetches photos)
+async function buildRCASheet(
+  wb: ExcelJS.Workbook,
   ws: ExcelJS.Worksheet,
   rcaData: Record<string, unknown>[],
   _filters: ExportFilters,
-): void {
+): Promise<void> {
   const MED_BLUE    = 'FF2B5F8A';
   const HEADER_BG   = 'FF1F4E79';
   const PALE_BLUE   = 'FFEDF2F9';
@@ -1588,8 +1607,6 @@ function buildRCASheet(
   const WHITE_ARGB  = 'FFFFFFFF';
   const GRAY_FOOTER = 'FF999999';
   const FILTER_TEXT = 'FF4A6FA5';
-  const AMBER       = 'FFFFF3E0';
-  const AMBER_FONT  = 'FFE65100';
 
   const thinBorder: Partial<ExcelJS.Borders> = {
     top:    { style: 'thin', color: { argb: 'FFB0B0B0' } },
@@ -1598,30 +1615,36 @@ function buildRCASheet(
     right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
   };
 
-  // RCA columns: 13 columns
-  const totalCols = 13;
+  // 15 columns: #, Week Period, BT, Inspected, NG, Pass Rate, Category,
+  //   Sub-Defect, Root Cause, Impact, Process, Corrective, Preventive,
+  //   Responsible, Deadline, Photo Before, Photo After
+  const totalCols = 17;
   const rcaHeaders = [
-    '#',
+    '序号 / No.',
     '周期 / Week Period',
-    '业务类型 / BT',
+    '业务类型 / Business Type',
     '检验数 / Inspected',
-    'NG数 / NG',
+    '不良数 / NG',
     '合格率 / Pass Rate',
+    '缺陷类别 / Category',
+    '子缺陷 / Sub-Defect',
     '根本原因 / Root Cause',
-    '影响 / Impact',
+    '影响范围 / Impact',
     '工序 / Process',
     '纠正措施 / Corrective Action',
     '预防措施 / Preventive Action',
     '责任人 / Responsible',
     '截止日期 / Deadline',
+    '改善前照片 / Photo Before',
+    '改善后照片 / Photo After',
   ];
 
   // ---- Title ----
   const row1 = ws.getRow(1);
-  row1.height = 50;
+  row1.height = 55;
   ws.mergeCells(1, 1, 1, totalCols);
   const titleCell = row1.getCell(1);
-  titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC RCA 根本原因分析报告';
+  titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC RCA 根本原因分析报告 / Root Cause Analysis Report';
   titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: WHITE_ARGB } };
   titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
@@ -1631,12 +1654,12 @@ function buildRCASheet(
 
   // Filter info
   const filterParts: string[] = [];
-  if (_filters.dateFrom) filterParts.push(`From: ${_filters.dateFrom}`);
-  if (_filters.dateTo) filterParts.push(`To: ${_filters.dateTo}`);
-  if (_filters.businessType) filterParts.push(`Type: ${_filters.businessType}`);
+  if (_filters.dateFrom) filterParts.push(`期间 / Period: ${_filters.dateFrom}`);
+  if (_filters.dateTo) filterParts.push(`至 / To: ${_filters.dateTo}`);
+  if (_filters.businessType) filterParts.push(`业务类型 / BT: ${_filters.businessType}`);
   if (filterParts.length > 0) {
     const filterRow = ws.getRow(currentRow);
-    filterRow.height = 13.4;
+    filterRow.height = 16;
     ws.mergeCells(currentRow, 1, currentRow, totalCols);
     const fCell = filterRow.getCell(1);
     fCell.value = filterParts.join('   |   ');
@@ -1651,7 +1674,7 @@ function buildRCASheet(
   // ---- Headers ----
   currentRow++;
   const headerRow = ws.getRow(currentRow);
-  headerRow.height = 32;
+  headerRow.height = 36;
   for (let c = 1; c <= totalCols; c++) {
     const cell = headerRow.getCell(c);
     cell.value = rcaHeaders[c - 1];
@@ -1662,9 +1685,25 @@ function buildRCASheet(
   }
   currentRow++;
 
+  // ---- Collect all photo URLs to batch-fetch ----
+  const photoMap = new Map<string, { base64: string; ext: string } | null>();
+  const allPhotoUrls = new Set<string>();
+  for (const rca of rcaData) {
+    const actions: Record<string, unknown>[] = (rca.rca_actions as any[]) || [];
+    for (const a of actions) {
+      if (a.photo_before && typeof a.photo_before === 'string') allPhotoUrls.add(a.photo_before);
+      if (a.photo_after && typeof a.photo_after === 'string') allPhotoUrls.add(a.photo_after);
+    }
+  }
+  // Batch fetch all photos in parallel (max 10 concurrent)
+  const urls = [...allPhotoUrls];
+  for (let i = 0; i < urls.length; i += 10) {
+    const batch = urls.slice(i, i + 10);
+    const results = await Promise.all(batch.map(u => fetchImageAsBase64(u)));
+    batch.forEach((u, j) => photoMap.set(u, results[j]));
+  }
+
   // ---- Data rows ----
-  // rcaData is array of rca_weekly records with rca_actions joined
-  // Sort by week_start, then business_type
   const sorted = [...rcaData].sort((a, b) => {
     const wsComp = String(a.week_start || '').localeCompare(String(b.week_start || ''));
     if (wsComp !== 0) return wsComp;
@@ -1680,14 +1719,13 @@ function buildRCASheet(
     const actions: Record<string, unknown>[] = (rca.rca_actions as any[]) || [];
 
     if (actions.length === 0) {
-      // Single row for RCA with no actions
       const bgColor = PALE_BLUE;
       const excelRow = ws.getRow(currentRow);
       excelRow.height = 20;
       const vals: (string | number)[] = [
         '', weekPeriod, bt, inspected, ng,
         passRate > 0 ? passRate.toFixed(2) + '%' : '-',
-        '-', '-', '-', '-', '-', '-', '-',
+        '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-',
       ];
       for (let c = 1; c <= totalCols; c++) {
         const cell = excelRow.getCell(c);
@@ -1702,14 +1740,15 @@ function buildRCASheet(
       }
       currentRow++;
     } else {
-      // Multiple rows — first row has week info, subsequent rows merged visually
       for (let ai = 0; ai < actions.length; ai++) {
         const action = actions[ai];
         const bgColor = ai % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
         const excelRow = ws.getRow(currentRow);
-        excelRow.height = 40;
+        excelRow.height = 80;
 
         const rank = ai + 1;
+        const subDefects = Array.isArray(action.sub_defects) ? (action.sub_defect as string[]).join(', ') : String(action.sub_defects || '-');
+
         const vals: (string | number)[] = [
           rank,
           ai === 0 ? weekPeriod : '',
@@ -1717,6 +1756,8 @@ function buildRCASheet(
           ai === 0 ? inspected : '',
           ai === 0 ? ng : '',
           ai === 0 ? (passRate > 0 ? passRate.toFixed(2) + '%' : '-') : '',
+          String(action.category || '-'),
+          subDefects,
           String(action.root_cause || '-'),
           String(action.impact || '-'),
           String(action.process || '-'),
@@ -1724,6 +1765,8 @@ function buildRCASheet(
           String(action.preventive_action || '-'),
           String(action.responsible || '-'),
           String(action.due_date || '-'),
+          '', // Photo Before — placeholder, image overlaid
+          '', // Photo After — placeholder, image overlaid
         ];
 
         for (let c = 1; c <= totalCols; c++) {
@@ -1735,8 +1778,7 @@ function buildRCASheet(
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
           cell.border = thinBorder;
 
-          // Highlight status
-          if (c >= 7 && c <= 11 && String(val) === '-') {
+          if (c >= 7 && c <= 13 && String(val) === '-') {
             cell.font = { name: 'Arial', size: 9, color: { argb: 'FF999999' } };
           }
         }
@@ -1745,6 +1787,32 @@ function buildRCASheet(
         if (ai === 0 && passRate < 95 && passRate > 0) {
           const rateCell = excelRow.getCell(6);
           rateCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFDC2626' } };
+        }
+
+        // Embed Photo Before (column 16 = 0-indexed col 15)
+        const beforeUrl = String(action.photo_before || '');
+        if (beforeUrl && photoMap.has(beforeUrl)) {
+          const imgData = photoMap.get(beforeUrl);
+          if (imgData) {
+            const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
+            ws.addImage(imgId, {
+              tl: { col: 15, row: currentRow - 1 },
+              ext: { width: 80, height: 60 },
+            });
+          }
+        }
+
+        // Embed Photo After (column 17 = 0-indexed col 16)
+        const afterUrl = String(action.photo_after || '');
+        if (afterUrl && photoMap.has(afterUrl)) {
+          const imgData = photoMap.get(afterUrl);
+          if (imgData) {
+            const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
+            ws.addImage(imgId, {
+              tl: { col: 16, row: currentRow - 1 },
+              ext: { width: 80, height: 60 },
+            });
+          }
         }
 
         currentRow++;
@@ -1762,9 +1830,9 @@ function buildRCASheet(
 
   const summaryRow = ws.getRow(currentRow);
   summaryRow.height = 24;
-  const summaryVals = [
+  const summaryVals: (string | number)[] = [
     '', '合计 / Grand Total', '', totalInspectedAll, totalNGAll, totalPassRateAll,
-    '', '', '', '', '', '', '',
+    '', '', '', '', '', '', '', '', '', '', '',
   ];
   for (let c = 1; c <= totalCols; c++) {
     const cell = summaryRow.getCell(c);
@@ -1787,20 +1855,24 @@ function buildRCASheet(
   footerCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
   footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
 
-  // Column widths
-  ws.getColumn(1).width = 4.5;      // A: #
-  ws.getColumn(2).width = 24.0;     // B: Week Period
-  ws.getColumn(3).width = 12.0;     // C: BT
+  // Column widths — wide enough to avoid text cutoff
+  ws.getColumn(1).width = 5.5;      // A: #
+  ws.getColumn(2).width = 26.0;     // B: Week Period
+  ws.getColumn(3).width = 14.0;     // C: Business Type
   ws.getColumn(4).width = 12.0;     // D: Inspected
   ws.getColumn(5).width = 10.0;     // E: NG
   ws.getColumn(6).width = 14.0;     // F: Pass Rate
-  ws.getColumn(7).width = 30.0;     // G: Root Cause
-  ws.getColumn(8).width = 22.0;     // H: Impact
-  ws.getColumn(9).width = 14.0;     // I: Process
-  ws.getColumn(10).width = 30.0;    // J: Corrective Action
-  ws.getColumn(11).width = 30.0;    // K: Preventive Action
-  ws.getColumn(12).width = 14.0;    // L: Responsible
-  ws.getColumn(13).width = 14.0;    // M: Deadline
+  ws.getColumn(7).width = 18.0;     // G: Category
+  ws.getColumn(8).width = 22.0;     // H: Sub-Defect
+  ws.getColumn(9).width = 42.0;     // I: Root Cause
+  ws.getColumn(10).width = 36.0;    // J: Impact
+  ws.getColumn(11).width = 16.0;    // K: Process
+  ws.getColumn(12).width = 42.0;    // L: Corrective Action
+  ws.getColumn(13).width = 42.0;    // M: Preventive Action
+  ws.getColumn(14).width = 16.0;    // N: Responsible
+  ws.getColumn(15).width = 14.0;    // O: Deadline
+  ws.getColumn(16).width = 18.0;    // P: Photo Before
+  ws.getColumn(17).width = 18.0;    // Q: Photo After
 }
 
 // ---------------------------------------------------------------------------
@@ -1824,9 +1896,9 @@ export async function exportFQRCACombinedExcel(
   const ws2 = wb.addWorksheet('缺陷分析 Analysis');
   buildFQCAnalysisSheet(ws2, fqcData, filters);
 
-  // Sheet 3: RCA
+  // Sheet 3: RCA (async — fetches photos)
   const ws3 = wb.addWorksheet('RCA 根本原因分析');
-  buildRCASheet(ws3, rcaData, filters);
+  await buildRCASheet(wb, ws3, rcaData, filters);
 
   const buffer = await wb.xlsx.writeBuffer();
   const period = filters.dateFrom ? `${filters.dateFrom}_${filters.dateTo || 'all'}` : 'All';
