@@ -7,12 +7,13 @@ import {
   exportFQCAnalysisCombinedExcel,
   exportFQCOQCExcel,
   exportIPQCExcel,
+  exportFQRCACombinedExcel,
   type ExportFilters,
 } from '@/lib/excel-export';
 
-type ExportType = 'fqc-daily' | 'fqc-analysis' | 'fqc-analysis-combined' | 'oqc' | 'ipqc';
+type ExportType = 'fqc-daily' | 'fqc-analysis' | 'fqc-analysis-combined' | 'rca-combined' | 'oqc' | 'ipqc';
 
-const VALID_TYPES: ExportType[] = ['fqc-daily', 'fqc-analysis', 'fqc-analysis-combined', 'oqc', 'ipqc'];
+const VALID_TYPES: ExportType[] = ['fqc-daily', 'fqc-analysis', 'fqc-analysis-combined', 'rca-combined', 'oqc', 'ipqc'];
 
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "type must be 'fqc-daily', 'fqc-analysis', 'fqc-analysis-combined', 'oqc', or 'ipqc'",
+            "type must be 'fqc-daily', 'fqc-analysis', 'fqc-analysis-combined', 'rca-combined', 'oqc', or 'ipqc'",
         },
         { status: 400 },
       );
@@ -155,6 +156,65 @@ export async function POST(request: NextRequest) {
         headers: {
           'Content-Type':
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="${encodeURIComponent(result.fileName)}"`,
+          'Cache-Control': 'no-cache',
+        },
+      });
+    }
+
+    if (type === 'rca-combined') {
+      // RCA combined: Sheet 1 = FQC Daily, Sheet 2 = Analysis, Sheet 3 = RCA
+      const month = filters.dateFrom ? filters.dateFrom.substring(0, 7) : undefined;
+      const bt = businessType;
+
+      // Fetch FQC inspection data (same as fqc-analysis-combined)
+      let fqcQuery = adminClient.from('fqc_inspections').select('*');
+      if (dateFrom) fqcQuery = fqcQuery.gte('inspection_date', dateFrom);
+      if (dateTo) fqcQuery = fqcQuery.lte('inspection_date', dateTo);
+      if (bt) fqcQuery = fqcQuery.eq('business_type', bt);
+      const { data: fqcRecords, error: fqcError } = await fqcQuery;
+      if (fqcError) {
+        return NextResponse.json({ error: 'Failed to export FQC data' }, { status: 500 });
+      }
+      const fqcData = (fqcRecords as Record<string, unknown>[]) || [];
+
+      // Fetch RCA data with actions
+      let rcaQuery = adminClient
+        .from('rca_weekly')
+        .select('*, rca_actions (*)')
+        .order('week_start', { ascending: true });
+      if (month) {
+        const [yStr, mStr] = month.split('-');
+        const y = parseInt(yStr, 10);
+        const m = parseInt(mStr, 10);
+        const firstDay = `${y}-${String(m).padStart(2, '0')}-01`;
+        const lastDay = new Date(y, m, 0).toISOString().split('T')[0];
+        rcaQuery = rcaQuery.gte('week_start', firstDay).lte('week_start', lastDay);
+      }
+      if (bt && bt !== 'ALL') {
+        rcaQuery = rcaQuery.eq('business_type', bt);
+      }
+      const { data: rcaRecords, error: rcaError } = await rcaQuery;
+      if (rcaError) {
+        return NextResponse.json({ error: 'Failed to export RCA data' }, { status: 500 });
+      }
+      const rcaData = (rcaRecords as Record<string, unknown>[]) || [];
+
+      let result: { buffer: Uint8Array; fileName: string };
+      try {
+        result = await exportFQRCACombinedExcel(fqcData, rcaData, exportFilters, lang);
+      } catch (xlsErr) {
+        console.error('XLSX generation error:', xlsErr);
+        return NextResponse.json(
+          { error: `Excel generation failed: ${xlsErr instanceof Error ? xlsErr.message : String(xlsErr)}` },
+          { status: 500 },
+        );
+      }
+
+      return new NextResponse(Buffer.from(result.buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': `attachment; filename="${encodeURIComponent(result.fileName)}"`,
           'Cache-Control': 'no-cache',
         },

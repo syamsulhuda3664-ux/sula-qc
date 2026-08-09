@@ -1575,6 +1575,264 @@ function buildFQCAnalysisSheet(
   ws.getColumn(6).width = 16.0;     // F: Remark / (empty)
 }
 
+// Helper: build RCA sheet in ExcelJS
+function buildRCASheet(
+  ws: ExcelJS.Worksheet,
+  rcaData: Record<string, unknown>[],
+  _filters: ExportFilters,
+): void {
+  const MED_BLUE    = 'FF2B5F8A';
+  const HEADER_BG   = 'FF1F4E79';
+  const PALE_BLUE   = 'FFEDF2F9';
+  const LIGHT_BLUE  = 'FFD6E4F0';
+  const WHITE_ARGB  = 'FFFFFFFF';
+  const GRAY_FOOTER = 'FF999999';
+  const FILTER_TEXT = 'FF4A6FA5';
+  const AMBER       = 'FFFFF3E0';
+  const AMBER_FONT  = 'FFE65100';
+
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top:    { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
+  };
+
+  // RCA columns: 13 columns
+  const totalCols = 13;
+  const rcaHeaders = [
+    '#',
+    '周期 / Week Period',
+    '业务类型 / BT',
+    '检验数 / Inspected',
+    'NG数 / NG',
+    '合格率 / Pass Rate',
+    '根本原因 / Root Cause',
+    '影响 / Impact',
+    '工序 / Process',
+    '纠正措施 / Corrective Action',
+    '预防措施 / Preventive Action',
+    '责任人 / Responsible',
+    '截止日期 / Deadline',
+  ];
+
+  // ---- Title ----
+  const row1 = ws.getRow(1);
+  row1.height = 50;
+  ws.mergeCells(1, 1, 1, totalCols);
+  const titleCell = row1.getCell(1);
+  titleCell.value = '厦门市欣维发实业有限公司品质检验表\nFQC RCA 根本原因分析报告';
+  titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: WHITE_ARGB } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  ws.getRow(2).height = 4;
+  let currentRow = 3;
+
+  // Filter info
+  const filterParts: string[] = [];
+  if (_filters.dateFrom) filterParts.push(`From: ${_filters.dateFrom}`);
+  if (_filters.dateTo) filterParts.push(`To: ${_filters.dateTo}`);
+  if (_filters.businessType) filterParts.push(`Type: ${_filters.businessType}`);
+  if (filterParts.length > 0) {
+    const filterRow = ws.getRow(currentRow);
+    filterRow.height = 13.4;
+    ws.mergeCells(currentRow, 1, currentRow, totalCols);
+    const fCell = filterRow.getCell(1);
+    fCell.value = filterParts.join('   |   ');
+    fCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: FILTER_TEXT } };
+    fCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+    fCell.alignment = { vertical: 'middle' };
+    currentRow++;
+  } else {
+    currentRow++;
+  }
+
+  // ---- Headers ----
+  currentRow++;
+  const headerRow = ws.getRow(currentRow);
+  headerRow.height = 32;
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = headerRow.getCell(c);
+    cell.value = rcaHeaders[c - 1];
+    cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  // ---- Data rows ----
+  // rcaData is array of rca_weekly records with rca_actions joined
+  // Sort by week_start, then business_type
+  const sorted = [...rcaData].sort((a, b) => {
+    const wsComp = String(a.week_start || '').localeCompare(String(b.week_start || ''));
+    if (wsComp !== 0) return wsComp;
+    return String(a.business_type || '').localeCompare(String(b.business_type || ''));
+  });
+
+  for (const rca of sorted) {
+    const weekPeriod = `${rca.week_start || ''} ~ ${rca.week_end || ''}`;
+    const bt = String(rca.business_type || '');
+    const inspected = Number(rca.total_inspected) || 0;
+    const ng = Number(rca.total_ng) || 0;
+    const passRate = Number(rca.overall_pass_rate) || 0;
+    const actions: Record<string, unknown>[] = (rca.rca_actions as any[]) || [];
+
+    if (actions.length === 0) {
+      // Single row for RCA with no actions
+      const bgColor = PALE_BLUE;
+      const excelRow = ws.getRow(currentRow);
+      excelRow.height = 20;
+      const vals: (string | number)[] = [
+        '', weekPeriod, bt, inspected, ng,
+        passRate > 0 ? passRate.toFixed(2) + '%' : '-',
+        '-', '-', '-', '-', '-', '-', '-',
+      ];
+      for (let c = 1; c <= totalCols; c++) {
+        const cell = excelRow.getCell(c);
+        const val = vals[c - 1];
+        cell.value = typeof val === 'number' ? val : String(val);
+        cell.font = { name: 'Arial', size: 9 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+        cell.alignment = c >= 4 && c <= 5
+          ? { horizontal: 'right', vertical: 'middle' }
+          : { horizontal: 'left', vertical: 'middle', wrapText: true };
+        cell.border = thinBorder;
+      }
+      currentRow++;
+    } else {
+      // Multiple rows — first row has week info, subsequent rows merged visually
+      for (let ai = 0; ai < actions.length; ai++) {
+        const action = actions[ai];
+        const bgColor = ai % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
+        const excelRow = ws.getRow(currentRow);
+        excelRow.height = 40;
+
+        const rank = ai + 1;
+        const vals: (string | number)[] = [
+          rank,
+          ai === 0 ? weekPeriod : '',
+          ai === 0 ? bt : '',
+          ai === 0 ? inspected : '',
+          ai === 0 ? ng : '',
+          ai === 0 ? (passRate > 0 ? passRate.toFixed(2) + '%' : '-') : '',
+          String(action.root_cause || '-'),
+          String(action.impact || '-'),
+          String(action.process || '-'),
+          String(action.corrective_action || '-'),
+          String(action.preventive_action || '-'),
+          String(action.responsible || '-'),
+          String(action.due_date || '-'),
+        ];
+
+        for (let c = 1; c <= totalCols; c++) {
+          const cell = excelRow.getCell(c);
+          const val = vals[c - 1];
+          cell.value = typeof val === 'number' ? val : String(val);
+          cell.font = { name: 'Arial', size: 9 };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
+          cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+          cell.border = thinBorder;
+
+          // Highlight status
+          if (c >= 7 && c <= 11 && String(val) === '-') {
+            cell.font = { name: 'Arial', size: 9, color: { argb: 'FF999999' } };
+          }
+        }
+
+        // Color pass rate red if < 95%
+        if (ai === 0 && passRate < 95 && passRate > 0) {
+          const rateCell = excelRow.getCell(6);
+          rateCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFDC2626' } };
+        }
+
+        currentRow++;
+      }
+    }
+  }
+
+  // ---- Summary row ----
+  currentRow++;
+  const totalInspectedAll = sorted.reduce((sum, r) => sum + (Number(r.total_inspected) || 0), 0);
+  const totalNGAll = sorted.reduce((sum, r) => sum + (Number(r.total_ng) || 0), 0);
+  const totalPassRateAll = totalInspectedAll > 0
+    ? (((totalInspectedAll - totalNGAll) / totalInspectedAll) * 100).toFixed(2) + '%'
+    : '-';
+
+  const summaryRow = ws.getRow(currentRow);
+  summaryRow.height = 24;
+  const summaryVals = [
+    '', '合计 / Grand Total', '', totalInspectedAll, totalNGAll, totalPassRateAll,
+    '', '', '', '', '', '', '',
+  ];
+  for (let c = 1; c <= totalCols; c++) {
+    const cell = summaryRow.getCell(c);
+    const val = summaryVals[c - 1];
+    cell.value = typeof val === 'number' ? val : String(val);
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+    cell.border = thinBorder;
+    cell.alignment = c >= 4 && c <= 5
+      ? { horizontal: 'right', vertical: 'middle' }
+      : { horizontal: 'left', vertical: 'middle' };
+  }
+  currentRow++;
+
+  // Footer
+  currentRow += 2;
+  const footerRow = ws.getRow(currentRow);
+  ws.mergeCells(currentRow, 1, currentRow, totalCols);
+  const footerCell = footerRow.getCell(1);
+  footerCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
+  footerCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
+
+  // Column widths
+  ws.getColumn(1).width = 4.5;      // A: #
+  ws.getColumn(2).width = 24.0;     // B: Week Period
+  ws.getColumn(3).width = 12.0;     // C: BT
+  ws.getColumn(4).width = 12.0;     // D: Inspected
+  ws.getColumn(5).width = 10.0;     // E: NG
+  ws.getColumn(6).width = 14.0;     // F: Pass Rate
+  ws.getColumn(7).width = 30.0;     // G: Root Cause
+  ws.getColumn(8).width = 22.0;     // H: Impact
+  ws.getColumn(9).width = 14.0;     // I: Process
+  ws.getColumn(10).width = 30.0;    // J: Corrective Action
+  ws.getColumn(11).width = 30.0;    // K: Preventive Action
+  ws.getColumn(12).width = 14.0;    // L: Responsible
+  ws.getColumn(13).width = 14.0;    // M: Deadline
+}
+
+// ---------------------------------------------------------------------------
+// 2c. FQC + Analysis + RCA Combined Export (3 sheets, ExcelJS)
+//     Sheet 1 = FQC Daily, Sheet 2 = Analysis, Sheet 3 = RCA
+// ---------------------------------------------------------------------------
+
+export async function exportFQRCACombinedExcel(
+  fqcData: Record<string, unknown>[],
+  rcaData: Record<string, unknown>[],
+  filters: ExportFilters,
+  _lang: ExportLang,
+): Promise<ExcelExportResult> {
+  const wb = new ExcelJS.Workbook();
+
+  // Sheet 1: FQC Daily
+  const ws1 = wb.addWorksheet('FQC日报明细 Daily Detail');
+  await buildFQCDailySheet(wb, ws1, fqcData, filters);
+
+  // Sheet 2: FQC Defect Analysis
+  const ws2 = wb.addWorksheet('缺陷分析 Analysis');
+  buildFQCAnalysisSheet(ws2, fqcData, filters);
+
+  // Sheet 3: RCA
+  const ws3 = wb.addWorksheet('RCA 根本原因分析');
+  buildRCASheet(ws3, rcaData, filters);
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const period = filters.dateFrom ? `${filters.dateFrom}_${filters.dateTo || 'all'}` : 'All';
+  return { buffer: new Uint8Array(buffer as ArrayBuffer), fileName: `SULA-QC_FQC_RCA_Report_${period}.xlsx` };
+}
+
 // ---------------------------------------------------------------------------
 // 3. OQC Rekap Excel — ExcelJS (professional theme matching FQC)
 // ---------------------------------------------------------------------------

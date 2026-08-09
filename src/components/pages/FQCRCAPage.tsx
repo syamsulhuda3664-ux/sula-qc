@@ -23,7 +23,7 @@ import {
 import {
   Save, Loader2, AlertCircle, Plus, ChevronDown, ChevronRight,
   RefreshCw, CheckCircle2, XCircle, Clock, Camera, X, Image as ImageIcon,
-  Pencil, Lock, FileText,
+  Pencil, Lock, FileText, Download,
 } from 'lucide-react';
 import { CATEGORY_ZH, SUBDEFECT_NAMES_ZH, SUBDEFECT_NAMES } from '@/lib/rca-generator';
 import { SUBDEFECT_ACTION_TEMPLATES_ZH } from '@/lib/rca-subdefect-templates-zh';
@@ -315,6 +315,52 @@ export default function FQCRCAPage() {
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
   const [actionEdits, setActionEdits] = useState<Record<string, ActionRow[]>>({});
   const [editingRcas, setEditingRcas] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+
+  // ═══════════════════════════════════════════════════════════
+  // Download Excel (3 sheets: FQC Daily + Analysis + RCA)
+  // ═══════════════════════════════════════════════════════════
+  const handleExport = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const [y, m] = selectedMonth.split('-');
+      const firstDay = `${selectedMonth}-01`;
+      const lastDay = new Date(parseInt(y), parseInt(m), 0).toISOString().split('T')[0];
+      const bt = effectiveType || 'ALL';
+
+      const filters: Record<string, string> = {};
+      filters.date_from = firstDay;
+      filters.date_to = lastDay;
+      if (bt !== 'ALL') filters.business_type = bt;
+
+      const res = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'rca-combined', filters }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Export failed');
+        return;
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `SULA-QC_FQC_RCA_Report_${firstDay}_${lastDay}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // ═══════════════════════════════════════════════════════════
   // Persist drafts across navigation & refresh via sessionStorage
@@ -698,6 +744,17 @@ export default function FQCRCAPage() {
             )}
             <Button variant="outline" size="sm" onClick={fetchSavedRecords} className="h-9">
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('action.refresh')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+              disabled={exporting || savedCount === 0}
+              className="h-9"
+            >
+              {exporting
+                ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> {t('action.export')}...</>
+                : <><Download className="h-3.5 w-3.5 mr-1" /> {t('action.download')}</>}
             </Button>
           </div>
         </CardContent>
