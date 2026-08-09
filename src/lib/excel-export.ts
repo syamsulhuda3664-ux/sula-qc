@@ -1581,7 +1581,7 @@ function buildFQCAnalysisSheet(
  * Fetch an image from URL and return as base64 buffer + extension.
  * Returns null on any failure (photo is optional — best effort).
  */
-async function fetchImageAsBase64(url: string): Promise<{ base64: string; ext: string; width: number; height: number } | null> {
+async function fetchImageAsBase64(url: string): Promise<{ base64: string; ext: string } | null> {
   try {
     if (!url || typeof url !== 'string') return null;
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
@@ -1589,88 +1589,10 @@ async function fetchImageAsBase64(url: string): Promise<{ base64: string; ext: s
     const buf = Buffer.from(await res.arrayBuffer());
     const ct = res.headers.get('content-type') || '';
     const ext = ct.includes('png') ? 'png' : 'jpeg';
-    const base64 = buf.toString('base64');
-    const dims = getImageSizeFromBuf(buf);
-    return { base64, ext, width: dims?.width || 0, height: dims?.height || 0 };
+    return { base64: buf.toString('base64'), ext };
   } catch {
     return null;
   }
-}
-
-/** Parse width/height from PNG or JPEG buffer */
-function getImageSizeFromBuf(buf: Buffer): { width: number; height: number } | null {
-  if (buf.length < 24) return null;
-  // PNG: IHDR at offset 16
-  if (buf[0] === 0x89 && buf[1] === 0x50) {
-    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
-  }
-  // JPEG: find SOF0 (FFC0) or SOF2 (FFC2)
-  if (buf[0] === 0xFF && buf[1] === 0xD8) {
-    let off = 2;
-    while (off < buf.length - 9) {
-      if (buf[off] !== 0xFF) break;
-      const m = buf[off + 1];
-      if (m === 0xC0 || m === 0xC2) {
-        return { height: buf.readUInt16BE(off + 5), width: buf.readUInt16BE(off + 7) };
-      }
-      if (m === 0xD8 || m === 0xD9) { off += 2; continue; }
-      const segLen = buf.readUInt16BE(off + 2);
-      off += 2 + segLen;
-    }
-  }
-  return null;
-}
-
-/**
- * Add an image to the worksheet that "fits" inside a cell (preserves aspect ratio)
- * with equal margin on all 4 sides and centered.
- *
- * @param colIdx  0-based column index (15 = Photo Before, 16 = Photo After)
- * @param rowIdx  0-based row index (currentRow - 1)
- * @param colWidth  Excel column width units (e.g. 18)
- * @param rowHeight  Row height in points (e.g. 120)
- */
-function addFitImage(
-  ws: ExcelJS.Worksheet,
-  wb: ExcelJS.Workbook,
-  imgData: { base64: string; ext: string; width: number; height: number },
-  colIdx: number,
-  rowIdx: number,
-  colWidth: number,
-  rowHeight: number,
-): void {
-  const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
-
-  // Fallback: if we couldn't read dimensions, use a reasonable default
-  if (!imgData.width || !imgData.height) {
-    ws.addImage(imgId, {
-      tl: { col: colIdx + 0.1, row: rowIdx + 0.05 },
-      ext: { width: 90, height: 90 },
-    });
-    return;
-  }
-
-  // Cell size in pixels (approximate conversion)
-  const cellWpx = (colWidth * 7) + 5;   // e.g. 18 → 131px
-  const cellHpx = rowHeight * (96 / 72);  // 120pt → 160px
-
-  const MARGIN_PX = 6; // margin in pixels on each side
-  const availW = cellWpx - MARGIN_PX * 2;
-  const availH = cellHpx - MARGIN_PX * 2;
-
-  // Scale to fit (maintain aspect ratio)
-  const scale = Math.min(availW / imgData.width, availH / imgData.height);
-  const dispW = imgData.width * scale;
-  const dispH = imgData.height * scale;
-
-  // Center within available area
-  const padH = (availW - dispW) / 2 + MARGIN_PX;
-  const padV = (availH - dispH) / 2 + MARGIN_PX;
-
-  ws.addImage(imgId, {
-    tl: { col: colIdx + padH / cellWpx, row: rowIdx + padV / cellHpx },
-    ext: { width: dispW, height: dispH },
-  });
 }
 
 // Helper: build RCA sheet in ExcelJS (async — fetches photos)
@@ -1766,7 +1688,7 @@ async function buildRCASheet(
   currentRow++;
 
   // ---- Collect all photo URLs to batch-fetch ----
-  const photoMap = new Map<string, { base64: string; ext: string; width: number; height: number } | null>();
+  const photoMap = new Map<string, { base64: string; ext: string } | null>();
   const allPhotoUrls = new Set<string>();
   for (const rca of rcaData) {
     const actions: Record<string, unknown>[] = (rca.rca_actions as any[]) || [];
@@ -1924,21 +1846,29 @@ async function buildRCASheet(
           rateCell.font = { name: 'Arial', size: 9, bold: true, color: { argb: 'FFDC2626' } };
         }
 
-        // Embed Photo Before — fit with margin, centered in cell
+        // Embed Photo Before — fill cell with small margin, centered
         const beforeUrl = String(action.photo_before || '');
         if (beforeUrl && photoMap.has(beforeUrl)) {
           const imgData = photoMap.get(beforeUrl);
           if (imgData) {
-            addFitImage(ws, wb, imgData, 15, currentRow - 1, 18.0, 120);
+            const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
+            ws.addImage(imgId, {
+              tl: { col: 15.05, row: currentRow - 1 + 0.03 },
+              br: { col: 15.95, row: currentRow - 0.03 },
+            });
           }
         }
 
-        // Embed Photo After — fit with margin, centered in cell
+        // Embed Photo After — fill cell with small margin, centered
         const afterUrl = String(action.photo_after || '');
         if (afterUrl && photoMap.has(afterUrl)) {
           const imgData = photoMap.get(afterUrl);
           if (imgData) {
-            addFitImage(ws, wb, imgData, 16, currentRow - 1, 18.0, 120);
+            const imgId = wb.addImage({ base64: imgData.base64, extension: imgData.ext as 'png' | 'jpeg' });
+            ws.addImage(imgId, {
+              tl: { col: 16.05, row: currentRow - 1 + 0.03 },
+              br: { col: 16.95, row: currentRow - 0.03 },
+            });
           }
         }
 
