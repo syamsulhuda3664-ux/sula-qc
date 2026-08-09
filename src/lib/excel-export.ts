@@ -2,7 +2,9 @@ import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
 import { extractLineSortKey } from './utils';
 import { SUBDEFECT_DB_COLUMNS } from './db-schema';
-import { SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, getSubDefectCategory, CATEGORY_ZH } from './rca-generator';
+import { SUBDEFECT_NAMES, SUBDEFECT_NAMES_ZH, getSubDefectCategory, CATEGORY_ZH, ACTION_TEMPLATES } from './rca-generator';
+import { SUBDEFECT_ACTION_TEMPLATES } from './rca-subdefect-templates';
+import { SUBDEFECT_ACTION_TEMPLATES_ZH } from './rca-subdefect-templates-zh';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -1744,7 +1746,7 @@ async function buildRCASheet(
         const action = actions[ai];
         const bgColor = ai % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
         const excelRow = ws.getRow(currentRow);
-        excelRow.height = 80;
+        excelRow.height = 120;
 
         const rank = ai + 1;
 
@@ -1765,6 +1767,26 @@ async function buildRCASheet(
             }).join(', ')
           : '-';
 
+        // Bilingual text fields: look up templates in both ID and ZH
+        const primarySub = rawSubs[0] || '';
+        const idTpl = SUBDEFECT_ACTION_TEMPLATES[primarySub] || ACTION_TEMPLATES[catEn];
+        const zhTpl = SUBDEFECT_ACTION_TEMPLATES_ZH[primarySub];
+
+        const bilingual = (stored: string, field: string) => {
+          if (!stored || stored === '-') return '-';
+          // Detect if stored text is Chinese (contains CJK chars)
+          const isZh = /[\u4e00-\u9fff]/.test(stored);
+          if (isZh && idTpl) {
+            const other = (idTpl as any)[field] || '';
+            return other ? `${stored}\n${other}` : stored;
+          }
+          if (!isZh && zhTpl) {
+            const other = (zhTpl as any)[field] || '';
+            return other ? `${stored}\n${other}` : stored;
+          }
+          return stored;
+        };
+
         const vals: (string | number)[] = [
           rank,
           ai === 0 ? weekPeriod : '',
@@ -1774,11 +1796,11 @@ async function buildRCASheet(
           ai === 0 ? (passRate > 0 ? passRate.toFixed(2) + '%' : '-') : '',
           catBilingual,
           subBilingual,
-          String(action.root_cause || '-'),
-          String(action.impact || '-'),
-          String(action.process || '-'),
-          String(action.corrective_action || '-'),
-          String(action.preventive_action || '-'),
+          bilingual(String(action.root_cause || ''), 'root_cause'),
+          bilingual(String(action.impact || ''), 'impact'),
+          bilingual(String(action.process || ''), 'process'),
+          bilingual(String(action.corrective_action || ''), 'corrective_action'),
+          bilingual(String(action.preventive_action || ''), 'preventive_action'),
           String(action.responsible || '-'),
           String(action.due_date || '-'),
           '', // Photo Before — placeholder, image overlaid
