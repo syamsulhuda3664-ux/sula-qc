@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 import { extractLineSortKey } from '@/lib/utils';
+import { generateIPQCFromFQC } from '@/lib/ipqc-generator';
+import { mapInspectionRow } from '@/lib/db-schema';
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
@@ -138,6 +140,99 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('IPQC records error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const auth = await authenticateRequest(request, 'full');
+  if (auth.error) return auth.error;
+  if (auth.user!.role !== 'staff_qa') {
+    return NextResponse.json({ error: 'Only staff_qa can generate IPQC' }, { status: 403 });
+  }
+
+  try {
+    const body = await request.json();
+    const { action, date_from, date_to, business_type: bt } = body;
+
+    if (action !== 'generate') {
+      return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    }
+
+    if (!date_from || !date_to) {
+      return NextResponse.json({ error: 'date_from and date_to are required' }, { status: 400 });
+    }
+
+    // 1. Fetch FQC records for the date range
+    let fqcQuery = adminClient
+      .from('fqc_inspections')
+      .select('*')
+      .gte('inspection_date', date_from)
+      .lte('inspection_date', date_to);
+
+    if (bt && bt !== 'ALL') {
+      fqcQuery = fqcQuery.eq('business_type', bt);
+    }
+
+    const { data: fqcRows, error: fqcError } = await fqcQuery;
+    if (fqcError) {
+      console.error('FQC fetch error:', fqcError);
+      return NextResponse.json({ error: 'Failed to fetch FQC data' }, { status: 500 });
+    }
+
+    if (!fqcRows || fqcRows.length === 0) {
+      return NextResponse.json({ error: 'No FQC data found for the selected period' }, { status: 400 });
+    }
+
+    // 2. Map DB rows to app-level names (line, inspector, style)
+    const mappedFQC = fqcRows.map(r => mapInspectionRow(r as Record<string, unknown>));
+
+    // 3. Generate IPQC records
+    const generated = generateIPQCFromFQC(mappedFQC as Record<string, unknown>[]);
+
+    // 4. Check existing IPQC records to skip duplicates
+    const existing = await adminClient
+      .from('ipqc_records')
+      .select('inspection_date, business_type, stage, production_line, style_code')
+      .gte('inspection_date', date_from)
+      .lte('inspection_date', date_to);
+    const existingSet = new Set<string>();
+    for (const e of (existing.data || [])) {
+      existingSet.add(`${e.inspection_date}__${e.business_type}__${e.stage}__${e.production_line}__${e.style_code}`);
+    }
+
+    // 5. Filter out duplicates, keep only new records
+    const newRecords = generated.filter(r => {
+      const key = `${r.inspection_date}__${r.business_type}__${r.stage}__${r.production_line}__${r.style_code}`;
+      return !existingSet.has(key);
+    });
+
+    // 6. Insert new records in batches of 100
+    let inserted = 0;
+    for (let i = 0; i < newRecords.length; i += 100) {
+      const batch = newRecords.slice(i, i + 100);
+      const { error: insertError } = await adminClient
+        .from('ipqc_records')
+        .insert(batch);
+      if (insertError) {
+        console.error('IPQC insert error:', insertError);
+        return NextResponse.json({
+          error: `Insert failed at batch ${Math.floor(i / 100) + 1}: ${insertError.message}`,
+          inserted,
+          total: generated.length,
+        }, { status: 500 });
+      }
+      inserted += batch.length;
+    }
+
+    return NextResponse.json({
+      message: `Generated ${generated.length} IPQC records (${inserted} new, ${generated.length - inserted} existing)`,
+      generated: generated.length,
+      inserted,
+      skipped: generated.length - inserted,
+    });
+  } catch (error) {
+    console.error('IPQC generate error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

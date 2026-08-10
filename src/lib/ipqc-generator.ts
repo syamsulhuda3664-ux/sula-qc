@@ -1,265 +1,276 @@
 export type IPQCStage = 'Cutting' | 'Sewing' | 'Assembly' | 'Finishing';
 
-export interface IPQCDefect {
-  category: string;
-  subDefect: string;
-  count: number;
-}
-
-export interface IPQCRecord {
-  id?: string;
-  inspection_date: Date;
-  stage: IPQCStage;
-  line: string;
-  inspector: string;
-  style: string;
-  order_no: string;
-  business_type: string;
-  checked_qty: number;
-  pass_qty: number;
-  fail_qty: number;
-  pass_rate: number;
-  defects: IPQCDefect[];
-  total_defects: number;
-  fqc_record_id?: string;
-  created_at?: Date;
-}
-
 /**
- * IPQC sub-defects per stage and category
+ * Realistic sub-defects per IPQC stage (bilingual: used in defect_detail JSON)
  */
-const IPQC_STAGE_DEFECTS: Record<IPQCStage, Record<string, string[]>> = {
-  Cutting: {
-    'Material': ['Color deviation', 'Fabric defect', 'Incorrect material', 'Grain direction wrong'],
-    'Dimension': ['Size out of spec', 'Pattern misalignment', 'Edge fraying'],
-    'Preparation': ['Missing parts', 'Incorrect parts count', 'Parts mixed up'],
-  },
-  Sewing: {
-    'Stitching': ['Skip stitch', 'Uneven stitch', 'Wrong stitch type', 'Thread break', 'Bobbin issue'],
-    'Assembly': ['Panel misalignment', 'Wrong sequence', 'Component reversed'],
-    'Appearance': ['Wrinkle', 'Puckering', 'Oil stain from machine'],
-  },
-  Assembly: {
-    'Hardware': ['Zipper installed wrong', 'Buckle misaligned', 'Missing rivet', 'Handle attachment loose'],
-    'Stitching': ['Open seam at joint', 'Reinforcement missing', 'Backtack missing'],
-    'Accessory': ['Missing accessory', 'Wrong accessory placed', 'Accessory position off'],
-  },
-  Finishing: {
-    'Appearance': ['Thread tail', 'Stain/spot', 'Scratch', 'Glue residue', 'Deformation'],
-    'Label': ['Missing label', 'Label misaligned', 'Wrong label content'],
-    'Packaging': ['Polybag missing', 'Incorrect tag', 'Silica gel missing'],
-  },
-};
-
-/**
- * Mapping from FQC defect categories to IPQC stages.
- * Each FQC defect category maps to one or more IPQC stages where it would be caught.
- */
-const FQC_TO_IPQC_STAGE: Record<string, { stage: IPQCStage; category: string; weight: number }[]> = {
-  stitching: [
-    { stage: 'Sewing', category: 'Stitching', weight: 0.7 },
-    { stage: 'Assembly', category: 'Stitching', weight: 0.2 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.1 },
+const STAGE_SUBDEFECTS: Record<IPQCStage, { category: string; subs: string[] }[]> = {
+  Cutting: [
+    { category: 'Material', subs: ['Color deviation 色差', 'Fabric defect 布疵', 'Incorrect material 错料', 'Grain direction wrong 纹路错'] },
+    { category: 'Dimension', subs: ['Size out of spec 尺寸超差', 'Pattern misalignment 对位偏移', 'Edge fraying 毛边'] },
+    { category: 'Preparation', subs: ['Missing parts 漏部件', 'Incorrect parts count 部件数量错', 'Parts mixed up 部件混料'] },
   ],
-  logo: [
-    { stage: 'Assembly', category: 'Appearance', weight: 0.6 },
-    { stage: 'Finishing', category: 'Label', weight: 0.4 },
+  Sewing: [
+    { category: 'Stitching', subs: ['Skip stitch 跳针', 'Uneven stitch 针距不均', 'Wrong stitch type 针法错误', 'Thread break 断线', 'Bobbin issue 底线问题'] },
+    { category: 'Appearance', subs: ['Wrinkle 起皱', 'Puckering 起扭', 'Oil stain 油渍'] },
   ],
-  material: [
-    { stage: 'Cutting', category: 'Material', weight: 0.8 },
-    { stage: 'Sewing', category: 'Appearance', weight: 0.2 },
+  Assembly: [
+    { category: 'Hardware', subs: ['Zipper installed wrong 拉链装错', 'Buckle misaligned 扣具偏位', 'Missing rivet 漜铆钉', 'Handle attachment loose 提手松动'] },
+    { category: 'Accessory', subs: ['Missing accessory 漏配件', 'Wrong accessory 配件错', 'Accessory position off 配件位置偏'] },
+    { category: 'Stitching', subs: ['Open seam at joint 接口开线', 'Reinforcement missing 漜加固', 'Backtack missing 漜回针'] },
   ],
-  hardware: [
-    { stage: 'Assembly', category: 'Hardware', weight: 0.8 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.2 },
-  ],
-  appearance: [
-    { stage: 'Sewing', category: 'Appearance', weight: 0.3 },
-    { stage: 'Assembly', category: 'Appearance', weight: 0.3 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.4 },
-  ],
-  zipper: [
-    { stage: 'Assembly', category: 'Hardware', weight: 0.8 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.2 },
-  ],
-  webbing: [
-    { stage: 'Sewing', category: 'Stitching', weight: 0.5 },
-    { stage: 'Assembly', category: 'Assembly', weight: 0.3 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.2 },
-  ],
-  other: [
-    { stage: 'Finishing', category: 'Appearance', weight: 0.5 },
-    { stage: 'Cutting', category: 'Dimension', weight: 0.3 },
-    { stage: 'Assembly', category: 'Accessory', weight: 0.2 },
-  ],
-  preparation: [
-    { stage: 'Cutting', category: 'Preparation', weight: 0.7 },
-    { stage: 'Assembly', category: 'Accessory', weight: 0.3 },
+  Finishing: [
+    { category: 'Appearance', subs: ['Thread tail 线头', 'Stain/spot 污渍', 'Scratch 划伤', 'Glue residue 胶水残留', 'Deformation 变形'] },
+    { category: 'Label', subs: ['Missing label 漜标', 'Label misaligned 标签歪斜', 'Wrong label content 标签内容错'] },
+    { category: 'Packaging', subs: ['Polybag missing 漜胶袋', 'Incorrect tag 吊牌错', 'Silica gel missing 漜干燥剂'] },
   ],
 };
 
 /**
- * Seeded random number generator
+ * FQC defect DB column → IPQC stage distribution.
+ * Weight = probability the defect originates from this stage.
  */
-function seededRandom(seed: number): () => number {
+const FQC_DEFECT_TO_STAGES: Record<string, { stage: IPQCStage; category: string; weight: number }[]> = {
+  defect_stitching: [
+    { stage: 'Sewing', category: 'Stitching', weight: 0.70 },
+    { stage: 'Assembly', category: 'Stitching', weight: 0.20 },
+    { stage: 'Finishing', category: 'Appearance', weight: 0.10 },
+  ],
+  defect_stitch_defect: [
+    { stage: 'Sewing', category: 'Stitching', weight: 0.75 },
+    { stage: 'Assembly', category: 'Stitching', weight: 0.25 },
+  ],
+  defect_logo: [
+    { stage: 'Assembly', category: 'Appearance', weight: 0.60 },
+    { stage: 'Finishing', category: 'Label', weight: 0.40 },
+  ],
+  defect_material: [
+    { stage: 'Cutting', category: 'Material', weight: 0.80 },
+    { stage: 'Sewing', category: 'Appearance', weight: 0.20 },
+  ],
+  defect_hardware: [
+    { stage: 'Assembly', category: 'Hardware', weight: 0.80 },
+    { stage: 'Finishing', category: 'Appearance', weight: 0.20 },
+  ],
+  defect_appearance: [
+    { stage: 'Sewing', category: 'Appearance', weight: 0.25 },
+    { stage: 'Assembly', category: 'Appearance', weight: 0.30 },
+    { stage: 'Finishing', category: 'Appearance', weight: 0.45 },
+  ],
+  defect_zipper: [
+    { stage: 'Assembly', category: 'Hardware', weight: 0.80 },
+    { stage: 'Finishing', category: 'Appearance', weight: 0.20 },
+  ],
+  defect_webbing: [
+    { stage: 'Sewing', category: 'Stitching', weight: 0.50 },
+    { stage: 'Assembly', category: 'Accessory', weight: 0.30 },
+    { stage: 'Finishing', category: 'Appearance', weight: 0.20 },
+  ],
+  defect_other: [
+    { stage: 'Finishing', category: 'Appearance', weight: 0.40 },
+    { stage: 'Cutting', category: 'Dimension', weight: 0.30 },
+    { stage: 'Assembly', category: 'Accessory', weight: 0.30 },
+  ],
+  defect_preparation: [
+    { stage: 'Cutting', category: 'Preparation', weight: 0.70 },
+    { stage: 'Assembly', category: 'Accessory', weight: 0.30 },
+  ],
+};
+
+/** Deterministic PRNG (Lehmer / Park-Miller) */
+function seededRng(seed: number) {
   let s = seed % 2147483647;
   if (s <= 0) s += 2147483646;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
+  return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
+
+function pick<T>(arr: T[], rng: () => number): T {
+  return arr[Math.floor(rng() * arr.length)];
+}
+
+/** Hash a string into a numeric seed */
+function hashSeed(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+  return Math.abs(h) || 1;
+}
+
+export interface IPQCGeneratedRow {
+  inspection_date: string;       // YYYY-MM-DD
+  production_line: string;
+  inspector_name: string;
+  style_code: string;
+  order_no: string;
+  business_type: string;
+  stage: IPQCStage;
+  check_count: number;
+  ok_count: number;
+  ng_count: number;
+  pass_rate: number;           // e.g. 95.67 (percentage)
+  total_defects: number;
+  defect_category: string;      // primary category e.g. "Stitching"
+  defect_detail: string;        // JSON string of defect items
 }
 
 /**
- * Pick a random item from an array
+ * Generate IPQC records from FQC DB rows.
+ *
+ * Key realism constraints:
+ * - IPQC checks 25-50% of FQC inspected qty (spot check during production)
+ * - IPQC pass rate is 2-6% higher than FQC (issues caught & fixed in-process)
+ * - IPQC total defects = 2-4x FQC defects (more caught, but fixed before FQC)
+ * - Defect categories match the stage where they logically occur
+ * - Same FQC input always produces the same IPQC output (deterministic)
  */
-function pickRandom<T>(arr: T[], rand: () => number): T {
-  return arr[Math.floor(rand() * arr.length)];
-}
+export function generateIPQCFromFQC(
+  fqcRows: Record<string, unknown>[],
+): IPQCGeneratedRow[] {
+  const results: IPQCGeneratedRow[] = [];
 
-/**
- * Generate IPQC records from FQC records.
- * For each FQC record, generates 1-2 IPQC records at earlier production stages.
- * IPQC pass rate is slightly higher (90-97%) since IPQC catches issues early.
- */
-export function generateIPQCRecords(fqcRecords: any[]): IPQCRecord[] {
-  const ipqcRecords: IPQCRecord[] = [];
-  let seedCounter = 42;
+  // Group FQC rows by date + business_type for seed stability
+  const grouped = new Map<string, Record<string, unknown>[]>();
+  for (const row of fqcRows) {
+    const date = String(row.inspection_date || '').split('T')[0];
+    const bt = String(row.business_type || 'OTHER');
+    const key = `${date}__${bt}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(row);
+  }
 
-  for (const fqc of fqcRecords) {
-    // Generate 1-2 IPQC records per FQC record
-    const numRecords = 1 + Math.round(seededRandom(seedCounter++)() * 0.6);
+  for (const [groupKey, rows] of grouped) {
+    const baseSeed = hashSeed(groupKey);
+    let seedIdx = baseSeed;
 
-    // Determine which stages to generate for based on FQC defect profile
-    const fqcDefectProfile: Record<string, number> = {
-      // Merge defect_stitch_defect into stitching
-      stitching: (fqc.defect_stitching || 0) + (fqc.defect_stitch_defect || 0),
-      logo: fqc.defect_logo || 0,
-      material: fqc.defect_material || 0,
-      hardware: fqc.defect_hardware || 0,
-      appearance: fqc.defect_appearance || 0,
-      zipper: fqc.defect_zipper || 0,
-      webbing: fqc.defect_webbing || 0,
-      other: fqc.defect_other || 0,
-      preparation: fqc.defect_preparation || 0,
-    };
+    // Aggregate FQC stats for this group
+    let totalInspected = 0, totalOK = 0, totalNG = 0, totalDefects = 0;
+    const fqcDefectSums: Record<string, number> = {};
 
-    const totalFQCDefects = Object.values(fqcDefectProfile).reduce((a, b) => a + b, 0);
-    const fqcPassRate = fqc.inspected_qty > 0
-      ? fqc.ok_qty / fqc.inspected_qty
-      : 1;
+    for (const row of rows) {
+      totalInspected += Number(row.inspected_qty) || 0;
+      totalOK += Number(row.ok_qty) || 0;
+      totalNG += Number(row.ng_qty) || 0;
+      totalDefects += Number(row.total_defects) || 0;
 
-    // Aggregate defect scores per IPQC stage
-    const stageScores: Record<IPQCStage, number> = {
-      Cutting: 0,
-      Sewing: 0,
-      Assembly: 0,
-      Finishing: 0,
-    };
-
-    for (const [fqcCat, mappings] of Object.entries(FQC_TO_IPQC_STAGE)) {
-      const fqcCount = fqcDefectProfile[fqcCat] || 0;
-      for (const mapping of mappings) {
-        stageScores[mapping.stage] += fqcCount * mapping.weight;
+      for (const col of Object.keys(FQC_DEFECT_TO_STAGES)) {
+        fqcDefectSums[col] = (fqcDefectSums[col] || 0) + (Number(row[col]) || 0);
       }
     }
 
-    // Select the top stages by defect score
-    const sortedStages = (Object.entries(stageScores) as [IPQCStage, number][])
-      .sort(([, a], [, b]) => b - a);
+    const fqcPassRate = totalInspected > 0 ? totalOK / totalInspected : 1;
+    const rng = seededRng(seedIdx++);
 
-    // Select stages to generate IPQC records for
-    const selectedStages: IPQCStage[] = [];
-    for (let i = 0; i < Math.min(numRecords, sortedStages.length); i++) {
-      selectedStages.push(sortedStages[i][0]);
+    // ── Determine which stages to generate ──
+    // Score each stage by weighted FQC defect contribution
+    const stageScores: Record<string, number> = { Cutting: 0, Sewing: 0, Assembly: 0, Finishing: 0 };
+    for (const [col, mappings] of Object.entries(FQC_DEFECT_TO_STAGES)) {
+      const count = fqcDefectSums[col] || 0;
+      for (const m of mappings) stageScores[m.stage] += count * m.weight;
     }
 
-    // If no stages selected, default to Sewing and Finishing
-    if (selectedStages.length === 0) {
-      selectedStages.push('Sewing', 'Finishing');
-    }
+    // Always generate for top 2-3 stages, but ensure all 4 stages appear over time
+    const sorted = (Object.entries(stageScores) as [string, number][]).sort((a, b) => b[1] - a[1]);
+    const numStages = totalDefects > 0
+      ? 2 + Math.round(rng() * 1.2)   // 2-3 stages when defects exist
+      : 2;                                // 2 stages when no defects
+    const selectedStages = sorted.slice(0, Math.min(numStages, 4)).map(([s]) => s as IPQCStage);
 
+    // ── Pick a representative FQC row for line/inspector/style/order ──
+    // Use different rows for different stages to add variety
+    const stageRowMap: Record<string, Record<string, unknown>> = {};
     for (const stage of selectedStages) {
-      const rand = seededRandom(seedCounter++);
+      stageRowMap[stage] = pick(rows, seededRng(seedIdx++));
+    }
 
-      // IPQC pass rate is higher than FQC (90-97%)
-      // Base IPQC pass rate is derived from FQC but improved
-      const ipqcPassRateBase = Math.min(0.97, fqcPassRate + 0.03 + rand() * 0.05);
-      // Add some random variation
-      const ipqcPassRate = Math.min(1, Math.max(0.88, ipqcPassRateBase + (rand() - 0.5) * 0.04));
+    // ── Generate IPQC record per selected stage ──
+    for (const stage of selectedStages) {
+      const sRng = seededRng(seedIdx++);
+      const srcRow = stageRowMap[stage];
+      const dateStr = String(srcRow.inspection_date || '').split('T')[0];
 
-      // IPQC checks fewer items than FQC (spot check)
-      const checkedQty = Math.max(5, Math.round(fqc.inspected_qty * (0.3 + rand() * 0.4)));
-      const passQty = Math.round(checkedQty * ipqcPassRate);
-      const failQty = checkedQty - passQty;
+      // Checked qty: 25-50% of FQC inspected (spot check)
+      const checkRatio = 0.25 + sRng() * 0.25;
+      const checkCount = Math.max(5, Math.round(totalInspected * checkRatio / selectedStages.length));
 
-      // Generate defects for this IPQC stage
-      const defects: IPQCDefect[] = [];
-      let totalDefects = 0;
+      // Pass rate: 2-6% higher than FQC (IPQC catches & fixes issues)
+      const ipqcPassRate = Math.min(0.995, Math.max(0.90, fqcPassRate + 0.02 + sRng() * 0.04 + (sRng() - 0.5) * 0.02));
+      const okCount = Math.round(checkCount * ipqcPassRate);
+      const ngCount = checkCount - okCount;
 
-      // Get defect categories for this stage
-      const stageDefects = IPQC_STAGE_DEFECTS[stage];
-      const stageScore = stageScores[stage] || 0;
+      // ── Generate synthetic defects for this stage ──
+      // IPQC catches 2-4x more defects than what leaks to FQC
+      const defectMultiplier = 2.5 + sRng() * 1.5;
+      const stageDefectBudget = Math.max(0, Math.round(
+        (stageScores[stage] || 0) * defectMultiplier / (selectedStages.length * 0.7)
+      ));
 
-      // IPQC should catch some defects that would otherwise become FQC defects
-      // Catch rate: IPQC catches more defects than what leaks to FQC
-      const catchRate = 0.6 + rand() * 0.3; // 60-90% catch rate
-      const expectedDefects = Math.max(0, Math.round(stageScore * catchRate / selectedStages.length));
+      // If FQC had zero defects for this group, still generate small random defects (realistic noise)
+      const baseDefects = totalDefects === 0
+        ? Math.round(sRng() * 2)  // 0-2 random defects
+        : stageDefectBudget;
 
-      if (expectedDefects > 0) {
-        // Distribute defects across categories
-        for (const [category, subDefects] of Object.entries(stageDefects)) {
-          const catShare = rand();
-          const catDefects = Math.round(expectedDefects * catShare);
-          if (catDefects <= 0) continue;
+      const defects: { category: string; subDefect: string; count: number }[] = [];
+      let defectTotal = 0;
+      const stageCats = STAGE_SUBDEFECTS[stage] || [];
 
-          // Distribute across sub-defects
-          let remaining = Math.min(catDefects, failQty - totalDefects);
-          for (let i = 0; i < subDefects.length && remaining > 0; i++) {
-            const count = i === subDefects.length - 1
-              ? remaining
-              : Math.max(0, Math.round(remaining * (0.3 + rand() * 0.4)));
+      if (baseDefects > 0 && stageCats.length > 0) {
+        let remaining = Math.min(baseDefects, ngCount * 3); // cap at 3x NG count
+        if (remaining <= 0) remaining = Math.max(1, baseDefects); // ensure some defects even if NG=0
+
+        for (const cat of stageCats) {
+          if (remaining <= 0) break;
+          // Weighted category selection — first categories get more defects
+          const catBudget = Math.round(remaining * (0.3 + sRng() * 0.5));
+          if (catBudget <= 0) continue;
+
+          let catRemaining = Math.min(catBudget, remaining);
+          const shuffled = [...cat.subs].sort(() => sRng() - 0.5);
+
+          for (let i = 0; i < shuffled.length && catRemaining > 0; i++) {
+            const isLast = i === shuffled.length - 1;
+            const count = isLast
+              ? catRemaining
+              : Math.max(0, Math.round(catRemaining * (0.2 + sRng() * 0.5)));
             if (count > 0) {
-              defects.push({
-                category,
-                subDefect: subDefects[i],
-                count,
-              });
-              totalDefects += count;
+              defects.push({ category: cat.category, subDefect: shuffled[i], count });
+              defectTotal += count;
+              catRemaining -= count;
               remaining -= count;
             }
           }
         }
       }
 
-      // Generate IPQC inspection date (1-3 days before FQC date)
-      const fqcDate = fqc.inspection_date instanceof Date
-        ? fqc.inspection_date
-        : new Date(fqc.inspection_date);
-      const ipqcDate = new Date(fqcDate);
-      ipqcDate.setDate(ipqcDate.getDate() - (1 + Math.floor(rand() * 3)));
+      // Primary defect category for the record
+      const primaryCat = defects.length > 0
+        ? defects.reduce((a, b) => a.count >= b.count ? a : b).category
+        : (stageCats[0]?.category || '');
 
-      ipqcRecords.push({
-        inspection_date: ipqcDate,
+      // Build defect_detail JSON string (matching existing export format)
+      const defectDetail = defects.length > 0
+        ? JSON.stringify(defects.map(d => ({
+            category: d.category,
+            subDefect: d.subDefect,
+            count: d.count,
+          })))
+        : '';
+
+      results.push({
+        inspection_date: dateStr,
+        production_line: String(srcRow.production_line || srcRow.line || ''),
+        inspector_name: String(srcRow.inspector_name || srcRow.inspector || ''),
+        style_code: String(srcRow.style_code || srcRow.style || ''),
+        order_no: String(srcRow.order_no || ''),
+        business_type: String(srcRow.business_type || 'OTHER'),
         stage,
-        line: fqc.line || '',
-        inspector: fqc.inspector || '',
-        style: fqc.style || '',
-        order_no: fqc.order_no || '',
-        business_type: fqc.business_type || 'OTHER',
-        checked_qty: checkedQty,
-        pass_qty: passQty,
-        fail_qty: failQty,
-        pass_rate: Math.round(ipqcPassRate * 10000) / 10000,
-        defects,
-        total_defects: totalDefects,
-        fqc_record_id: fqc.id,
-        created_at: new Date(),
+        check_count: checkCount,
+        ok_count: okCount,
+        ng_count: ngCount,
+        pass_rate: Math.round(ipqcPassRate * 10000) / 100, // store as percentage e.g. 95.67
+        total_defects: defectTotal,
+        defect_category: primaryCat,
+        defect_detail: defectDetail,
       });
     }
   }
 
-  return ipqcRecords;
+  return results;
 }
-
-export { IPQC_STAGE_DEFECTS, FQC_TO_IPQC_STAGE };
