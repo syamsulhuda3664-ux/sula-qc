@@ -693,24 +693,7 @@ export default function FQCRCAPage() {
   const zhCategory = (cat: string) => (isZhMode ? (CATEGORY_ZH[cat] || cat) : cat);
   const zhSubDefect = (sub: string) => (isZhMode ? (SUBDEFECT_ZH_MAP[sub] || sub) : sub);
 
-  const statusColor = (status: string) => {
-    if (status === 'completed') return 'text-emerald-600 bg-emerald-50 border-emerald-200';
-    if (status === 'in_progress') return 'text-amber-600 bg-amber-50 border-amber-200';
-    if (status === 'draft') return 'text-orange-600 bg-orange-50 border-orange-200';
-    return 'text-slate-500 bg-slate-50 border-slate-200';
-  };
-  const statusIcon = (status: string) => {
-    if (status === 'completed') return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />;
-    if (status === 'in_progress') return <Clock className="h-3.5 w-3.5 text-amber-500" />;
-    if (status === 'draft') return <FileText className="h-3.5 w-3.5 text-orange-500" />;
-    return <XCircle className="h-3.5 w-3.5 text-slate-400" />;
-  };
-  const statusLabel = (status: string) => {
-    if (status === 'draft') return lang === 'zh' ? '草稿' : 'Draft';
-    if (status === 'completed') return t('rca.statusCompleted');
-    if (status === 'in_progress') return t('rca.statusInProgress');
-    return t('rca.statusPending');
-  };
+
 
   const monthLabel = `${monthNames[month - 1]} ${year}`;
   const savedCount = savedRecords.length;
@@ -818,7 +801,6 @@ export default function FQCRCAPage() {
                       const bt = rca.business_type || '';
                       const btColor = BT_COLORS[bt] || 'bg-slate-100 text-slate-600';
                       const editing = isEditing(rca);
-                      const rcaStatus = rca.status || 'pending';
 
                       return (
                         <Collapsible key={key} open={isExp} onOpenChange={() => toggleWeek(key)}>
@@ -833,10 +815,7 @@ export default function FQCRCAPage() {
                                   <span className="text-slate-400">NG: <b className="text-red-600">{(rca.total_ng || 0).toLocaleString()}</b></span>
                                   <span className="text-slate-400">{t('rca.overallPassRate')}: <b className={`${(rca.overall_pass_rate || 0) >= 95 ? 'text-emerald-600' : 'text-red-600'}`}>{rca.overall_pass_rate}%</b></span>
                                 </div>
-                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0 ${statusColor(rcaStatus)}`}>
-                                  {statusIcon(rcaStatus)}
-                                  {statusLabel(rcaStatus)}
-                                </span>
+
                                 {isExp ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" /> : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />}
                               </button>
                             </CollapsibleTrigger>
