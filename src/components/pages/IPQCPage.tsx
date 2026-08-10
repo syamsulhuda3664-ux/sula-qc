@@ -178,8 +178,8 @@ export default function IPQCPage() {
               <Input value={line} onChange={(e) => { setLine(e.target.value); setPage(1); }} placeholder={t('fqc.line')} className="h-9" />
             </div>
             <div className="w-full sm:w-28">
-              <label className="text-xs font-medium text-slate-600 mb-1 block">Order No</label>
-              <Input value={orderNo} onChange={(e) => { setOrderNo(e.target.value); setPage(1); }} placeholder="Order" className="h-9" />
+              <label className="text-xs font-medium text-slate-600 mb-1 block">{t('fqc.orderNo')}</label>
+              <Input value={orderNo} onChange={(e) => { setOrderNo(e.target.value); setPage(1); }} placeholder={t('fqc.orderNo')} className="h-9" />
             </div>
             <div className="w-full sm:w-36">
               <label className="text-xs font-medium text-slate-600 mb-1 block">{t('ipqc.stage')}</label>
