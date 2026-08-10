@@ -207,6 +207,7 @@ export default function FQCAnalysisPage() {
   const topSubDefects = data?.section_b?.top_sub_defects || [];
   const topStyles = data?.section_c?.top_styles || [];
   const grandTotal = data?.grand_total_defects || 0;
+  const hotIssueContrib = data?.hot_issue_contribution || 0;
 
   // Prepare chart data
   const pieData = useMemo(() =>
@@ -320,7 +321,7 @@ export default function FQCAnalysisPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">A. {t('rca.topCategories')}</CardTitle>
-          <p className="text-xs text-slate-500">{t('common.total')}: {grandTotal} | {t('common.records')}: {data?.total_records || 0}</p>
+          <p className="text-xs text-slate-500">{t('common.total')}: {grandTotal} | {t('common.records')}: {data?.total_records || 0}{hotIssueContrib > 0 && <span className="text-orange-600 font-medium"> (+{hotIssueContrib} dari Hot Issue)</span>}</p>
         </CardHeader>
         <CardContent className="px-4 pb-4">
           <div className="flex items-start gap-2 mb-4 p-3 rounded-lg bg-blue-50 border border-blue-100">
@@ -493,8 +494,8 @@ export default function FQCAnalysisPage() {
           </CardTitle>
           <p className="text-xs text-slate-500">
             {isZhMode
-              ? '手动录入的关键问题，将优先进入 RCA Top 3'
-              : 'Manually entered critical issues, prioritized in RCA Top 3'}
+              ? '手动录入的关键问题，已计入上方 A/B 聚合数据，并优先进入 RCA Top 3'
+              : 'Manually entered critical issues — counts merged into Sections A/B above and prioritized in RCA Top 3'}
           </p>
         </CardHeader>
         <CardContent className="px-4 pb-4">
@@ -502,8 +503,8 @@ export default function FQCAnalysisPage() {
             <Flame className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
             <p className="text-xs text-orange-700 leading-relaxed">
               {isZhMode
-                ? 'Hot Issue 是由 QA 团队手动标记的关键缺陷问题。这些条目在生成 RCA 时会自动占据 Top 3 的优先位置。'
-                : 'Hot Issues are critical defects manually flagged by QA team. These entries automatically take priority slots in the Top 3 RCA.'}
+                ? 'Hot Issue 的缺陷数量已自动合并到上方 A（类别汇总）和 B（Top 20 子缺陷）的聚合数据中，使分析图表反映完整的缺陷情况。这些条目在生成 RCA 时会自动占据 Top 3 的优先位置。'
+                : 'Defect counts from Hot Issues are automatically merged into Section A (Category Summary) and Section B (Top 20 Sub-Defects) above, ensuring the analysis reflects the complete defect picture. These entries also take priority slots in the Top 3 RCA.'}
             </p>
           </div>
           {hotLoading && (<div className="space-y-2"><Skeleton className="h-16 w-full rounded-lg" /><Skeleton className="h-16 w-full rounded-lg" /></div>)}

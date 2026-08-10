@@ -16,6 +16,18 @@ const DEFECT_CATEGORIES = [
   { key: 'defect_preparation', name: 'Preparation' },
 ];
 
+/** Map category name → categoryKey for hot issue aggregation */
+const CATEGORY_NAME_TO_KEY: Record<string, string> = {};
+for (const cat of DEFECT_CATEGORIES) {
+  CATEGORY_NAME_TO_KEY[cat.name.toLowerCase()] = cat.key;
+}
+
+/** Build reverse lookup: sub-defect name (lowercase) → index in SUBDEFECT_NAMES */
+const SUBDEFECT_NAME_TO_INDEX: Record<string, number> = {};
+SUBDEFECT_NAMES.forEach((name, idx) => {
+  SUBDEFECT_NAME_TO_INDEX[name.toLowerCase()] = idx;
+});
+
 export async function GET(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
   if (auth.error) return auth.error;
@@ -63,6 +75,60 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Section B: Top 20 Sub-defects
+    // Sum each sub_* column individually across all rows (DB has 64 individual columns, not a JSON array)
+    const subDefectCounts = SUBDEFECT_DB_COLUMNS.map(col =>
+      allRecords.reduce((sum, r) => sum + (Number(r[col]) || 0), 0)
+    );
+
+    // ═══════════════════════════════════════════════════════════
+    // MERGE HOT ISSUES into aggregate (shift the numbers up)
+    // Hot Issues are independent records but their defect counts
+    // must be added to FQC aggregate so the analysis reflects
+    // both daily inspection data AND critical flagged issues.
+    // This survives FQC re-upload because hot issues are never
+    // deleted by the upload flow.
+    // ═══════════════════════════════════════════════════════════
+    let hotIssueContribution = 0;
+    try {
+      let hiQuery = adminClient
+        .from('rca_hot_issues')
+        .select('*');
+
+      if (dateFrom) hiQuery = hiQuery.gte('issue_date', dateFrom);
+      if (dateTo) hiQuery = hiQuery.lte('issue_date', dateTo);
+      if (businessType) hiQuery = hiQuery.eq('business_type', businessType);
+
+      const { data: hotIssues } = await hiQuery;
+      const hiList = hotIssues || [];
+
+      for (const hi of hiList) {
+        const qty = Number(hi.defect_qty) || 0;
+        if (qty <= 0) continue;
+
+        // Add to category total
+        const catKey = hi.category ? CATEGORY_NAME_TO_KEY[hi.category.toLowerCase()] : null;
+        if (catKey && categoryTotals[catKey] !== undefined) {
+          categoryTotals[catKey] += qty;
+        }
+
+        // Add to sub-defect total (match by sub_defect name)
+        const subIdx = hi.sub_defect ? SUBDEFECT_NAME_TO_INDEX[hi.sub_defect.toLowerCase()] : undefined;
+        if (subIdx !== undefined && subDefectCounts[subIdx] !== undefined) {
+          subDefectCounts[subIdx] += qty;
+        }
+
+        hotIssueContribution += qty;
+      }
+
+      // Recalculate grand total after merging hot issues
+      grandTotalDefects += hotIssueContribution;
+    } catch (hiErr) {
+      console.error('Error merging hot issues into analysis:', hiErr);
+      // Non-fatal: continue with FQC-only data
+    }
+
+    // Build categorySummary AFTER hot issue merge so it includes hot issue counts
     const categorySummary = DEFECT_CATEGORIES.map((cat) => ({
       category: cat.name,
       categoryKey: cat.key,
@@ -71,12 +137,6 @@ export async function GET(request: NextRequest) {
         ? Math.round((categoryTotals[cat.key] / grandTotalDefects) * 10000) / 100
         : 0,
     })).sort((a, b) => b.defectCount - a.defectCount);
-
-    // Section B: Top 20 Sub-defects
-    // Sum each sub_* column individually across all rows (DB has 64 individual columns, not a JSON array)
-    const subDefectCounts = SUBDEFECT_DB_COLUMNS.map(col =>
-      allRecords.reduce((sum, r) => sum + (Number(r[col]) || 0), 0)
-    );
 
     const subDefectList = subDefectCounts
       .map((count, index) => ({
@@ -136,6 +196,7 @@ export async function GET(request: NextRequest) {
       total_records: allRecords.length,
       total_inspected_qty: totalInspectedQty,
       grand_total_defects: grandTotalDefects,
+      hot_issue_contribution: hotIssueContribution,
       section_a: { category_summary: categorySummary },
       section_b: { top_sub_defects: subDefectList },
       section_c: { top_styles: topStyles },
