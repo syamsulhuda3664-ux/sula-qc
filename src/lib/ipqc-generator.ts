@@ -254,7 +254,38 @@ export function generateIPQCFromFQC(
 ): IPQCGeneratedRow[] {
   const results: IPQCGeneratedRow[] = [];
 
-  for (const fqcRow of fqcRows) {
+  // ── Deduplicate FQC rows by (date, order_no) ──
+  // One order may appear in multiple FQC rows (different lines, sub-lots, etc.)
+  // IPQC must always be exactly 5 sessions per order per day.
+  // Merge defect counts, keep first row's metadata.
+  const mergedMap = new Map<string, Record<string, unknown>>();
+  for (const row of fqcRows) {
+    const dateStr = String(row.inspection_date || '').split('T')[0];
+    const orderNo = String(row.order_no || '');
+    if (!orderNo) continue;
+
+    const key = `${dateStr}__${orderNo}`;
+    if (mergedMap.has(key)) {
+      // Merge numeric defect counts into existing row
+      const existing = mergedMap.get(key)!;
+      const numericKeys = [
+        'inspected_qty', 'ok_qty', 'ng_qty',
+        'defect_stitching', 'defect_stitch_defect', 'defect_logo',
+        'defect_material', 'defect_hardware', 'defect_appearance',
+        'defect_zipper', 'defect_webbing', 'defect_other', 'defect_preparation',
+      ];
+      for (const k of numericKeys) {
+        const existingVal = Number(existing[k]) || 0;
+        const newVal = Number(row[k]) || 0;
+        if (newVal > 0) existing[k] = existingVal + newVal;
+      }
+    } else {
+      mergedMap.set(key, { ...row });
+    }
+  }
+
+  // Generate IPQC from deduplicated rows
+  for (const fqcRow of mergedMap.values()) {
     const dateStr = String(fqcRow.inspection_date || '').split('T')[0];
     const bt = String(fqcRow.business_type || 'OTHER');
     const line = String(fqcRow.production_line || fqcRow.line || '');
