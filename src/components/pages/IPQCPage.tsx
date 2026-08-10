@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Scissors, Wrench, Layers, Sparkles, Info, Download, Loader2, ClipboardCheck } from 'lucide-react';
+import { IPQC_COMPONENT_ZH, IPQC_FINDING_ZH, IPQC_ACTION_ZH, translateIPQCField } from '@/lib/ipqc-i18n-map';
 
 const STAGES = ['Cutting', 'Sewing', 'Assembly', 'Finishing'];
 
@@ -60,6 +61,12 @@ export default function IPQCPage() {
   const [orderNo, setOrderNo] = useState('');
 
   const sessionLabels = SESSION_LABELS[lang] || SESSION_LABELS.en;
+  const isZhMode = lang === 'zh';
+
+  // Translation helpers for data content (component, finding, action)
+  const zhComponent = (text: string | null | undefined) => isZhMode ? translateIPQCField(text, IPQC_COMPONENT_ZH) : text;
+  const zhFinding = (text: string | null | undefined) => isZhMode ? translateIPQCField(text, IPQC_FINDING_ZH) : text;
+  const zhAction = (text: string | null | undefined) => isZhMode ? translateIPQCField(text, IPQC_ACTION_ZH) : text;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -328,22 +335,22 @@ export default function IPQCPage() {
                                 {stageIcons[r.process_stage]} {t(`ipqc.stage.${(r.process_stage || '').toLowerCase()}`)}
                               </span>
                             </TableCell>
-                            <TableCell className="text-xs py-1.5" title={r.component_checked || ''}>
-                              <span className="block truncate">{r.component_checked || '-'}</span>
+                            <TableCell className="text-xs py-1.5" title={zhComponent(r.component_checked) || ''}>
+                              <span className="block truncate">{zhComponent(r.component_checked) || '-'}</span>
                             </TableCell>
                             <TableCell className="text-xs text-right py-1.5">{r.check_count}</TableCell>
                             <TableCell className="text-xs text-right py-1.5 text-emerald-600">{r.ok_count}</TableCell>
                             <TableCell className="text-xs text-right py-1.5 font-medium">
                               {r.ng_count > 0 ? <span className="text-red-600">{r.ng_count}</span> : '0'}
                             </TableCell>
-                            <TableCell className="text-xs py-1.5" title={r.finding || ''}>
+                            <TableCell className="text-xs py-1.5" title={zhFinding(r.finding) || ''}>
                               {r.finding
-                                ? <span className="block truncate text-red-600">{r.finding}</span>
+                                ? <span className="block truncate text-red-600">{zhFinding(r.finding)}</span>
                                 : <span className="text-slate-300">-</span>}
                             </TableCell>
-                            <TableCell className="text-xs py-1.5" title={r.action_taken || ''}>
+                            <TableCell className="text-xs py-1.5" title={zhAction(r.action_taken) || ''}>
                               {r.action_taken
-                                ? <span className="block truncate text-slate-700">{r.action_taken}</span>
+                                ? <span className="block truncate text-slate-700">{zhAction(r.action_taken)}</span>
                                 : <span className="text-slate-300">-</span>}
                             </TableCell>
                           </TableRow>
