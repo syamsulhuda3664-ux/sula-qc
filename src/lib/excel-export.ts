@@ -2963,22 +2963,22 @@ export async function exportOQCCombinedExcel(
 const IPQC_HEADERS = [
   'No / 序号',
   '日期 / Date',
+  '订单号 / Order No',
+  'Sesi',
   '阶段 / Stage',
   '生产线 / Line',
   '检验员 / Inspector',
   '款号 / Style',
-  '订单号 / Order No.',
-  '检查数量 / Checked',
-  '合格数 / Pass',
-  '不合格数 / Fail',
-  '合格率 / Pass Rate',
-  '缺陷数 / Defects',
-  '缺陷详情 / Defect Detail',
-  '业务类型 / Business Type',
+  '组件检查 / Component Checked',
+  '检查数 / Checked',
+  '合格 / OK',
+  '不合格 / NG',
+  'Ditemukan / Finding',
+  'Tindak Lanjut & Hasil / Action Taken',
 ];
 
 const IPQC_WIDTHS = [
-  6, 14, 12, 12, 14, 16, 20, 12, 10, 10, 12, 10, 30, 14,
+  6, 14, 20, 7, 12, 12, 14, 16, 30, 10, 10, 10, 30, 35,
 ];
 
 export function exportIPQCExcel(
@@ -3026,38 +3026,38 @@ export function exportIPQCExcel(
 
   const stageSummaryHeaders = [
     '阶段 / Stage',
-    '检验次数 / Inspections',
-    '检查数量 / Checked',
-    '合格数 / Pass',
-    '不合格数 / Fail',
+    'Sesi / Sessions',
+    '检查数 / Checked',
+    '合格 / OK',
+    '不合格 / NG',
     '合格率 / Pass Rate',
-    '缺陷总数 / Total Defects',
+    'Temuan / Findings',
   ];
   writeRow(ws, row, 0, stageSummaryHeaders, HEADER_STYLE);
   row++;
 
-  const stageAgg: Record<string, { count: number; checked: number; pass: number; fail: number; defects: number }> = {};
+  const stageAgg: Record<string, { sessions: number; checked: number; pass: number; fail: number; findings: number }> = {};
   for (const s of STAGES) {
-    stageAgg[s] = { count: 0, checked: 0, pass: 0, fail: 0, defects: 0 };
+    stageAgg[s] = { sessions: 0, checked: 0, pass: 0, fail: 0, findings: 0 };
   }
-  let totalChecked = 0, totalPass = 0, totalFail = 0, totalDefects = 0;
+  let totalChecked = 0, totalPass = 0, totalFail = 0, totalFindings = 0;
 
   for (const rec of data) {
-    const stage = String(rec.stage || 'Other');
-    if (!stageAgg[stage]) stageAgg[stage] = { count: 0, checked: 0, pass: 0, fail: 0, defects: 0 };
-    stageAgg[stage].count++;
+    const stage = String(rec.process_stage || 'Other');
+    if (!stageAgg[stage]) stageAgg[stage] = { sessions: 0, checked: 0, pass: 0, fail: 0, findings: 0 };
+    stageAgg[stage].sessions++;
     const checked = Number(rec.check_count) || 0;
     const pass = Number(rec.ok_count) || 0;
     const fail = Number(rec.ng_count) || 0;
-    const defects = Number(rec.total_defects) || 0;
+    const hasFinding = rec.finding && String(rec.finding).length > 0;
     stageAgg[stage].checked += checked;
     stageAgg[stage].pass += pass;
     stageAgg[stage].fail += fail;
-    stageAgg[stage].defects += defects;
+    if (hasFinding) stageAgg[stage].findings++;
     totalChecked += checked;
     totalPass += pass;
     totalFail += fail;
-    totalDefects += defects;
+    if (hasFinding) totalFindings++;
   }
 
   for (const s of STAGES) {
@@ -3065,17 +3065,17 @@ export function exportIPQCExcel(
     const rate = agg.checked > 0 ? agg.pass / agg.checked : 0;
     writeRow(ws, row, 0, [
       stageLabels[s] || s,
-      agg.count,
+      agg.sessions,
       agg.checked,
       agg.pass,
       agg.fail,
       fmtPct(rate, true),
-      agg.defects,
+      agg.findings,
     ], DATA_STYLE);
     row++;
   }
 
-  // Total row for stage summary
+  // Total row
   const totalRate = totalChecked > 0 ? totalPass / totalChecked : 0;
   writeRow(ws, row, 0, [
     '合计 / Total',
@@ -3084,11 +3084,11 @@ export function exportIPQCExcel(
     totalPass,
     totalFail,
     fmtPct(totalRate, true),
-    totalDefects,
+    totalFindings,
   ], SUBTOTAL_STYLE);
   row += 2;
 
-  // ---- Detail Data Table ----
+  // ---- Detail Data ----
   writeRow(ws, row, 0, ['明细数据 / Detail Records'], {
     font: { name: 'Arial', sz: 12, bold: true, color: { rgb: '333333' } },
   });
@@ -3099,64 +3099,40 @@ export function exportIPQCExcel(
   writeRow(ws, row, 0, IPQC_HEADERS, HEADER_STYLE);
   row++;
 
-  const sortedIPQC = [...data].sort((a, b) =>
-    String(a.inspection_date || '').localeCompare(String(b.inspection_date || ''))
-  );
+  const SESSION_LABELS = ['', 'Ke-1', 'Ke-2', 'Ke-3', 'Ke-4', 'Ke-5'];
+
+  const sortedIPQC = [...data].sort((a, b) => {
+    const dateComp = String(a.inspection_date || '').localeCompare(String(b.inspection_date || ''));
+    if (dateComp !== 0) return dateComp;
+    const orderComp = String(a.order_no || '').localeCompare(String(b.order_no || ''));
+    if (orderComp !== 0) return orderComp;
+    return (Number(a.session_no) || 0) - (Number(b.session_no) || 0);
+  });
 
   for (let i = 0; i < sortedIPQC.length; i++) {
     const rec = sortedIPQC[i];
     const checked = Number(rec.check_count) || 0;
     const pass = Number(rec.ok_count) || 0;
     const fail = Number(rec.ng_count) || 0;
-    const rate = checked > 0 ? pass / checked : 0;
-    const defects = Number(rec.total_defects) || 0;
-
-    // Build defect detail string from defect_detail JSON string (DB stores as JSON string)
-    let defectDetail = '';
-    const rawDetail = String(rec.defect_detail || '');
-    let parsedDefects: Record<string, unknown>[] | null = null;
-    try { parsedDefects = JSON.parse(rawDetail); } catch { /* not JSON */ }
-    if (Array.isArray(parsedDefects) && parsedDefects.length > 0) {
-      defectDetail = parsedDefects.map((d: Record<string, unknown>) =>
-        `${d.category || ''}: ${d.subDefect || d.sub_defect || ''} (${d.count || 0})`
-      ).join('; ');
-    } else {
-      defectDetail = defects > 0 ? `${defects} defects` : '-';
-    }
 
     writeRow(ws, row, 0, [
       i + 1,
       String(rec.inspection_date || ''),
-      stageLabels[String(rec.stage || '')] || String(rec.stage || ''),
+      String(rec.order_no || ''),
+      SESSION_LABELS[Number(rec.session_no) || 0] || String(rec.session_no || ''),
+      stageLabels[String(rec.process_stage || '')] || String(rec.process_stage || ''),
       String(rec.production_line || ''),
       String(rec.inspector_name || ''),
       String(rec.style_code || ''),
-      String(rec.order_no || ''),
+      String(rec.component_checked || '-'),
       checked,
       pass,
       fail,
-      fmtPct(rate, true),
-      defects,
-      defectDetail,
-      String(rec.business_type || ''),
+      String(rec.finding || '-'),
+      String(rec.action_taken || '-'),
     ], DATA_STYLE);
     row++;
   }
-
-  // Grand total
-  writeRow(ws, row, 0, [
-    '',
-    '合计 / Grand Total',
-    '', '', '', '', '',
-    totalChecked,
-    totalPass,
-    totalFail,
-    fmtPct(totalRate, true),
-    totalDefects,
-    '',
-    '',
-  ], GRAND_TOTAL_STYLE);
-  row++;
 
   // Footer
   row += 1;

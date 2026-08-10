@@ -1,274 +1,316 @@
-export type IPQCStage = 'Cutting' | 'Sewing' | 'Assembly' | 'Finishing';
+/**
+ * IPQC Generator v2 — Bag & Suitcase Manufacturing
+ * 
+ * Generates 5 sessions per order per day.
+ * Each session checks a specific component per process stage.
+ * Uses deterministic PRNG seeded by date + order_no + session for consistency.
+ */
+
+// ═══════════════════════════════════════════════════════════
+// PROCESS STAGES & COMPONENTS (Bag/Suitcase Manufacturing)
+// ═══════════════════════════════════════════════════════════
+
+export const IPQC_STAGES = ['Cutting', 'Sewing', 'Assembly', 'Finishing'] as const;
+export type IPQCStage = typeof IPQC_STAGES[number];
 
 /**
- * Realistic sub-defects per IPQC stage (bilingual: used in defect_detail JSON)
+ * Components checked per session per stage.
+ * Session 1-5 maps to different components within each stage.
+ * In a real factory, not all 4 stages run every day for every order — 
+ * the generator selects stages relevant to the order's progress.
  */
-const STAGE_SUBDEFECTS: Record<IPQCStage, { category: string; subs: string[] }[]> = {
+const STAGE_SESSION_COMPONENTS: Record<IPQCStage, { session: number; component: string }[]> = {
   Cutting: [
-    { category: 'Material', subs: ['Color deviation 色差', 'Fabric defect 布疵', 'Incorrect material 错料', 'Grain direction wrong 纹路错'] },
-    { category: 'Dimension', subs: ['Size out of spec 尺寸超差', 'Pattern misalignment 对位偏移', 'Edge fraying 毛边'] },
-    { category: 'Preparation', subs: ['Missing parts 漏部件', 'Incorrect parts count 部件数量错', 'Parts mixed up 部件混料'] },
+    { session: 1, component: 'Panel kain utama (Main fabric panels)' },
+    { session: 2, component: 'Lining / Furing (Lining fabric)' },
+    { session: 3, component: 'Foam / Busa (Foam inserts)' },
+    { session: 4, component: 'Webbing / Tali (Webbing straps)' },
+    { session: 5, component: 'Komponen kecil: D-ring, buckle, rivet (Small parts)' },
   ],
   Sewing: [
-    { category: 'Stitching', subs: ['Skip stitch 跳针', 'Uneven stitch 针距不均', 'Wrong stitch type 针法错误', 'Thread break 断线', 'Bobbin issue 底线问题'] },
-    { category: 'Appearance', subs: ['Wrinkle 起皱', 'Puckering 起扭', 'Oil stain 油渍'] },
+    { session: 1, component: 'Jahit samping badan (Side seam)' },
+    { session: 2, component: 'Jahit ritsleting / zipper (Zipper stitching)' },
+    { session: 3, component: 'Jahit handle / gagang (Handle attachment)' },
+    { session: 4, component: 'Jahit webbing ke badan (Webbing attachment)' },
+    { session: 5, component: 'Jahit aksen / dekorasi (Topstitch & detail)' },
   ],
   Assembly: [
-    { category: 'Hardware', subs: ['Zipper installed wrong 拉链装错', 'Buckle misaligned 扣具偏位', 'Missing rivet 漜铆钉', 'Handle attachment loose 提手松动'] },
-    { category: 'Accessory', subs: ['Missing accessory 漏配件', 'Wrong accessory 配件错', 'Accessory position off 配件位置偏'] },
-    { category: 'Stitching', subs: ['Open seam at joint 接口开线', 'Reinforcement missing 漜加固', 'Backtack missing 漜回针'] },
+    { session: 1, component: 'Pasang zipper slider & puller' },
+    { session: 2, component: 'Pasang handle ke badan (Handle assembly)' },
+    { session: 3, component: 'Pasang wheel / roda (Wheel assembly for luggage)' },
+    { session: 4, component: 'Pasang trolley / pegangan tarik (Trolley handle)' },
+    { session: 5, component: 'Pasang aksesori: tag, label, hook' },
   ],
   Finishing: [
-    { category: 'Appearance', subs: ['Thread tail 线头', 'Stain/spot 污渍', 'Scratch 划伤', 'Glue residue 胶水残留', 'Deformation 变形'] },
-    { category: 'Label', subs: ['Missing label 漜标', 'Label misaligned 标签歪斜', 'Wrong label content 标签内容错'] },
-    { category: 'Packaging', subs: ['Polybag missing 漜胶袋', 'Incorrect tag 吊牌错', 'Silica gel missing 漜干燥剂'] },
+    { session: 1, component: 'Pemasangan label & wash label' },
+    { session: 2, component: 'Pembersihan benang sisa & oil stain' },
+    { session: 3, component: 'Cek kelurusan & simetri bag' },
+    { session: 4, component: 'Pemasangan silica gel & polybag' },
+    { session: 5, component: 'Final check sebelum packing' },
   ],
 };
+
+// ═══════════════════════════════════════════════════════════
+// DEFECT DICTIONARY — Realistic for bag/suitcase manufacturing
+// ═══════════════════════════════════════════════════════════
+
+interface DefectEntry {
+  finding: string;
+  action: string;
+  weight: number; // probability weight (higher = more common)
+}
 
 /**
- * FQC defect DB column → IPQC stage distribution.
- * Weight = probability the defect originates from this stage.
+ * Per-stage defect dictionary. Each defect has a realistic finding description
+ * and the corrective action that would be taken.
+ * Weight determines how likely this defect is to appear.
  */
-const FQC_DEFECT_TO_STAGES: Record<string, { stage: IPQCStage; category: string; weight: number }[]> = {
-  defect_stitching: [
-    { stage: 'Sewing', category: 'Stitching', weight: 0.70 },
-    { stage: 'Assembly', category: 'Stitching', weight: 0.20 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.10 },
+const STAGE_DEFECTS: Record<IPQCStage, DefectEntry[]> = {
+  Cutting: [
+    { finding: 'Color deviation pada 2 panel kain utama', action: 'Potong ulang 2 panel, ganti dari roll kain yang sama', weight: 15 },
+    { finding: 'Ukuran panel tidak sesuai pola (toleransi >2mm)', action: 'Adjust pola cutting, potong ulang 1 pcs', weight: 12 },
+    { finding: 'Grain direction kain salah arah pada 3 panel', action: 'Sortir ulang, potong ulang dengan arah grain benar', weight: 10 },
+    { finding: 'Fabric defect (jarum tertusuk / hole) pada 1 panel', action: 'Buang panel cacat, potong pengganti', weight: 8 },
+    { finding: 'Tepi kain raveling / fraying berlebihan', action: 'Ganti pisau cutting, check tension', weight: 6 },
+    { finding: 'Kain belang-belang (shade variation) antar roll', action: 'Klaim ke supplier, pakai roll yang sama untuk 1 order', weight: 5 },
+    { finding: 'Foam / busa tipis tidak sesuai spesifikasi', action: 'Ganti foam dari stok yang benar, check ketebalan', weight: 4 },
+  { finding: 'Webbing potongan miring / tidak 90 derajat', action: 'Potong ulang dengan jig guide', weight: 3 },
   ],
-  defect_stitch_defect: [
-    { stage: 'Sewing', category: 'Stitching', weight: 0.75 },
-    { stage: 'Assembly', category: 'Stitching', weight: 0.25 },
+  Sewing: [
+    { finding: 'Skip stitch pada jahitan samping (3 titik)', action: 'Re-stitch area yang skip, periksa jarum & benang', weight: 18 },
+    { finding: 'Needle hole terlalu besar / visible pada kain gelap', action: 'Ganti ukuran jarum (no.9 ke no.11), re-stitch', weight: 8 },
+    { finding: 'Bartack handle tidak rata / salah posisi', action: 'Bongkar bartack, posisi ulang, bartack ulang', weight: 10 },
+    { finding: 'Jahitan tidak mengikuti garis pola (off-line 2mm)', action: 'Adjust needle position, re-stitch', weight: 9 },
+    { finding: 'Tension benang tidak konsisten (baggy/loose)', action: 'Adjust tension upper & bobbin, test jahit sampel', weight: 7 },
+    { finding: 'Benang putus di tengah jahitan (thread break)', action: 'Knot & backtack, lanjutkan jahitan, periksa benang', weight: 6 },
+    { finding: 'Puckering / kain mengkerut setelah dijahit', action: 'Adjust tension & differential feed, re-stitch jika perlu', weight: 5 },
+    { finding: 'Wrong stitch type pada bagian tertentu', action: 'Bongkar jahitan, jahit ulang dengan stitch type benar', weight: 3 },
+    { finding: 'Oil stain dari mesin pada 2 pcs', action: 'Bersihkan mesin, coba hilangkan noda dengan solvent, ganti jika tidak bisa', weight: 4 },
+    { finding: 'Jahit webbing ke badan tidak centered', action: 'Bongkar, posisi ulang dengan center mark, re-stitch', weight: 7 },
   ],
-  defect_logo: [
-    { stage: 'Assembly', category: 'Appearance', weight: 0.60 },
-    { stage: 'Finishing', category: 'Label', weight: 0.40 },
+  Assembly: [
+    { finding: 'Zipper stuck / macet saat ditarik', action: 'Ganti zipper slider, test berulang', weight: 15 },
+    { finding: 'Handle loose / longgar setelah dipasang', action: 'Perkuat bartack, tambahan rivet jika perlu', weight: 12 },
+    { finding: 'Wheel tidak berputar lancar (2 dari 4 roda)', action: 'Ganti wheel yang bermasalah, test berputar', weight: 10 },
+    { finding: 'Trolley handle macet / tidak naik turun', action: 'Adjust mekanisme trolley, lubricate, ganti jika perlu', weight: 8 },
+    { finding: 'Rivet longgar / bisa diputar', action: 'Re-rivet dengan tools yang benar, check pressure', weight: 7 },
+    { finding: 'Buckle / snap hook salah posisi', action: 'Bongkar, pasang ulang di posisi benar', weight: 5 },
+    { finding: 'Zipper head reversed / terbalik arah', action: 'Ganti zipper head dengan arah benar', weight: 4 },
+    { finding: 'D-ring atau O-ring tidak tertutup rapi', action: 'Adjust penutup, bartack tambahan', weight: 3 },
   ],
-  defect_material: [
-    { stage: 'Cutting', category: 'Material', weight: 0.80 },
-    { stage: 'Sewing', category: 'Appearance', weight: 0.20 },
-  ],
-  defect_hardware: [
-    { stage: 'Assembly', category: 'Hardware', weight: 0.80 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.20 },
-  ],
-  defect_appearance: [
-    { stage: 'Sewing', category: 'Appearance', weight: 0.25 },
-    { stage: 'Assembly', category: 'Appearance', weight: 0.30 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.45 },
-  ],
-  defect_zipper: [
-    { stage: 'Assembly', category: 'Hardware', weight: 0.80 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.20 },
-  ],
-  defect_webbing: [
-    { stage: 'Sewing', category: 'Stitching', weight: 0.50 },
-    { stage: 'Assembly', category: 'Accessory', weight: 0.30 },
-    { stage: 'Finishing', category: 'Appearance', weight: 0.20 },
-  ],
-  defect_other: [
-    { stage: 'Finishing', category: 'Appearance', weight: 0.40 },
-    { stage: 'Cutting', category: 'Dimension', weight: 0.30 },
-    { stage: 'Assembly', category: 'Accessory', weight: 0.30 },
-  ],
-  defect_preparation: [
-    { stage: 'Cutting', category: 'Preparation', weight: 0.70 },
-    { stage: 'Assembly', category: 'Accessory', weight: 0.30 },
+  Finishing: [
+    { finding: 'Label merek miring / posisi tidak centered', action: 'Bongkar label, pasang ulang dengan jig posisi', weight: 14 },
+    { finding: 'Sisa benang / thread tail di 5 titik', action: 'Potong bersih semua thread tail, check dengan cahaya', weight: 12 },
+    { finding: 'Oil stain / dirt pada bagian luar', action: 'Bersihkan dengan pembersih kain, reject jika tidak hilang', weight: 8 },
+    { finding: 'Wash label terbalik / terbaca terbalik', action: 'Bongkar, pasang ulang dengan arah benar', weight: 5 },
+    { finding: 'Silica gel tidak dimasukkan / tertinggal', action: 'Masukkan silica gel, seal polybag', weight: 4 },
+    { finding: 'Polybag tidak tertutup rapat', action: 'Reseal polybag, check heat sealer', weight: 3 },
+    { finding: 'Scratch / gores pada hardware (logo plate)', action: 'Ganti hardware yang tergores, reject part', weight: 6 },
+    { finding: 'Bag body asimetris (sisi kiri-kanan beda)', action: 'Return ke sewing untuk koreksi, atau downgrade', weight: 4 },
+    { finding: 'Hook / aksesori tertinggal tidak terpasang', action: 'Pasang hook, check kelengkapan vs BOM', weight: 3 },
+    { finding: 'Kemasan karton kurang / tidak sesuai standar', action: 'Ganti karton, check spec packaging', weight: 2 },
   ],
 };
 
-/** Deterministic PRNG (Lehmer / Park-Miller) */
+// ═══════════════════════════════════════════════════════════
+// DETERMINISTIC PRNG
+// ═══════════════════════════════════════════════════════════
+
 function seededRng(seed: number) {
   let s = seed % 2147483647;
   if (s <= 0) s += 2147483646;
   return () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
 }
 
-function pick<T>(arr: T[], rng: () => number): T {
-  return arr[Math.floor(rng() * arr.length)];
-}
-
-/** Hash a string into a numeric seed */
 function hashSeed(str: string): number {
   let h = 0;
   for (let i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
   return Math.abs(h) || 1;
 }
 
+function pickWeighted<T extends { weight: number }>(items: T[], rng: () => number): T | null {
+  if (items.length === 0) return null;
+  const totalWeight = items.reduce((s, i) => s + i.weight, 0);
+  let r = rng() * totalWeight;
+  for (const item of items) {
+    r -= item.weight;
+    if (r <= 0) return item;
+  }
+  return items[items.length - 1];
+}
+
+// ═══════════════════════════════════════════════════════════
+// GENERATOR
+// ═══════════════════════════════════════════════════════════
+
 export interface IPQCGeneratedRow {
-  inspection_date: string;       // YYYY-MM-DD
+  inspection_date: string;
+  business_type: string;
   production_line: string;
   inspector_name: string;
   style_code: string;
   order_no: string;
-  business_type: string;
-  stage: IPQCStage;
+  session_no: number;
+  process_stage: string;
+  component_checked: string;
+  finding: string | null;
   check_count: number;
   ok_count: number;
   ng_count: number;
-  pass_rate: number;           // e.g. 95.67 (percentage)
-  total_defects: number;
-  defect_category: string;      // primary category e.g. "Stitching"
-  defect_detail: string;        // JSON string of defect items
+  action_taken: string | null;
+}
+
+/**
+ * Determine which stages are active for this order based on FQC defect profile.
+ * In real production, the stages present depend on where the order is in the process.
+ * We use the FQC defect categories to infer which stages were involved.
+ */
+function selectActiveStages(fqcRow: Record<string, unknown>, rng: () => number): IPQCStage[] {
+  const scores: Record<IPQCStage, number> = {
+    Cutting: 0,
+    Sewing: 0,
+    Assembly: 0,
+    Finishing: 0,
+  };
+
+  // Score based on FQC defect categories
+  const stitchDefects = (Number(fqcRow.defect_stitching) || 0) + (Number(fqcRow.defect_stitch_defect) || 0);
+  scores.Sewing += stitchDefects * 0.7;
+  scores.Assembly += stitchDefects * 0.2;
+  scores.Finishing += stitchDefects * 0.1;
+
+  scores.Cutting += (Number(fqcRow.defect_material) || 0) * 0.8 + (Number(fqcRow.defect_preparation) || 0) * 0.7;
+  scores.Sewing += (Number(fqcRow.defect_material) || 0) * 0.15;
+
+  scores.Assembly += (Number(fqcRow.defect_hardware) || 0) * 0.8 + (Number(fqcRow.defect_zipper) || 0) * 0.7;
+  scores.Finishing += (Number(fqcRow.defect_zipper) || 0) * 0.2;
+
+  scores.Sewing += (Number(fqcRow.defect_webbing) || 0) * 0.5;
+  scores.Assembly += (Number(fqcRow.defect_webbing) || 0) * 0.3;
+  scores.Finishing += (Number(fqcRow.defect_webbing) || 0) * 0.1;
+
+  scores.Sewing += (Number(fqcRow.defect_appearance) || 0) * 0.25;
+  scores.Assembly += (Number(fqcRow.defect_appearance) || 0) * 0.3;
+  scores.Finishing += (Number(fqcRow.defect_appearance) || 0) * 0.45;
+
+  scores.Assembly += (Number(fqcRow.defect_logo) || 0) * 0.6;
+  scores.Finishing += (Number(fqcRow.defect_logo) || 0) * 0.4;
+
+  scores.Finishing += (Number(fqcRow.defect_other) || 0) * 0.5;
+  scores.Cutting += (Number(fqcRow.defect_other) || 0) * 0.3;
+  scores.Assembly += (Number(fqcRow.defect_other) || 0) * 0.2;
+
+  // Always include at least 2 stages. If FQC had defects, include relevant ones.
+  const sorted = (Object.entries(scores) as [IPQCStage, number][]).sort((a, b) => b[1] - a[1]);
+  const totalDefects = Object.values(scores).reduce((s, v) => s + v, 0);
+
+  if (totalDefects === 0) {
+    // No defects — pick 2-3 random stages (most orders go through cutting + sewing + assembly)
+    const numStages = 2 + Math.round(rng() * 1); // 2-3
+    return sorted.slice(0, numStages).map(([s]) => s);
+  }
+
+  // Include stages that have score > 0, min 2, max 4
+  const active = sorted.filter(([, score]) => score > 0);
+  return active.slice(0, 4).map(([s]) => s);
 }
 
 /**
  * Generate IPQC records from FQC DB rows.
  *
- * Key realism constraints:
- * - IPQC checks 25-50% of FQC inspected qty (spot check during production)
- * - IPQC pass rate is 2-6% higher than FQC (issues caught & fixed in-process)
- * - IPQC total defects = 2-4x FQC defects (more caught, but fixed before FQC)
- * - Defect categories match the stage where they logically occur
- * - Same FQC input always produces the same IPQC output (deterministic)
+ * For each FQC row (per order/line):
+ * - Select 2-4 active stages based on defect profile
+ * - For each active stage, generate 5 sessions (Ke-1 through Ke-5)
+ * - Each session checks a specific component
+ * - Some sessions find defects, some don't (realistic distribution)
+ * - Defects are drawn from a weighted bag/suitcase defect dictionary
+ *
+ * Deterministic: same FQC input always produces same IPQC output.
  */
 export function generateIPQCFromFQC(
   fqcRows: Record<string, unknown>[],
 ): IPQCGeneratedRow[] {
   const results: IPQCGeneratedRow[] = [];
 
-  // Group FQC rows by date + business_type for seed stability
-  const grouped = new Map<string, Record<string, unknown>[]>();
-  for (const row of fqcRows) {
-    const date = String(row.inspection_date || '').split('T')[0];
-    const bt = String(row.business_type || 'OTHER');
-    const key = `${date}__${bt}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(row);
-  }
+  for (const fqcRow of fqcRows) {
+    const dateStr = String(fqcRow.inspection_date || '').split('T')[0];
+    const bt = String(fqcRow.business_type || 'OTHER');
+    const line = String(fqcRow.production_line || fqcRow.line || '');
+    const inspector = String(fqcRow.inspector_name || fqcRow.inspector || '');
+    const style = String(fqcRow.style_code || fqcRow.style || '');
+    const orderNo = String(fqcRow.order_no || '');
+    const inspectedQty = Number(fqcRow.inspected_qty) || 0;
+    const okQty = Number(fqcRow.ok_qty) || 0;
+    const ngQty = Number(fqcRow.ng_qty) || 0;
+    const fqcPassRate = inspectedQty > 0 ? okQty / inspectedQty : 0.95;
 
-  for (const [groupKey, rows] of grouped) {
-    const baseSeed = hashSeed(groupKey);
-    let seedIdx = baseSeed;
+    if (!orderNo) continue;
 
-    // Aggregate FQC stats for this group
-    let totalInspected = 0, totalOK = 0, totalNG = 0, totalDefects = 0;
-    const fqcDefectSums: Record<string, number> = {};
+    // Seed based on date + order for deterministic output
+    const baseSeed = hashSeed(`${dateStr}__${orderNo}`);
+    const rng = seededRng(baseSeed);
 
-    for (const row of rows) {
-      totalInspected += Number(row.inspected_qty) || 0;
-      totalOK += Number(row.ok_qty) || 0;
-      totalNG += Number(row.ng_qty) || 0;
-      totalDefects += Number(row.total_defects) || 0;
+    // Select which stages this order goes through
+    const activeStages = selectActiveStages(fqcRow, rng);
 
-      for (const col of Object.keys(FQC_DEFECT_TO_STAGES)) {
-        fqcDefectSums[col] = (fqcDefectSums[col] || 0) + (Number(row[col]) || 0);
-      }
-    }
+    // Base check count per session: 5-15% of FQC inspected qty per session
+    const sessionsPerStage = 5;
+    const baseCheckPerSession = Math.max(5, Math.round(inspectedQty * (0.05 + rng() * 0.10) / (activeStages.length * sessionsPerStage)));
 
-    const fqcPassRate = totalInspected > 0 ? totalOK / totalInspected : 1;
-    const rng = seededRng(seedIdx++);
+    for (const stage of activeStages) {
+      const components = STAGE_SESSION_COMPONENTS[stage];
+      const defects = STAGE_DEFECTS[stage];
 
-    // ── Determine which stages to generate ──
-    // Score each stage by weighted FQC defect contribution
-    const stageScores: Record<string, number> = { Cutting: 0, Sewing: 0, Assembly: 0, Finishing: 0 };
-    for (const [col, mappings] of Object.entries(FQC_DEFECT_TO_STAGES)) {
-      const count = fqcDefectSums[col] || 0;
-      for (const m of mappings) stageScores[m.stage] += count * m.weight;
-    }
+      for (let ses = 1; ses <= sessionsPerStage; ses++) {
+        const sesRng = seededRng(baseSeed + ses * 1000 + hashSeed(stage));
+        const compIdx = Math.min(ses - 1, components.length - 1);
+        const component = components[compIdx].component;
 
-    // Always generate for top 2-3 stages, but ensure all 4 stages appear over time
-    const sorted = (Object.entries(stageScores) as [string, number][]).sort((a, b) => b[1] - a[1]);
-    const numStages = totalDefects > 0
-      ? 2 + Math.round(rng() * 1.2)   // 2-3 stages when defects exist
-      : 2;                                // 2 stages when no defects
-    const selectedStages = sorted.slice(0, Math.min(numStages, 4)).map(([s]) => s as IPQCStage);
+        // Check count: vary slightly per session (80-120% of base)
+        const checkCount = Math.max(3, Math.round(baseCheckPerSession * (0.8 + sesRng() * 0.4)));
 
-    // ── Pick a representative FQC row for line/inspector/style/order ──
-    // Use different rows for different stages to add variety
-    const stageRowMap: Record<string, Record<string, unknown>> = {};
-    for (const stage of selectedStages) {
-      stageRowMap[stage] = pick(rows, seededRng(seedIdx++));
-    }
+        // Defect probability: ~30-50% chance a session finds something
+        const defectChance = 0.30 + sesRng() * 0.20;
+        const hasDefect = sesRng() < defectChance;
 
-    // ── Generate IPQC record per selected stage ──
-    for (const stage of selectedStages) {
-      const sRng = seededRng(seedIdx++);
-      const srcRow = stageRowMap[stage];
-      const dateStr = String(srcRow.inspection_date || '').split('T')[0];
+        let ngCount = 0;
+        let finding: string | null = null;
+        let action: string | null = null;
 
-      // Checked qty: 25-50% of FQC inspected (spot check)
-      const checkRatio = 0.25 + sRng() * 0.25;
-      const checkCount = Math.max(5, Math.round(totalInspected * checkRatio / selectedStages.length));
+        if (hasDefect) {
+          // Pick a defect from the dictionary
+          const defect = pickWeighted(defects, sesRng);
+          if (defect) {
+            // NG count: 1-3 typically for IPQC spot check
+            ngCount = 1 + Math.floor(sesRng() * 3);
+            // Scale down if check count is small
+            if (checkCount < 10) ngCount = Math.min(ngCount, Math.max(1, Math.floor(checkCount * 0.15)));
+            ngCount = Math.min(ngCount, checkCount);
 
-      // Pass rate: 2-6% higher than FQC (IPQC catches & fixes issues)
-      const ipqcPassRate = Math.min(0.995, Math.max(0.90, fqcPassRate + 0.02 + sRng() * 0.04 + (sRng() - 0.5) * 0.02));
-      const okCount = Math.round(checkCount * ipqcPassRate);
-      const ngCount = checkCount - okCount;
-
-      // ── Generate synthetic defects for this stage ──
-      // IPQC catches 2-4x more defects than what leaks to FQC
-      const defectMultiplier = 2.5 + sRng() * 1.5;
-      const stageDefectBudget = Math.max(0, Math.round(
-        (stageScores[stage] || 0) * defectMultiplier / (selectedStages.length * 0.7)
-      ));
-
-      // If FQC had zero defects for this group, still generate small random defects (realistic noise)
-      const baseDefects = totalDefects === 0
-        ? Math.round(sRng() * 2)  // 0-2 random defects
-        : stageDefectBudget;
-
-      const defects: { category: string; subDefect: string; count: number }[] = [];
-      let defectTotal = 0;
-      const stageCats = STAGE_SUBDEFECTS[stage] || [];
-
-      if (baseDefects > 0 && stageCats.length > 0) {
-        let remaining = Math.min(baseDefects, ngCount * 3); // cap at 3x NG count
-        if (remaining <= 0) remaining = Math.max(1, baseDefects); // ensure some defects even if NG=0
-
-        for (const cat of stageCats) {
-          if (remaining <= 0) break;
-          // Weighted category selection — first categories get more defects
-          const catBudget = Math.round(remaining * (0.3 + sRng() * 0.5));
-          if (catBudget <= 0) continue;
-
-          let catRemaining = Math.min(catBudget, remaining);
-          const shuffled = [...cat.subs].sort(() => sRng() - 0.5);
-
-          for (let i = 0; i < shuffled.length && catRemaining > 0; i++) {
-            const isLast = i === shuffled.length - 1;
-            const count = isLast
-              ? catRemaining
-              : Math.max(0, Math.round(catRemaining * (0.2 + sRng() * 0.5)));
-            if (count > 0) {
-              defects.push({ category: cat.category, subDefect: shuffled[i], count });
-              defectTotal += count;
-              catRemaining -= count;
-              remaining -= count;
-            }
+            finding = defect.finding;
+            action = defect.action;
           }
         }
+
+        const okCount = checkCount - ngCount;
+
+        results.push({
+          inspection_date: dateStr,
+          business_type: bt,
+          production_line: line,
+          inspector_name: inspector,
+          style_code: style,
+          order_no: orderNo,
+          session_no: ses,
+          process_stage: stage,
+          component_checked: component,
+          finding: finding,
+          check_count: checkCount,
+          ok_count: okCount,
+          ng_count: ngCount,
+          action_taken: action,
+        });
       }
-
-      // Primary defect category for the record
-      const primaryCat = defects.length > 0
-        ? defects.reduce((a, b) => a.count >= b.count ? a : b).category
-        : (stageCats[0]?.category || '');
-
-      // Build defect_detail JSON string (matching existing export format)
-      const defectDetail = defects.length > 0
-        ? JSON.stringify(defects.map(d => ({
-            category: d.category,
-            subDefect: d.subDefect,
-            count: d.count,
-          })))
-        : '';
-
-      results.push({
-        inspection_date: dateStr,
-        production_line: String(srcRow.production_line || srcRow.line || ''),
-        inspector_name: String(srcRow.inspector_name || srcRow.inspector || ''),
-        style_code: String(srcRow.style_code || srcRow.style || ''),
-        order_no: String(srcRow.order_no || ''),
-        business_type: String(srcRow.business_type || 'OTHER'),
-        stage,
-        check_count: checkCount,
-        ok_count: okCount,
-        ng_count: ngCount,
-        pass_rate: Math.round(ipqcPassRate * 10000) / 100, // store as percentage e.g. 95.67
-        total_defects: defectTotal,
-        defect_category: primaryCat,
-        defect_detail: defectDetail,
-      });
     }
   }
 

@@ -159,7 +159,7 @@ export async function PATCH(request: NextRequest) {
     // Determine date column based on table
     const dateColumn = table === 'fqc_daily_uploads' ? 'upload_date'
       : table === 'fqc_inspections' ? 'inspection_date'
-      : table === 'ipqc_records' ? 'record_date'
+      : table === 'ipqc_records' ? 'inspection_date'
       : table === 'oqc_daily_lots' ? 'lot_date'
       : table === 'rca_weekly' ? 'week_start'
       : 'created_at';

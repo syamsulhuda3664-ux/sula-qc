@@ -1,69 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
-import { SUBDEFECT_NAMES } from '@/lib/rca-generator';
-import { SUBDEFECT_DB_COLUMNS } from '@/lib/db-schema';
-
-/**
- * Sync defect qty from a hot issue to fqc_inspections table.
- * Finds matching inspection row(s) by date + BT + style (+ optional order_no),
- * then adds `delta` to the specific sub_defect column, category column, and ng_qty.
- */
-async function syncDefectToFqcInspection(
-  issueDate: string,
-  businessType: string,
-  styleCode: string,
-  orderNo: string | null,
-  subDefect: string,
-  categoryKey: string,
-  delta: number
-) {
-  if (!subDefect || delta === 0) return;
-
-  // Find the sub-defect DB column name
-  const subIdx = SUBDEFECT_NAMES.indexOf(subDefect);
-  const subCol = subIdx >= 0 ? SUBDEFECT_DB_COLUMNS[subIdx] : null;
-  if (!subCol) return;
-
-  // Build query to find matching fqc_inspections row(s)
-  let query = adminClient
-    .from('fqc_inspections')
-    .select('id, ng_qty')
-    .eq('inspection_date', issueDate)
-    .eq('business_type', businessType)
-    .eq('style_code', styleCode);
-
-  if (orderNo) query = query.eq('order_no', orderNo);
-
-  const { data: rows, error: fetchErr } = await query;
-  if (fetchErr || !rows || rows.length === 0) {
-    console.log(`[Hot Issue Sync] No matching fqc_inspections row found for ${issueDate} / ${businessType} / ${styleCode} / ${orderNo || 'any'}`);
-    return;
-  }
-
-  // Update each matching row
-  for (const row of rows) {
-    const updates: Record<string, unknown> = {
-      // Increment the specific sub-defect column
-      [subCol]: (Number((row as any)[subCol]) || 0) + delta,
-      // Increment the category column
-      [categoryKey]: (Number((row as any)[categoryKey]) || 0) + delta,
-      // Increment ng_qty
-      ng_qty: (Number(row.ng_qty) || 0) + delta,
-    };
-
-    const { error: updateErr } = await adminClient
-      .from('fqc_inspections')
-      .update(updates)
-      .eq('id', row.id);
-
-    if (updateErr) {
-      console.error(`[Hot Issue Sync] Failed to update inspection ${row.id}:`, updateErr.message);
-    } else {
-      console.log(`[Hot Issue Sync] Updated inspection ${row.id}: ${subCol} += ${delta}, ${categoryKey} += ${delta}`);
-    }
-  }
-}
 
 // ═══════════════════════════════════════════════════════════
 // GET — list hot issues (all authenticated users can view)
@@ -113,6 +50,9 @@ export async function GET(request: NextRequest) {
 
 // ═══════════════════════════════════════════════════════════
 // POST — create hot issue (staff_qa, manager_qc only)
+// Note: Hot Issue data is independent — does NOT modify fqc_inspections.
+//       FQC Analysis aggregates purely from fqc_inspections (FQC daily uploads).
+//       Hot Issues only feed into RCA Top 3 priority.
 // ═══════════════════════════════════════════════════════════
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request, 'view');
@@ -133,8 +73,6 @@ export async function POST(request: NextRequest) {
     if (!issue_date || !business_type || !sub_defect) {
       return NextResponse.json({ error: 'issue_date, business_type, and sub_defect are required' }, { status: 400 });
     }
-
-    const styleCode = (style_codes && style_codes.length > 0) ? style_codes[0] : '';
 
     const { data, error } = await adminClient
       .from('rca_hot_issues')
@@ -169,14 +107,6 @@ export async function POST(request: NextRequest) {
     if (error) {
       console.error('Create hot issue error:', error);
       return NextResponse.json({ error: 'Failed to create hot issue' }, { status: 500 });
-    }
-
-    // Sync defect qty to fqc_inspections
-    if (styleCode && category && defect_qty > 0) {
-      await syncDefectToFqcInspection(
-        issue_date, business_type, styleCode, order_no || null,
-        sub_defect, category, defect_qty
-      );
     }
 
     return NextResponse.json({ record: data, message: 'Hot issue created' });
