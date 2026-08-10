@@ -1,9 +1,11 @@
 /**
- * IPQC Generator v2 — Bag & Suitcase Manufacturing
+ * IPQC Generator v3 — Bag & Suitcase Manufacturing
  * 
- * Generates 5 sessions per order per day.
- * Each session checks a specific component per process stage.
- * Uses deterministic PRNG seeded by date + order_no + session for consistency.
+ * Generates exactly 5 sessions per order per day.
+ * Each session checks 1 process stage + 1 specific component.
+ * Sessions cycle through the active stages for that order.
+ * Uses deterministic PRNG seeded by date + order_no for consistency.
+ * Approach A: finding + action + result in one row (no open/closed status).
  */
 
 // ═══════════════════════════════════════════════════════════
@@ -14,39 +16,37 @@ export const IPQC_STAGES = ['Cutting', 'Sewing', 'Assembly', 'Finishing'] as con
 export type IPQCStage = typeof IPQC_STAGES[number];
 
 /**
- * Components checked per session per stage.
- * Session 1-5 maps to different components within each stage.
- * In a real factory, not all 4 stages run every day for every order — 
- * the generator selects stages relevant to the order's progress.
+ * Components per stage. Generator picks one per session.
+ * Realistic components checked during IPQC in bag/suitcase factory.
  */
-const STAGE_SESSION_COMPONENTS: Record<IPQCStage, { session: number; component: string }[]> = {
+const STAGE_COMPONENTS: Record<IPQCStage, string[]> = {
   Cutting: [
-    { session: 1, component: 'Panel kain utama (Main fabric panels)' },
-    { session: 2, component: 'Lining / Furing (Lining fabric)' },
-    { session: 3, component: 'Foam / Busa (Foam inserts)' },
-    { session: 4, component: 'Webbing / Tali (Webbing straps)' },
-    { session: 5, component: 'Komponen kecil: D-ring, buckle, rivet (Small parts)' },
+    'Panel kain utama (Main fabric panels)',
+    'Lining / Furing (Lining fabric)',
+    'Foam / Busa (Foam inserts)',
+    'Webbing / Tali (Webbing straps)',
+    'Komponen kecil: D-ring, buckle, rivet (Small parts)',
   ],
   Sewing: [
-    { session: 1, component: 'Jahit samping badan (Side seam)' },
-    { session: 2, component: 'Jahit ritsleting / zipper (Zipper stitching)' },
-    { session: 3, component: 'Jahit handle / gagang (Handle attachment)' },
-    { session: 4, component: 'Jahit webbing ke badan (Webbing attachment)' },
-    { session: 5, component: 'Jahit aksen / dekorasi (Topstitch & detail)' },
+    'Jahit samping badan (Side seam)',
+    'Jahit ritsleting / zipper (Zipper stitching)',
+    'Jahit handle / gagang (Handle attachment)',
+    'Jahit webbing ke badan (Webbing attachment)',
+    'Jahit aksen / dekorasi (Topstitch & detail)',
   ],
   Assembly: [
-    { session: 1, component: 'Pasang zipper slider & puller' },
-    { session: 2, component: 'Pasang handle ke badan (Handle assembly)' },
-    { session: 3, component: 'Pasang wheel / roda (Wheel assembly for luggage)' },
-    { session: 4, component: 'Pasang trolley / pegangan tarik (Trolley handle)' },
-    { session: 5, component: 'Pasang aksesori: tag, label, hook' },
+    'Pasang zipper slider & puller',
+    'Pasang handle ke badan (Handle assembly)',
+    'Pasang wheel / roda (Wheel assembly for luggage)',
+    'Pasang trolley / pegangan tarik (Trolley handle)',
+    'Pasang aksesori: tag, label, hook',
   ],
   Finishing: [
-    { session: 1, component: 'Pemasangan label & wash label' },
-    { session: 2, component: 'Pembersihan benang sisa & oil stain' },
-    { session: 3, component: 'Cek kelurusan & simetri bag' },
-    { session: 4, component: 'Pemasangan silica gel & polybag' },
-    { session: 5, component: 'Final check sebelum packing' },
+    'Pemasangan label & wash label',
+    'Pembersihan benang sisa & oil stain',
+    'Cek kelurusan & simetri bag',
+    'Pemasangan silica gel & polybag',
+    'Final check sebelum packing',
   ],
 };
 
@@ -60,11 +60,6 @@ interface DefectEntry {
   weight: number; // probability weight (higher = more common)
 }
 
-/**
- * Per-stage defect dictionary. Each defect has a realistic finding description
- * and the corrective action that would be taken.
- * Weight determines how likely this defect is to appear.
- */
 const STAGE_DEFECTS: Record<IPQCStage, DefectEntry[]> = {
   Cutting: [
     { finding: 'Color deviation pada 2 panel kain utama', action: 'Potong ulang 2 panel, ganti dari roll kain yang sama', weight: 15 },
@@ -74,7 +69,7 @@ const STAGE_DEFECTS: Record<IPQCStage, DefectEntry[]> = {
     { finding: 'Tepi kain raveling / fraying berlebihan', action: 'Ganti pisau cutting, check tension', weight: 6 },
     { finding: 'Kain belang-belang (shade variation) antar roll', action: 'Klaim ke supplier, pakai roll yang sama untuk 1 order', weight: 5 },
     { finding: 'Foam / busa tipis tidak sesuai spesifikasi', action: 'Ganti foam dari stok yang benar, check ketebalan', weight: 4 },
-  { finding: 'Webbing potongan miring / tidak 90 derajat', action: 'Potong ulang dengan jig guide', weight: 3 },
+    { finding: 'Webbing potongan miring / tidak 90 derajat', action: 'Potong ulang dengan jig guide', weight: 3 },
   ],
   Sewing: [
     { finding: 'Skip stitch pada jahitan samping (3 titik)', action: 'Re-stitch area yang skip, periksa jarum & benang', weight: 18 },
@@ -162,8 +157,8 @@ export interface IPQCGeneratedRow {
 
 /**
  * Determine which stages are active for this order based on FQC defect profile.
- * In real production, the stages present depend on where the order is in the process.
- * We use the FQC defect categories to infer which stages were involved.
+ * Doesn't force stages that don't have relevant defects.
+ * Returns 2-4 stages, min 2 (most orders have at least sewing + assembly).
  */
 function selectActiveStages(fqcRow: Record<string, unknown>, rng: () => number): IPQCStage[] {
   const scores: Record<IPQCStage, number> = {
@@ -200,7 +195,6 @@ function selectActiveStages(fqcRow: Record<string, unknown>, rng: () => number):
   scores.Cutting += (Number(fqcRow.defect_other) || 0) * 0.3;
   scores.Assembly += (Number(fqcRow.defect_other) || 0) * 0.2;
 
-  // Always include at least 2 stages. If FQC had defects, include relevant ones.
   const sorted = (Object.entries(scores) as [IPQCStage, number][]).sort((a, b) => b[1] - a[1]);
   const totalDefects = Object.values(scores).reduce((s, v) => s + v, 0);
 
@@ -216,14 +210,42 @@ function selectActiveStages(fqcRow: Record<string, unknown>, rng: () => number):
 }
 
 /**
+ * Build a schedule of 5 sessions from the active stages.
+ * If 2 stages: [A, B, A, B, A] — cycles through
+ * If 3 stages: [A, B, C, A, B]
+ * If 4 stages: [A, B, C, D, A]
+ * Ensures all active stages get checked at least once.
+ */
+function buildSessionSchedule(activeStages: IPQCStage[], rng: () => number): IPQCStage[] {
+  const schedule: IPQCStage[] = [];
+  for (let i = 0; i < 5; i++) {
+    schedule.push(activeStages[i % activeStages.length]);
+  }
+  return schedule;
+}
+
+/**
+ * Pick a component for a given stage and session.
+ * Uses the session number to deterministically pick from the stage's component list.
+ * Across 5 sessions, tries to cover different components within the same stage.
+ */
+function pickComponent(stage: IPQCStage, sessionNo: number, stageOccurrence: number, rng: () => number): string {
+  const components = STAGE_COMPONENTS[stage];
+  // Use stageOccurrence to pick a different component each time the same stage appears
+  const idx = (stageOccurrence + Math.floor(rng() * 2)) % components.length;
+  return components[idx];
+}
+
+/**
  * Generate IPQC records from FQC DB rows.
  *
  * For each FQC row (per order/line):
  * - Select 2-4 active stages based on defect profile
- * - For each active stage, generate 5 sessions (Ke-1 through Ke-5)
- * - Each session checks a specific component
+ * - Generate exactly 5 sessions (Ke-1 through Ke-5) TOTAL per order
+ * - Each session picks 1 stage (cycling) + 1 component
  * - Some sessions find defects, some don't (realistic distribution)
- * - Defects are drawn from a weighted bag/suitcase defect dictionary
+ * - Defects drawn from weighted bag/suitcase defect dictionary
+ * - Approach A: finding + action_taken in one row (no open/closed)
  *
  * Deterministic: same FQC input always produces same IPQC output.
  */
@@ -250,67 +272,72 @@ export function generateIPQCFromFQC(
     const baseSeed = hashSeed(`${dateStr}__${orderNo}`);
     const rng = seededRng(baseSeed);
 
-    // Select which stages this order goes through
+    // Select which stages this order goes through (2-4 stages)
     const activeStages = selectActiveStages(fqcRow, rng);
 
-    // Base check count per session: 5-15% of FQC inspected qty per session
-    const sessionsPerStage = 5;
-    const baseCheckPerSession = Math.max(5, Math.round(inspectedQty * (0.05 + rng() * 0.10) / (activeStages.length * sessionsPerStage)));
+    // Build exactly 5 sessions cycling through active stages
+    const schedule = buildSessionSchedule(activeStages, rng);
 
-    for (const stage of activeStages) {
-      const components = STAGE_SESSION_COMPONENTS[stage];
-      const defects = STAGE_DEFECTS[stage];
+    // Base check count per session: ~2-5% of FQC inspected qty
+    const baseCheckPerSession = Math.max(3, Math.round(inspectedQty * (0.02 + rng() * 0.03)));
 
-      for (let ses = 1; ses <= sessionsPerStage; ses++) {
-        const sesRng = seededRng(baseSeed + ses * 1000 + hashSeed(stage));
-        const compIdx = Math.min(ses - 1, components.length - 1);
-        const component = components[compIdx].component;
+    // Track how many times each stage has appeared (for component variety)
+    const stageOccurrence: Record<string, number> = {};
 
-        // Check count: vary slightly per session (80-120% of base)
-        const checkCount = Math.max(3, Math.round(baseCheckPerSession * (0.8 + sesRng() * 0.4)));
+    for (let ses = 1; ses <= 5; ses++) {
+      const sesRng = seededRng(baseSeed + ses * 1000);
+      const stage = schedule[ses - 1];
 
-        // Defect probability: ~30-50% chance a session finds something
-        const defectChance = 0.30 + sesRng() * 0.20;
-        const hasDefect = sesRng() < defectChance;
+      // Track occurrence count for this stage
+      stageOccurrence[stage] = (stageOccurrence[stage] || 0) + 1;
 
-        let ngCount = 0;
-        let finding: string | null = null;
-        let action: string | null = null;
+      // Pick component (varies by stage occurrence to avoid repetition)
+      const component = pickComponent(stage, ses, stageOccurrence[stage] - 1, sesRng);
 
-        if (hasDefect) {
-          // Pick a defect from the dictionary
-          const defect = pickWeighted(defects, sesRng);
-          if (defect) {
-            // NG count: 1-3 typically for IPQC spot check
-            ngCount = 1 + Math.floor(sesRng() * 3);
-            // Scale down if check count is small
-            if (checkCount < 10) ngCount = Math.min(ngCount, Math.max(1, Math.floor(checkCount * 0.15)));
-            ngCount = Math.min(ngCount, checkCount);
+      // Check count: vary slightly per session (80-120% of base)
+      const checkCount = Math.max(3, Math.round(baseCheckPerSession * (0.8 + sesRng() * 0.4)));
 
-            finding = defect.finding;
-            action = defect.action;
-          }
+      // Defect probability: ~30-50% chance a session finds something
+      const defectChance = 0.30 + sesRng() * 0.20;
+      const hasDefect = sesRng() < defectChance;
+
+      let ngCount = 0;
+      let finding: string | null = null;
+      let action: string | null = null;
+
+      if (hasDefect) {
+        const defects = STAGE_DEFECTS[stage];
+        const defect = pickWeighted(defects, sesRng);
+        if (defect) {
+          // NG count: 1-3 typically for IPQC spot check
+          ngCount = 1 + Math.floor(sesRng() * 3);
+          // Scale down if check count is small
+          if (checkCount < 10) ngCount = Math.min(ngCount, Math.max(1, Math.floor(checkCount * 0.15)));
+          ngCount = Math.min(ngCount, checkCount);
+
+          finding = defect.finding;
+          action = defect.action;
         }
-
-        const okCount = checkCount - ngCount;
-
-        results.push({
-          inspection_date: dateStr,
-          business_type: bt,
-          production_line: line,
-          inspector_name: inspector,
-          style_code: style,
-          order_no: orderNo,
-          session_no: ses,
-          process_stage: stage,
-          component_checked: component,
-          finding: finding,
-          check_count: checkCount,
-          ok_count: okCount,
-          ng_count: ngCount,
-          action_taken: action,
-        });
       }
+
+      const okCount = checkCount - ngCount;
+
+      results.push({
+        inspection_date: dateStr,
+        business_type: bt,
+        production_line: line,
+        inspector_name: inspector,
+        style_code: style,
+        order_no: orderNo,
+        session_no: ses,
+        process_stage: stage,
+        component_checked: component,
+        finding: finding,
+        check_count: checkCount,
+        ok_count: okCount,
+        ng_count: ngCount,
+        action_taken: action,
+      });
     }
   }
 
