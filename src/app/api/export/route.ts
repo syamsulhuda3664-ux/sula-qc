@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
     }
     data = (records as Record<string, unknown>[]) || [];
 
-    const result = exportIPQCExcel(data, exportFilters, lang);
+    const result = await exportIPQCExcel(data, exportFilters, lang);
 
     return new NextResponse(Buffer.from(result.buffer), {
       status: 200,

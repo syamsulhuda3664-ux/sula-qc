@@ -2957,89 +2957,123 @@ export async function exportOQCCombinedExcel(
 }
 
 // ---------------------------------------------------------------------------
-// 4. IPQC Excel
+// 4. IPQC Excel (ExcelJS — matching FQC design theme)
 // ---------------------------------------------------------------------------
 
-const IPQC_HEADERS = [
-  'No / 序号',
-  '日期 / Date',
-  '订单号 / Order No',
-  'Sesi',
-  '阶段 / Stage',
-  '生产线 / Line',
-  '检验员 / Inspector',
-  '款号 / Style',
-  '组件检查 / Component Checked',
-  '检查数 / Checked',
-  '合格 / OK',
-  '不合格 / NG',
-  'Ditemukan / Finding',
-  'Tindak Lanjut & Hasil / Action Taken',
-];
-
-const IPQC_WIDTHS = [
-  6, 14, 20, 7, 12, 12, 14, 16, 30, 10, 10, 10, 30, 35,
-];
-
-export function exportIPQCExcel(
+export async function exportIPQCExcel(
   data: Record<string, unknown>[],
   filters: ExportFilters,
-  _lang: ExportLang,
-): ExcelExportResult {
-  const wb = createBook();
-  const ws: XLSX.WorkSheet = {};
-  const totalCols = IPQC_HEADERS.length;
+  lang: ExportLang,
+): Promise<ExcelExportResult> {
+  const isZh = lang === 'zh';
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('IPQC过程检验 IPQC Records');
 
-  let row = writeTitle(ws, 'SULA-QC 过程品质检验报告\nIPQC In-Process Quality Control Report', 0, totalCols - 1);
+  // -- Color constants (matching FQC theme) --
+  const MED_BLUE    = 'FF2B5F8A';
+  const HEADER_BG   = 'FF1F4E79';
+  const PALE_BLUE   = 'FFEDF2F9';
+  const LIGHT_BLUE  = 'FFD6E4F0';
+  const WHITE_ARGB  = 'FFFFFFFF';
+  const GRAY_FOOTER = 'FF999999';
+  const FILTER_TEXT = 'FF4A6FA5';
+  const ORANGE_ACCENT = 'FFFF8C00';
+  const RED_ACCENT = 'FFDC2626';
 
-  // Filter info
+  const thinBorder: Partial<ExcelJS.Borders> = {
+    top:    { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    left:   { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    bottom: { style: 'thin', color: { argb: 'FFB0B0B0' } },
+    right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
+  };
+
+  // Import translation maps for zh mode
+  const { IPQC_COMPONENT_ZH, IPQC_FINDING_ZH, IPQC_ACTION_ZH } = await import('./ipqc-i18n-map');
+  const zh = (text: string | null | undefined, map: Record<string, string>) =>
+    isZh && text ? (map[text] || text) : (text || '');
+
+  // Stage labels
+  const stageLabels: Record<string, string> = isZh
+    ? { Cutting: '裁剪', Sewing: '缝制', Assembly: '组装', Finishing: '后整' }
+    : { Cutting: 'Cutting', Sewing: 'Sewing', Assembly: 'Assembly', Finishing: 'Finishing' };
+
+  const sessionLabels = isZh
+    ? ['', '第1次', '第2次', '第3次', '第4次', '第5次']
+    : ['', 'Ke-1', 'Ke-2', 'Ke-3', 'Ke-4', 'Ke-5'];
+
+  // Column definitions: 10 columns for detail section
+  const DETAIL_HEADERS = isZh
+    ? ['序号', '次', '工序', '检查组件', '检查', '合格', 'NG', '发现', '跟进与结果']
+    : ['No', 'Sesi', 'Proses', 'Komponen Dicek', 'Cek', 'OK', 'NG', 'Ditemukan', 'Tindak Lanjut & Hasil'];
+  const DETAIL_COLS = DETAIL_HEADERS.length; // 9
+
+  // Stage summary headers
+  const STAGE_SUM_HEADERS = isZh
+    ? ['工序', '次数', '检查数', '合格数', '不合格', '合格率', '有发现']
+    : ['Stage', 'Sessions', 'Checked', 'OK', 'NG', 'Pass Rate', 'Findings'];
+
+  // ============ TITLE ROW (height 63) ============
+  ws.mergeCells(1, 1, 1, DETAIL_COLS);
+  const row1 = ws.getRow(1);
+  row1.height = 63;
+  const titleCell = row1.getCell(1);
+  titleCell.value = '厦门市欣维发实业有限公司品质检验表\nIPQC 过程品质检验报告 / In-Process Quality Control Report';
+  titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: WHITE_ARGB } };
+  titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: MED_BLUE } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  // Spacer rows
+  ws.getRow(2).height = 4;
+  ws.getRow(3).height = 3;
+
+  // ============ FILTER ROW ============
+  let currentRow = 4;
   const filterParts: string[] = [];
   if (filters.dateFrom) filterParts.push(`From: ${filters.dateFrom}`);
   if (filters.dateTo) filterParts.push(`To: ${filters.dateTo}`);
   if (filters.businessType) filterParts.push(`Type: ${filters.businessType}`);
+
   if (filterParts.length > 0) {
-    writeRow(ws, row, 0, [filterParts.join('   |   ')], {
-      font: { name: 'Arial', sz: 9, italic: true, color: { rgb: '666666' } },
-    });
-    ws['!merges'] = ws['!merges'] || [];
-    ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
-    row += 2;
-  } else {
-    row += 2;
+    const fRow = ws.getRow(currentRow);
+    fRow.height = 13.4;
+    ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
+    const fCell = fRow.getCell(1);
+    fCell.value = filterParts.join('   |   ');
+    fCell.font = { name: 'Arial', size: 9, italic: true, color: { argb: FILTER_TEXT } };
+    fCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+    fCell.alignment = { vertical: 'middle' };
+    currentRow++;
   }
 
-  // ---- Stage Summary ----
-  writeRow(ws, row, 0, ['阶段汇总 / Stage Summary'], {
-    font: { name: 'Arial', sz: 12, bold: true, color: { rgb: '333333' } },
-  });
-  ws['!merges'] = ws['!merges'] || [];
-  ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
-  row++;
+  // ============ STAGE SUMMARY SECTION ============
+  const stageTitleRow = ws.getRow(currentRow);
+  stageTitleRow.height = 22;
+  ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
+  const stCell = stageTitleRow.getCell(1);
+  stCell.value = isZh ? '阶段汇总 / Stage Summary' : 'Ringkasan Tahap / Stage Summary';
+  stCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF333333' } };
+  stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+  stCell.alignment = { vertical: 'middle', indent: 1 };
+  stCell.border = thinBorder;
+  currentRow++;
 
+  // Stage summary headers
+  const ssHeaderRow = ws.getRow(currentRow);
+  ssHeaderRow.height = 30;
+  for (let c = 1; c <= STAGE_SUM_HEADERS.length; c++) {
+    const cell = ssHeaderRow.getCell(c);
+    cell.value = STAGE_SUM_HEADERS[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = thinBorder;
+  }
+  currentRow++;
+
+  // Compute stage aggregates
   const STAGES = ['Cutting', 'Sewing', 'Assembly', 'Finishing'] as const;
-  const stageLabels: Record<string, string> = {
-    Cutting: '裁剪 / Cutting',
-    Sewing: '缝制 / Sewing',
-    Assembly: '组装 / Assembly',
-    Finishing: '后整 / Finishing',
-  };
-
-  const stageSummaryHeaders = [
-    '阶段 / Stage',
-    'Sesi / Sessions',
-    '检查数 / Checked',
-    '合格 / OK',
-    '不合格 / NG',
-    '合格率 / Pass Rate',
-    'Temuan / Findings',
-  ];
-  writeRow(ws, row, 0, stageSummaryHeaders, HEADER_STYLE);
-  row++;
-
   const stageAgg: Record<string, { sessions: number; checked: number; pass: number; fail: number; findings: number }> = {};
-  for (const s of STAGES) {
-    stageAgg[s] = { sessions: 0, checked: 0, pass: 0, fail: 0, findings: 0 };
-  }
+  for (const s of STAGES) stageAgg[s] = { sessions: 0, checked: 0, pass: 0, fail: 0, findings: 0 };
   let totalChecked = 0, totalPass = 0, totalFail = 0, totalFindings = 0;
 
   for (const rec of data) {
@@ -3060,91 +3094,230 @@ export function exportIPQCExcel(
     if (hasFinding) totalFindings++;
   }
 
+  // Write stage rows (alternating)
+  let si = 0;
   for (const s of STAGES) {
     const agg = stageAgg[s];
     const rate = agg.checked > 0 ? agg.pass / agg.checked : 0;
-    writeRow(ws, row, 0, [
-      stageLabels[s] || s,
-      agg.sessions,
-      agg.checked,
-      agg.pass,
-      agg.fail,
-      fmtPct(rate, true),
-      agg.findings,
-    ], DATA_STYLE);
-    row++;
+    const bg = si % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
+    const sr = ws.getRow(currentRow);
+    sr.height = 20;
+    const sVals: (string | number)[] = [stageLabels[s] || s, agg.sessions, agg.checked, agg.pass, agg.fail, fmtPct(rate, true), agg.findings];
+    for (let c = 1; c <= STAGE_SUM_HEADERS.length; c++) {
+      const cell = sr.getCell(c);
+      const val = sVals[c - 1];
+      cell.value = typeof val === 'number' ? val : String(val);
+      cell.font = { name: 'Arial', size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+      cell.alignment = c >= 3 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+      cell.border = thinBorder;
+    }
+    currentRow++;
+    si++;
   }
 
-  // Total row
-  const totalRate = totalChecked > 0 ? totalPass / totalChecked : 0;
-  writeRow(ws, row, 0, [
-    '合计 / Total',
-    data.length,
-    totalChecked,
-    totalPass,
-    totalFail,
-    fmtPct(totalRate, true),
-    totalFindings,
-  ], SUBTOTAL_STYLE);
-  row += 2;
+  // Stage total row
+  const stageTotalRate = totalChecked > 0 ? totalPass / totalChecked : 0;
+  const stTotalRow = ws.getRow(currentRow);
+  stTotalRow.height = 22;
+  const stTotalVals: (string | number)[] = [isZh ? '合计 Total' : 'Total', data.length, totalChecked, totalPass, totalFail, fmtPct(stageTotalRate, true), totalFindings];
+  for (let c = 1; c <= STAGE_SUM_HEADERS.length; c++) {
+    const cell = stTotalRow.getCell(c);
+    const val = stTotalVals[c - 1];
+    cell.value = typeof val === 'number' ? val : String(val);
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = c >= 3 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+    cell.border = thinBorder;
+  }
+  currentRow += 2; // gap before detail
 
-  // ---- Detail Data ----
-  writeRow(ws, row, 0, ['明细数据 / Detail Records'], {
-    font: { name: 'Arial', sz: 12, bold: true, color: { rgb: '333333' } },
-  });
-  ws['!merges'] = ws['!merges'] || [];
-  ws['!merges'].push({ s: { r: row, c: 0 }, e: { r: row, c: totalCols - 1 } });
-  row++;
+  // ============ DETAIL SECTION TITLE ============
+  const detailTitleRow = ws.getRow(currentRow);
+  detailTitleRow.height = 22;
+  ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
+  const dtCell = detailTitleRow.getCell(1);
+  dtCell.value = isZh ? '明细数据 / Detail Records' : 'Data Detail / Detail Records';
+  dtCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF333333' } };
+  dtCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
+  dtCell.alignment = { vertical: 'middle', indent: 1 };
+  dtCell.border = thinBorder;
+  currentRow++;
 
-  writeRow(ws, row, 0, IPQC_HEADERS, HEADER_STYLE);
-  row++;
+  // Detail headers
+  const dHeaderRow = ws.getRow(currentRow);
+  dHeaderRow.height = 36;
+  for (let c = 1; c <= DETAIL_COLS; c++) {
+    const cell = dHeaderRow.getCell(c);
+    cell.value = DETAIL_HEADERS[c - 1];
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = thinBorder;
+  }
+  currentRow++;
 
-  const SESSION_LABELS = ['', 'Ke-1', 'Ke-2', 'Ke-3', 'Ke-4', 'Ke-5'];
-
-  const sortedIPQC = [...data].sort((a, b) => {
-    const dateComp = String(a.inspection_date || '').localeCompare(String(b.inspection_date || ''));
-    if (dateComp !== 0) return dateComp;
-    const orderComp = String(a.order_no || '').localeCompare(String(b.order_no || ''));
-    if (orderComp !== 0) return orderComp;
+  // ============ DETAIL DATA — Grouped per (date, order) ============
+  // Sort: date DESC, order ASC, session ASC
+  const sorted = [...data].sort((a, b) => {
+    const dc = String(b.inspection_date || '').split('T')[0].localeCompare(String(a.inspection_date || '').split('T')[0]);
+    if (dc !== 0) return dc;
+    const oc = String(a.order_no || '').localeCompare(String(b.order_no || ''));
+    if (oc !== 0) return oc;
     return (Number(a.session_no) || 0) - (Number(b.session_no) || 0);
   });
 
-  for (let i = 0; i < sortedIPQC.length; i++) {
-    const rec = sortedIPQC[i];
-    const checked = Number(rec.check_count) || 0;
-    const pass = Number(rec.ok_count) || 0;
-    const fail = Number(rec.ng_count) || 0;
-
-    writeRow(ws, row, 0, [
-      i + 1,
-      String(rec.inspection_date || ''),
-      String(rec.order_no || ''),
-      SESSION_LABELS[Number(rec.session_no) || 0] || String(rec.session_no || ''),
-      stageLabels[String(rec.process_stage || '')] || String(rec.process_stage || ''),
-      String(rec.production_line || ''),
-      String(rec.inspector_name || ''),
-      String(rec.style_code || ''),
-      String(rec.component_checked || '-'),
-      checked,
-      pass,
-      fail,
-      String(rec.finding || '-'),
-      String(rec.action_taken || '-'),
-    ], DATA_STYLE);
-    row++;
+  // Group by (date, order)
+  const orderGroups: { date: string; orderNo: string; bt: string; style: string; line: string; inspector: string; records: typeof sorted }[] = [];
+  const groupMap = new Map<string, typeof orderGroups[number]>();
+  for (const rec of sorted) {
+    const d = String(rec.inspection_date || '').split('T')[0];
+    const o = String(rec.order_no || '');
+    const key = `${d}__${o}`;
+    if (!groupMap.has(key)) {
+      const g = { date: d, orderNo: o, bt: String(rec.business_type || ''), style: String(rec.style_code || ''), line: String(rec.production_line || ''), inspector: String(rec.inspector_name || ''), records: [] };
+      groupMap.set(key, g);
+      orderGroups.push(g);
+    }
+    groupMap.get(key)!.records.push(rec);
   }
 
-  // Footer
-  row += 1;
-  writeRow(ws, row, 0, [`Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`], {
-    font: { name: 'Arial', sz: 8, italic: true, color: { rgb: 'AAAAAA' } },
-  });
+  const numColsDetail = new Set<number>([5, 6, 7]); // Cek, OK, NG are numbers
+  let dataRowNum = 0;
 
-  setColWidths(ws, IPQC_WIDTHS);
-  ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: totalCols - 1 } });
-  XLSX.utils.book_append_sheet(wb, ws, 'IPQC过程检验 IPQC Records');
+  for (const group of orderGroups) {
+    // -- Order header row --
+    const ohRow = ws.getRow(currentRow);
+    ohRow.height = 24;
+    ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
+    const ohCell = ohRow.getCell(1);
+    const orderLabel = isZh
+      ? `${group.orderNo}  |  ${group.date}  |  ${group.style}  |  ${group.bt.replace('PT', '')}  |  ${isZh ? '线别' : 'Line'}: ${group.line}  |  ${isZh ? '检验员' : 'Inspector'}: ${group.inspector}`
+      : `${group.orderNo}  |  ${group.date}  |  ${group.style}  |  ${group.bt.replace('PT', '')}  |  Line: ${group.line}  |  Inspector: ${group.inspector}`;
+    ohCell.value = orderLabel;
+    ohCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+    ohCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+    ohCell.alignment = { vertical: 'middle', indent: 1 };
+    ohCell.border = thinBorder;
+    currentRow++;
 
-  const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+    let gChecked = 0, gOK = 0, gNG = 0, gFindings = 0;
+
+    // -- 5 session rows --
+    for (let si2 = 0; si2 < group.records.length; si2++) {
+      const rec = group.records[si2];
+      const checked = Number(rec.check_count) || 0;
+      const pass = Number(rec.ok_count) || 0;
+      const fail = Number(rec.ng_count) || 0;
+      const hasFinding = rec.finding && String(rec.finding).length > 0;
+      gChecked += checked;
+      gOK += pass;
+      gNG += fail;
+      if (hasFinding) gFindings++;
+
+      const bg = dataRowNum % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
+      const dr = ws.getRow(currentRow);
+      dr.height = 22;
+
+      const vals: (string | number)[] = [
+        si2 + 1,
+        sessionLabels[Number(rec.session_no) || 0] || String(rec.session_no || ''),
+        stageLabels[String(rec.process_stage || '')] || String(rec.process_stage || ''),
+        zh(String(rec.component_checked || ''), IPQC_COMPONENT_ZH),
+        checked,
+        pass,
+        fail,
+        zh(String(rec.finding || ''), IPQC_FINDING_ZH),
+        zh(String(rec.action_taken || ''), IPQC_ACTION_ZH),
+      ];
+
+      for (let c = 1; c <= DETAIL_COLS; c++) {
+        const cell = dr.getCell(c);
+        const val = vals[c - 1];
+        cell.value = typeof val === 'number' ? val : String(val);
+        cell.font = { name: 'Arial', size: 10 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        cell.alignment = numColsDetail.has(c)
+          ? { horizontal: 'right', vertical: 'middle' }
+          : { horizontal: 'left', vertical: 'middle', wrapText: true };
+        cell.border = thinBorder;
+
+        // Red highlight for NG > 0
+        if (c === 7 && fail > 0) {
+          cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: RED_ACCENT } };
+        }
+        // Red highlight for finding text
+        if (c === 8 && hasFinding) {
+          cell.font = { name: 'Arial', size: 10, color: { argb: RED_ACCENT } };
+        }
+      }
+      currentRow++;
+      dataRowNum++;
+    }
+
+    // -- Order subtotal row --
+    const osRow = ws.getRow(currentRow);
+    osRow.height = 22;
+    ws.mergeCells(currentRow, 1, currentRow, 4);
+    const osCell = osRow.getCell(1);
+    osCell.value = isZh ? `小计 ${group.orderNo}` : `Subtotal ${group.orderNo}`;
+    osCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+    osCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+    osCell.alignment = { vertical: 'middle', indent: 1 };
+    osCell.border = thinBorder;
+
+    const subVals: (string | number)[] = ['', '', gChecked, gOK, gNG, gFindings > 0 ? `${gFindings} ${isZh ? '发现' : 'findings'}` : '-'];
+    for (let c = 5; c <= DETAIL_COLS; c++) {
+      const cell = osRow.getCell(c);
+      const val = subVals[c - 5];
+      cell.value = typeof val === 'number' ? val : String(val);
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
+      cell.alignment = c <= 7 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+      cell.border = thinBorder;
+      if (c === 7 && gNG > 0) {
+        cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: RED_ACCENT } };
+      }
+    }
+    currentRow++;
+  }
+
+  // ============ GRAND TOTAL ROW ============
+  const gtRow = ws.getRow(currentRow);
+  gtRow.height = 25;
+  ws.mergeCells(currentRow, 1, currentRow, 4);
+  const gtCell = gtRow.getCell(1);
+  gtCell.value = isZh ? '合计 GRAND TOTAL' : 'GRAND TOTAL';
+  gtCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+  gtCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+  gtCell.alignment = { vertical: 'middle', indent: 1 };
+  gtCell.border = thinBorder;
+
+  const gtVals: (string | number)[] = ['', '', totalChecked, totalPass, totalFail, totalFindings > 0 ? `${totalFindings} ${isZh ? '发现' : 'findings'}` : '-'];
+  for (let c = 5; c <= DETAIL_COLS; c++) {
+    const cell = gtRow.getCell(c);
+    const val = gtVals[c - 5];
+    cell.value = typeof val === 'number' ? val : String(val);
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
+    cell.alignment = c <= 7 ? { horizontal: 'right', vertical: 'middle' } : { horizontal: 'left', vertical: 'middle' };
+    cell.border = thinBorder;
+  }
+  currentRow += 2;
+
+  // ============ FOOTER ============
+  ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
+  const footRow = ws.getRow(currentRow);
+  const footCell = footRow.getCell(1);
+  footCell.value = `Generated by SULA-QC System on ${new Date().toISOString().split('T')[0]}`;
+  footCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
+
+  // ============ COLUMN WIDTHS ============
+  const widths = [5, 8, 12, 28, 10, 10, 8, 30, 35];
+  for (let c = 0; c < DETAIL_COLS; c++) ws.getColumn(c + 1).width = widths[c] || 10;
+
+  // ============ GENERATE BUFFER ============
+  const buffer = await wb.xlsx.writeBuffer();
   const period = filters.dateFrom ? `${filters.dateFrom}_${filters.dateTo || 'all'}` : 'All';
-  return { buffer: new Uint8Array(buffer), fileName: `SULA-QC_IPQC_${period}.xlsx` };
+  return { buffer: new Uint8Array(buffer as ArrayBuffer), fileName: `SULA-QC_IPQC_${period}.xlsx` };
 }
