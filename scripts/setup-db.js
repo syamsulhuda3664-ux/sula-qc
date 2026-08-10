@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS ipqc_records (
   inspection_date DATE NOT NULL,
   business_type TEXT,
   production_line TEXT,
+  inspector_name TEXT,
   style_code TEXT,
   order_no TEXT,
   stage TEXT CHECK (stage IN ('Cutting', 'Sewing', 'Assembly', 'Finishing')),
@@ -186,6 +187,7 @@ CREATE TABLE IF NOT EXISTS ipqc_records (
   ok_count INTEGER DEFAULT 0,
   ng_count INTEGER DEFAULT 0,
   pass_rate DECIMAL(10, 6),
+  total_defects INTEGER DEFAULT 0,
   defect_category TEXT,
   defect_detail TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()

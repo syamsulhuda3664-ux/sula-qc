@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { adminClient } from '@/lib/supabase-admin';
 import { authenticateRequest } from '@/lib/auth';
 import { parseFQCExcelMultiSheet, type ParsedSheet } from '@/lib/fqc-parser';
-import { mapInspectionToDb } from '@/lib/db-schema';
+import { mapInspectionToDb, mapInspectionRow } from '@/lib/db-schema';
 import { generateOQCLot, type OQCLot } from '@/lib/oqc-generator';
+import { generateIPQCFromFQC } from '@/lib/ipqc-generator';
 
 export async function POST(request: NextRequest) {
   const auth = await authenticateRequest(request, 'full');
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const errors: string[] = [];
-    const sheetResults: { date: string; sheetName: string; recordCount: number; oqcLots: number }[] = [];
+    const sheetResults: { date: string; sheetName: string; recordCount: number; oqcGenerated: boolean; ipqcGenerated: number }[] = [];
     let totalInspectionCount = 0;
 
     for (const parsed of sheets) {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
 
       if (parsed.records.length === 0) {
         errors.push(`Sheet "${parsed.sheetName}": no valid records`);
-        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcLots: 0 });
+        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcGenerated: false, ipqcGenerated: 0 });
         continue;
       }
 
@@ -72,11 +73,53 @@ export async function POST(request: NextRequest) {
       if (insertError) {
         console.error(`Insert error for ${dateStr}:`, insertError);
         errors.push(`Sheet "${parsed.sheetName}" (${dateStr}): DB insert failed - ${insertError.message}`);
-        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcLots: 0 });
+        sheetResults.push({ date: dateStr, sheetName: parsed.sheetName, recordCount: 0, oqcGenerated: false, ipqcGenerated: 0 });
         continue;
       }
 
       totalInspectionCount += parsed.records.length;
+
+      // ── Auto-generate IPQC from the newly inserted FQC data ──
+      let ipqcInserted = 0;
+      try {
+        // Fetch the freshly inserted FQC rows from DB (with correct DB column names)
+        const { data: freshFQC } = await adminClient
+          .from('fqc_inspections')
+          .select('*')
+          .eq('inspection_date', dateStr);
+
+        if (freshFQC && freshFQC.length > 0) {
+          // Map DB rows to app-level field names for the generator
+          const mappedFQC = freshFQC.map(r => mapInspectionRow(r as Record<string, unknown>));
+          const generated = generateIPQCFromFQC(mappedFQC as Record<string, unknown>[]);
+
+          // Delete existing IPQC for this date (since FQC was re-uploaded)
+          for (const sheetBt of sheetBts) {
+            await adminClient
+              .from('ipqc_records')
+              .delete()
+              .eq('inspection_date', dateStr)
+              .eq('business_type', sheetBt);
+          }
+
+          // Insert new IPQC records in batches of 100
+          for (let i = 0; i < generated.length; i += 100) {
+            const batch = generated.slice(i, i + 100);
+            const { error: ipqcErr } = await adminClient
+              .from('ipqc_records')
+              .insert(batch);
+            if (ipqcErr) {
+              console.error(`IPQC auto-generate error for ${dateStr}:`, ipqcErr);
+              errors.push(`IPQC auto-generate failed for ${dateStr}: ${ipqcErr.message}`);
+            } else {
+              ipqcInserted += batch.length;
+            }
+          }
+        }
+      } catch (ipqcGenErr) {
+        console.error(`IPQC generation error for ${dateStr}:`, ipqcGenErr);
+        errors.push(`IPQC generation error for ${dateStr}: ${ipqcGenErr instanceof Error ? ipqcGenErr.message : String(ipqcGenErr)}`);
+      }
 
       // ── Group FQC records by business_type ──
       const groupedByBt: Record<string, typeof parsed.records> = {};
@@ -234,7 +277,8 @@ export async function POST(request: NextRequest) {
         date: dateStr,
         sheetName: parsed.sheetName,
         recordCount: parsed.records.length,
-        oqcLots: oqcLotsCount,
+        oqcGenerated: oqcLotsCount > 0,
+        ipqcGenerated: ipqcInserted,
       });
     }
 

@@ -14,8 +14,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Scissors, Wrench, Layers, Sparkles, Loader2 } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { RefreshCw, Scissors, Wrench, Layers, Sparkles, Info } from 'lucide-react';
 
 const STAGES = ['Cutting', 'Sewing', 'Assembly', 'Finishing'];
 
@@ -35,12 +34,10 @@ const stageColors: Record<string, string> = {
 
 export default function IPQCPage() {
   const { t } = useI18n();
-  const { user } = useAuth();
   const { effectiveType, isLocked } = useBusinessTypeLock();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [genMsg, setGenMsg] = useState<string | null>(null);
+
   const [page, setPage] = useState(1);
   const { dateFrom, dateTo, setDateFrom, setDateTo, clearDates } = useDateFilter();
   const [businessType, setBusinessType] = useState('ALL');
@@ -71,32 +68,7 @@ export default function IPQCPage() {
     fetchData();
   }, [fetchData]);
 
-  const canGenerate = user?.role === 'staff_qa';
   const bt = effectiveType || businessType;
-
-  const handleGenerate = async () => {
-    if (!dateFrom || !dateTo) return;
-    setGenerating(true);
-    setGenMsg(null);
-    try {
-      const res = await fetch('/api/ipqc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'generate', date_from: dateFrom, date_to: dateTo, business_type: bt }),
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setGenMsg(json.message);
-        fetchData();
-      } else {
-        setGenMsg(json.error || 'Generate failed');
-      }
-    } catch {
-      setGenMsg('Network error');
-    } finally {
-      setGenerating(false);
-    }
-  };
 
   const records = data?.records || [];
   const subtotals = data?.subtotals || {};
@@ -144,24 +116,18 @@ export default function IPQCPage() {
                 </SelectContent>
               </Select>
             </div>
-            {canGenerate && (
-              <Button size="sm" onClick={handleGenerate} disabled={generating || !dateFrom || !dateTo} className="h-9 bg-slate-900 hover:bg-slate-800">
-                {generating ? <><Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> Generating...</> : <><RefreshCw className="h-3.5 w-3.5 mr-1" /> Generate</>}
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={() => { clearDates(); setBusinessType('ALL'); setLine(''); setStage('ALL'); setPage(1); setGenMsg(null); }} className="h-9">
+            <Button variant="outline" size="sm" onClick={() => { clearDates(); setBusinessType('ALL'); setLine(''); setStage('ALL'); setPage(1); }} className="h-9">
               <RefreshCw className="h-3.5 w-3.5 mr-1" /> {t('action.reset')}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Generate result message */}
-      {genMsg && (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${genMsg.includes('error') || genMsg.includes('Error') || genMsg.includes('failed') || genMsg.includes('No FQC') ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-          {genMsg}
-        </div>
-      )}
+      {/* Auto-generated info */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-700 flex items-center gap-2">
+        <Info className="h-4 w-4 shrink-0" />
+        <span>IPQC data di-generate otomatis saat upload FQC Daily.</span>
+      </div>
 
       {/* Stage Summary Cards */}
       {!loading && (
