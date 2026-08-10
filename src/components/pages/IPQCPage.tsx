@@ -40,10 +40,14 @@ const stageBgColors: Record<string, string> = {
   Finishing: 'border-l-emerald-400',
 };
 
-const sessionLabels = ['', 'Ke-1', 'Ke-2', 'Ke-3', 'Ke-4', 'Ke-5'];
+// Session labels per language
+const SESSION_LABELS: Record<string, string[]> = {
+  zh: ['', '第1次', '第2次', '第3次', '第4次', '第5次'],
+  en: ['', 'Ke-1', 'Ke-2', 'Ke-3', 'Ke-4', 'Ke-5'],
+};
 
 export default function IPQCPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { effectiveType, isLocked } = useBusinessTypeLock();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -54,6 +58,8 @@ export default function IPQCPage() {
   const [line, setLine] = useState('');
   const [stage, setStage] = useState('ALL');
   const [orderNo, setOrderNo] = useState('');
+
+  const sessionLabels = SESSION_LABELS[lang] || SESSION_LABELS.en;
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -106,7 +112,6 @@ export default function IPQCPage() {
   };
 
   const records = data?.records || [];
-  const subtotals = data?.subtotals || {};
   const pagination = data?.pagination || {};
 
   // Group records by (date + order_no) for per-order display
@@ -127,11 +132,9 @@ export default function IPQCPage() {
       }
       groups[key].records.push(r);
     }
-    // Sort each group's records by session_no
     for (const g of Object.values(groups)) {
       g.records.sort((a: any, b: any) => (a.session_no || 0) - (b.session_no || 0));
     }
-    // Sort groups by date desc, order_no asc
     return Object.values(groups).sort((a, b) => {
       const dateComp = b.date.localeCompare(a.date);
       if (dateComp !== 0) return dateComp;
@@ -139,7 +142,7 @@ export default function IPQCPage() {
     });
   }, [records]);
 
-  // Summary stats for the page
+  // Summary stats
   const totalFindings = useMemo(() => records.filter((r: any) => r.finding).length, [records]);
   const totalNG = useMemo(() => records.reduce((s: number, r: any) => s + (Number(r.ng_count) || 0), 0), [records]);
   const totalChecked = useMemo(() => records.reduce((s: number, r: any) => s + (Number(r.check_count) || 0), 0), [records]);
@@ -205,13 +208,13 @@ export default function IPQCPage() {
         <div className="flex items-start gap-2">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
           <div>
-            <p className="font-medium mb-1">Cara membaca laporan IPQC:</p>
+            <p className="font-medium mb-1" dangerouslySetInnerHTML={{ __html: t('ipqc.howToRead') }} />
             <ul className="list-disc ml-4 space-y-0.5">
-              <li>Setiap order diperiksa <strong>5 kali sehari</strong> (Sesi Ke-1 s/d Ke-5, setiap ~2 jam).</li>
-              <li>Setiap sesi memeriksa <strong>1 komponen spesifik</strong> pada 1 proses (Cutting / Sewing / Assembly / Finishing).</li>
-              <li>Kolom <strong>Ditemukan</strong>: temuan defect jika ada. Kolom <strong>Tindak Lanjut & Hasil</strong>: aksi perbaikan yang sudah dilakukan beserta hasilnya.</li>
-              <li>Proses yang dicek bergantung pada order — tidak semua order melewati semua tahap (misalnya yang hanya sewing + assembly tidak akan ada cutting).</li>
-              <li>Data di-generate otomatis saat upload FQC Daily berdasarkan nomor order dan tanggal pemeriksaan.</li>
+              <li dangerouslySetInnerHTML={{ __html: t('ipqc.howToRead1') }} />
+              <li dangerouslySetInnerHTML={{ __html: t('ipqc.howToRead2') }} />
+              <li dangerouslySetInnerHTML={{ __html: t('ipqc.howToRead3') }} />
+              <li dangerouslySetInnerHTML={{ __html: t('ipqc.howToRead4') }} />
+              <li>{t('ipqc.howToRead5')}</li>
             </ul>
           </div>
         </div>
@@ -225,7 +228,7 @@ export default function IPQCPage() {
               <div className="p-2 rounded-lg bg-slate-100"><ClipboardCheck className="h-4 w-4 text-slate-600" /></div>
               <div>
                 <p className="text-lg font-bold">{groupedOrders.length}</p>
-                <p className="text-xs text-slate-500">Order diperiksa</p>
+                <p className="text-xs text-slate-500">{t('ipqc.ordersChecked')}</p>
               </div>
             </CardContent>
           </Card>
@@ -234,7 +237,7 @@ export default function IPQCPage() {
               <div className="p-2 rounded-lg bg-emerald-50"><Sparkles className="h-4 w-4 text-emerald-600" /></div>
               <div>
                 <p className="text-lg font-bold">{totalChecked}</p>
-                <p className="text-xs text-slate-500">Total dicek</p>
+                <p className="text-xs text-slate-500">{t('ipqc.totalChecked')}</p>
               </div>
             </CardContent>
           </Card>
@@ -243,7 +246,7 @@ export default function IPQCPage() {
               <div className="p-2 rounded-lg bg-red-50"><Layers className="h-4 w-4 text-red-600" /></div>
               <div>
                 <p className="text-lg font-bold text-red-600">{totalNG}</p>
-                <p className="text-xs text-slate-500">Total NG</p>
+                <p className="text-xs text-slate-500">{t('ipqc.totalNG')}</p>
               </div>
             </CardContent>
           </Card>
@@ -252,7 +255,7 @@ export default function IPQCPage() {
               <div className="p-2 rounded-lg bg-orange-50"><Wrench className="h-4 w-4 text-orange-600" /></div>
               <div>
                 <p className="text-lg font-bold text-orange-600">{totalFindings}</p>
-                <p className="text-xs text-slate-500">Sesi ada temuan</p>
+                <p className="text-xs text-slate-500">{t('ipqc.sessionsWithFindings')}</p>
               </div>
             </CardContent>
           </Card>
@@ -285,12 +288,12 @@ export default function IPQCPage() {
                     <span className="text-xs text-slate-500">{group.date}</span>
                     {group.style && <Badge variant="outline" className="text-[10px] h-5">{group.style}</Badge>}
                     {group.bt && <Badge variant="outline" className="text-[10px] h-5">{group.bt.replace('PT', '')}</Badge>}
-                    {group.line && <span className="text-[10px] text-slate-400">Line: {group.line}</span>}
-                    {group.inspector && <span className="text-[10px] text-slate-400">Inspector: {group.inspector}</span>}
+                    {group.line && <span className="text-[10px] text-slate-400">{t('ipqc.line')}: {group.line}</span>}
+                    {group.inspector && <span className="text-[10px] text-slate-400">{t('ipqc.inspector')}: {group.inspector}</span>}
                     <div className="ml-auto flex items-center gap-3 text-[10px]">
-                      <span className="text-slate-500">Dicek: <strong>{groupChecked}</strong></span>
+                      <span className="text-slate-500">{t('ipqc.check')}: <strong>{groupChecked}</strong></span>
                       <span className="text-red-600">NG: <strong>{groupNG}</strong></span>
-                      {groupFindings > 0 && <span className="text-orange-600">{groupFindings} temuan</span>}
+                      {groupFindings > 0 && <span className="text-orange-600">{groupFindings} {t('ipqc.findings')}</span>}
                     </div>
                   </div>
                 </CardHeader>
@@ -299,14 +302,14 @@ export default function IPQCPage() {
                     <Table className="table-fixed w-full">
                       <TableHeader>
                         <TableRow className="bg-white hover:bg-white">
-                          <TableHead className="text-[10px] w-14">Sesi</TableHead>
-                          <TableHead className="text-[10px] w-28">Proses</TableHead>
-                          <TableHead className="text-[10px] w-[200px]">Komponen yang Dicek</TableHead>
-                          <TableHead className="text-[10px] text-right w-12">Cek</TableHead>
-                          <TableHead className="text-[10px] text-right w-12">OK</TableHead>
+                          <TableHead className="text-[10px] w-14">{t('ipqc.session')}</TableHead>
+                          <TableHead className="text-[10px] w-28">{t('ipqc.process')}</TableHead>
+                          <TableHead className="text-[10px] w-[200px]">{t('ipqc.componentChecked')}</TableHead>
+                          <TableHead className="text-[10px] text-right w-12">{t('ipqc.check')}</TableHead>
+                          <TableHead className="text-[10px] text-right w-12">{t('ipqc.ok')}</TableHead>
                           <TableHead className="text-[10px] text-right w-12">NG</TableHead>
-                          <TableHead className="text-[10px] w-[200px]">Ditemukan</TableHead>
-                          <TableHead className="text-[10px]">Tindak Lanjut & Hasil</TableHead>
+                          <TableHead className="text-[10px] w-[200px]">{t('ipqc.finding')}</TableHead>
+                          <TableHead className="text-[10px]">{t('ipqc.actionTaken')}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -358,7 +361,7 @@ export default function IPQCPage() {
           <CardContent className="py-16 text-center">
             <ClipboardCheck className="h-8 w-8 text-slate-300 mx-auto mb-3" />
             <p className="text-sm text-slate-400">{t('common.noData')}</p>
-            <p className="text-xs text-slate-300 mt-1">IPQC data akan muncul setelah FQC Daily di-upload</p>
+            <p className="text-xs text-slate-300 mt-1">{t('ipqc.emptyMsg')}</p>
           </CardContent>
         </Card>
       )}
@@ -367,7 +370,7 @@ export default function IPQCPage() {
       {!loading && pagination.total_pages > 1 && (
         <div className="flex items-center justify-between px-1">
           <p className="text-xs text-slate-500">
-            {t('common.showing')} {groupedOrders.length} order {t('common.of')} {Math.ceil((pagination.total_count || 0) / 5)} orders
+            {t('common.showing')} {groupedOrders.length} {lang === 'zh' ? '订单 /' : 'order'} {t('common.of')} {Math.ceil((pagination.total_count || 0) / 5)} {lang === 'zh' ? '订单' : 'orders'}
           </p>
           <div className="flex gap-1">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)} className="h-8 text-xs">{t('action.prev')}</Button>
