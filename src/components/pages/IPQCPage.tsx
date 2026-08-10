@@ -296,16 +296,16 @@ export default function IPQCPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
-                    <Table>
+                    <Table className="table-fixed w-full">
                       <TableHeader>
                         <TableRow className="bg-white hover:bg-white">
                           <TableHead className="text-[10px] w-14">Sesi</TableHead>
-                          <TableHead className="text-[10px]">Proses</TableHead>
-                          <TableHead className="text-[10px]">Komponen yang Dicek</TableHead>
+                          <TableHead className="text-[10px] w-28">Proses</TableHead>
+                          <TableHead className="text-[10px] w-[200px]">Komponen yang Dicek</TableHead>
                           <TableHead className="text-[10px] text-right w-12">Cek</TableHead>
                           <TableHead className="text-[10px] text-right w-12">OK</TableHead>
                           <TableHead className="text-[10px] text-right w-12">NG</TableHead>
-                          <TableHead className="text-[10px]">Ditemukan</TableHead>
+                          <TableHead className="text-[10px] w-[200px]">Ditemukan</TableHead>
                           <TableHead className="text-[10px]">Tindak Lanjut & Hasil</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -315,30 +315,32 @@ export default function IPQCPage() {
                             key={r.id || ri}
                             className={`hover:bg-slate-50/50 border-l-2 ${stageBgColors[r.process_stage] || 'border-l-slate-200'} ${r.finding ? 'bg-red-50/20' : ''}`}
                           >
-                            <TableCell className="text-xs">
+                            <TableCell className="text-xs py-1.5">
                               <span className="inline-flex items-center justify-center w-10 h-5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">
                                 {sessionLabels[r.session_no] || `${r.session_no}`}
                               </span>
                             </TableCell>
-                            <TableCell className="text-xs">
-                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${stageColors[r.process_stage] || ''}`}>
+                            <TableCell className="text-xs py-1.5">
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap ${stageColors[r.process_stage] || ''}`}>
                                 {stageIcons[r.process_stage]} {t(`ipqc.stage.${(r.process_stage || '').toLowerCase()}`)}
                               </span>
                             </TableCell>
-                            <TableCell className="text-xs max-w-[220px]">{r.component_checked || '-'}</TableCell>
-                            <TableCell className="text-xs text-right">{r.check_count}</TableCell>
-                            <TableCell className="text-xs text-right text-emerald-600">{r.ok_count}</TableCell>
-                            <TableCell className="text-xs text-right font-medium">
+                            <TableCell className="text-xs py-1.5" title={r.component_checked || ''}>
+                              <span className="block truncate">{r.component_checked || '-'}</span>
+                            </TableCell>
+                            <TableCell className="text-xs text-right py-1.5">{r.check_count}</TableCell>
+                            <TableCell className="text-xs text-right py-1.5 text-emerald-600">{r.ok_count}</TableCell>
+                            <TableCell className="text-xs text-right py-1.5 font-medium">
                               {r.ng_count > 0 ? <span className="text-red-600">{r.ng_count}</span> : '0'}
                             </TableCell>
-                            <TableCell className="text-xs max-w-[220px]">
+                            <TableCell className="text-xs py-1.5" title={r.finding || ''}>
                               {r.finding
-                                ? <span className="text-red-600 leading-snug">{r.finding}</span>
+                                ? <span className="block truncate text-red-600">{r.finding}</span>
                                 : <span className="text-slate-300">-</span>}
                             </TableCell>
-                            <TableCell className="text-xs max-w-[250px]">
+                            <TableCell className="text-xs py-1.5" title={r.action_taken || ''}>
                               {r.action_taken
-                                ? <span className="text-slate-700 leading-snug">{r.action_taken}</span>
+                                ? <span className="block truncate text-slate-700">{r.action_taken}</span>
                                 : <span className="text-slate-300">-</span>}
                             </TableCell>
                           </TableRow>
