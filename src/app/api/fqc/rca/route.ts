@@ -230,29 +230,17 @@ export async function POST(request: NextRequest) {
       const typesToGenerate = bt && bt !== 'ALL' ? [bt] : BUSINESS_TYPES;
       const months = getMonthsInRange(date_from, date_to);
 
-      // First: delete existing DRAFT-ONLY data (no saved RCAs are touched)
-      // We only delete if the user is regenerating — saved RCAs stay
-      // Actually, for regeneration: delete existing saved RCAs too (old behavior)
-      for (const { year, month: m } of months) {
-        const firstDay = `${year}-${String(m).padStart(2, '0')}-01`;
-        const lastDay = fmt(new Date(year, m, 0));
-
-        let getQuery = adminClient
-          .from('rca_weekly')
-          .select('id')
-          .gte('week_start', firstDay)
-          .lte('week_start', lastDay);
-        if (bt && bt !== 'ALL') {
-          getQuery = getQuery.eq('business_type', bt);
-        }
-        const { data: toDelete } = await getQuery;
-
-        if (toDelete && toDelete.length > 0) {
-          const ids = toDelete.map((r: { id: string }) => r.id);
-          await adminClient.from('rca_actions').delete().in('rca_id', ids);
-          let delQuery = adminClient.from('rca_weekly').delete().in('id', ids);
-          const { error: delError } = await delQuery;
-          if (delError) console.error('Delete old RCAs error:', delError);
+      // Fetch all saved RCAs for the date range to skip them during generation
+      const savedRcaKeys = new Set<string>();
+      const { data: existingRcas } = await adminClient
+        .from('rca_weekly')
+        .select('week_start, week_end, business_type')
+        .gte('week_start', date_from || '1900-01-01')
+        .lte('week_start', date_to || '2099-12-31');
+      if (existingRcas) {
+        for (const r of existingRcas) {
+          if (bt && bt !== 'ALL' && r.business_type !== bt) continue;
+          savedRcaKeys.add(`${r.week_start}__${r.business_type}`);
         }
       }
 
@@ -264,6 +252,9 @@ export async function POST(request: NextRequest) {
 
         for (const week of weeks) {
           for (const btKey of typesToGenerate) {
+            // Skip weeks that already have saved RCA in DB
+            const key = `${week.start}__${btKey}`;
+            if (savedRcaKeys.has(key)) continue;
             // Fetch hot issues for this week period + business type
             const { data: hotIssues } = await adminClient
               .from('rca_hot_issues')
