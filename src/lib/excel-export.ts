@@ -2987,10 +2987,15 @@ export async function exportIPQCExcel(
     right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
   };
 
-  // Import translation maps for zh mode
+  // Import translation maps for bilingual mode (zh shows both ID + Mandarin)
   const { IPQC_COMPONENT_ZH, IPQC_FINDING_ZH, IPQC_ACTION_ZH } = await import('./ipqc-i18n-map');
-  const zh = (text: string | null | undefined, map: Record<string, string>) =>
-    isZh && text ? (map[text] || text) : (text || '');
+  const bilingual = (text: string | null | undefined, map: Record<string, string>) => {
+    const original = text || '';
+    if (!isZh || !original) return original;
+    const zhText = map[original];
+    if (!zhText || zhText === original) return original;
+    return `${original} / ${zhText}`;
+  };
 
   // Stage labels
   const stageLabels: Record<string, string> = isZh
@@ -3223,12 +3228,12 @@ export async function exportIPQCExcel(
         si2 + 1,
         sessionLabels[Number(rec.session_no) || 0] || String(rec.session_no || ''),
         stageLabels[String(rec.process_stage || '')] || String(rec.process_stage || ''),
-        zh(String(rec.component_checked || ''), IPQC_COMPONENT_ZH),
+        bilingual(String(rec.component_checked || ''), IPQC_COMPONENT_ZH),
         checked,
         pass,
         fail,
-        zh(String(rec.finding || ''), IPQC_FINDING_ZH),
-        zh(String(rec.action_taken || ''), IPQC_ACTION_ZH),
+        bilingual(String(rec.finding || ''), IPQC_FINDING_ZH),
+        bilingual(String(rec.action_taken || ''), IPQC_ACTION_ZH),
       ];
 
       for (let c = 1; c <= DETAIL_COLS; c++) {
@@ -3313,7 +3318,9 @@ export async function exportIPQCExcel(
   footCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
 
   // ============ COLUMN WIDTHS ============
-  const widths = [5, 8, 12, 28, 10, 10, 8, 30, 35];
+  const widths = isZh
+    ? [5, 8, 12, 48, 10, 10, 8, 55, 60]
+    : [5, 8, 12, 28, 10, 10, 8, 30, 35];
   for (let c = 0; c < DETAIL_COLS; c++) ws.getColumn(c + 1).width = widths[c] || 10;
 
   // ============ GENERATE BUFFER ============
