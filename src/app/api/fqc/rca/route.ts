@@ -185,7 +185,8 @@ export async function GET(request: NextRequest) {
       const m = parseInt(monthStr, 10);
       const firstDay = `${year}-${String(m).padStart(2, '0')}-01`;
       const lastDay = fmt(new Date(year, m, 0));
-      query = query.gte('week_start', firstDay).lte('week_start', lastDay);
+      // Strict: only include weeks fully within the selected month
+      query = query.gte('week_start', firstDay).lte('week_end', lastDay);
     }
 
     if (bt && bt !== 'ALL') {
@@ -236,7 +237,7 @@ export async function POST(request: NextRequest) {
         .from('rca_weekly')
         .select('week_start, week_end, business_type')
         .gte('week_start', date_from || '1900-01-01')
-        .lte('week_start', date_to || '2099-12-31');
+        .lte('week_end', date_to || '2099-12-31');
       if (existingRcas) {
         for (const r of existingRcas) {
           if (bt && bt !== 'ALL' && r.business_type !== bt) continue;
