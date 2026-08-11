@@ -2987,11 +2987,12 @@ export async function exportIPQCExcel(
     right:  { style: 'thin', color: { argb: 'FFB0B0B0' } },
   };
 
-  // Import translation maps for bilingual mode (zh shows both ID + Mandarin)
+  // Import translation maps — IPQC Excel is ALWAYS bilingual (ID + Mandarin)
+  // regardless of user role, because the file is often shared with managers.
   const { IPQC_COMPONENT_ZH, IPQC_FINDING_ZH, IPQC_ACTION_ZH } = await import('./ipqc-i18n-map');
   const bilingual = (text: string | null | undefined, map: Record<string, string>) => {
     const original = text || '';
-    if (!isZh || !original) return original;
+    if (!original) return original;
     const zhText = map[original];
     if (!zhText || zhText === original) return original;
     return `${original} / ${zhText}`;
@@ -3318,9 +3319,8 @@ export async function exportIPQCExcel(
   footCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
 
   // ============ COLUMN WIDTHS ============
-  const widths = isZh
-    ? [5, 8, 12, 48, 10, 10, 8, 55, 60]
-    : [5, 8, 12, 28, 10, 10, 8, 30, 35];
+  // Always use wider columns to fit bilingual text
+  const widths = [5, 8, 12, 48, 10, 10, 8, 55, 60];
   for (let c = 0; c < DETAIL_COLS; c++) ws.getColumn(c + 1).width = widths[c] || 10;
 
   // ============ GENERATE BUFFER ============
