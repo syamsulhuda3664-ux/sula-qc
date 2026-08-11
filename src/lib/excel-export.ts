@@ -2998,25 +2998,23 @@ export async function exportIPQCExcel(
     return `${original} / ${zhText}`;
   };
 
-  // Stage labels
-  const stageLabels: Record<string, string> = isZh
-    ? { Cutting: '裁剪', Sewing: '缝制', Assembly: '组装', Finishing: '后整' }
-    : { Cutting: 'Cutting', Sewing: 'Sewing', Assembly: 'Assembly', Finishing: 'Finishing' };
+  // Stage labels — always bilingual in Excel
+  const stageLabels: Record<string, string> = {
+    Cutting: 'Cutting / 裁剪',
+    Sewing: 'Sewing / 缝制',
+    Assembly: 'Assembly / 组装',
+    Finishing: 'Finishing / 后整',
+  };
 
-  const sessionLabels = isZh
-    ? ['', '第1次', '第2次', '第3次', '第4次', '第5次']
-    : ['', 'Ke-1', 'Ke-2', 'Ke-3', 'Ke-4', 'Ke-5'];
+  // Session labels — always bilingual in Excel
+  const sessionLabels = ['', 'Ke-1 / 第1次', 'Ke-2 / 第2次', 'Ke-3 / 第3次', 'Ke-4 / 第4次', 'Ke-5 / 第5次'];
 
-  // Column definitions: 10 columns for detail section
-  const DETAIL_HEADERS = isZh
-    ? ['序号', '次', '工序', '检查组件', '检查', '合格', 'NG', '发现', '跟进与结果']
-    : ['No', 'Sesi', 'Proses', 'Komponen Dicek', 'Cek', 'OK', 'NG', 'Ditemukan', 'Tindak Lanjut & Hasil'];
+  // Column definitions — always bilingual in Excel
+  const DETAIL_HEADERS = ['No / 序号', 'Sesi / 次', 'Proses / 工序', 'Komponen Dicek / 检查组件', 'Cek / 检查', 'OK / 合格', 'NG', 'Ditemukan / 发现', 'Tindak Lanjut & Hasil / 跟进与结果'];
   const DETAIL_COLS = DETAIL_HEADERS.length; // 9
 
-  // Stage summary headers
-  const STAGE_SUM_HEADERS = isZh
-    ? ['工序', '次数', '检查数', '合格数', '不合格', '合格率', '有发现']
-    : ['Stage', 'Sessions', 'Checked', 'OK', 'NG', 'Pass Rate', 'Findings'];
+  // Stage summary headers — always bilingual in Excel
+  const STAGE_SUM_HEADERS = ['Stage / 工序', 'Sessions / 次数', 'Checked / 检查数', 'OK / 合格数', 'NG / 不合格', 'Pass Rate / 合格率', 'Findings / 有发现'];
 
   // ============ TITLE ROW (height 63) ============
   ws.mergeCells(1, 1, 1, DETAIL_COLS);
@@ -3056,7 +3054,7 @@ export async function exportIPQCExcel(
   stageTitleRow.height = 22;
   ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
   const stCell = stageTitleRow.getCell(1);
-  stCell.value = isZh ? '阶段汇总 / Stage Summary' : 'Ringkasan Tahap / Stage Summary';
+  stCell.value = 'Ringkasan Tahap / 阶段汇总 Stage Summary';
   stCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF333333' } };
   stCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
   stCell.alignment = { vertical: 'middle', indent: 1 };
@@ -3126,7 +3124,7 @@ export async function exportIPQCExcel(
   const stageTotalRate = totalChecked > 0 ? totalPass / totalChecked : 0;
   const stTotalRow = ws.getRow(currentRow);
   stTotalRow.height = 22;
-  const stTotalVals: (string | number)[] = [isZh ? '合计 Total' : 'Total', data.length, totalChecked, totalPass, totalFail, fmtPct(stageTotalRate, true), totalFindings];
+  const stTotalVals: (string | number)[] = ['Total / 合计', data.length, totalChecked, totalPass, totalFail, fmtPct(stageTotalRate, true), totalFindings];
   for (let c = 1; c <= STAGE_SUM_HEADERS.length; c++) {
     const cell = stTotalRow.getCell(c);
     const val = stTotalVals[c - 1];
@@ -3143,7 +3141,7 @@ export async function exportIPQCExcel(
   detailTitleRow.height = 22;
   ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
   const dtCell = detailTitleRow.getCell(1);
-  dtCell.value = isZh ? '明细数据 / Detail Records' : 'Data Detail / Detail Records';
+  dtCell.value = 'Data Detail / 明细数据 Detail Records';
   dtCell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF333333' } };
   dtCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALE_BLUE } };
   dtCell.alignment = { vertical: 'middle', indent: 1 };
@@ -3197,9 +3195,7 @@ export async function exportIPQCExcel(
     ohRow.height = 24;
     ws.mergeCells(currentRow, 1, currentRow, DETAIL_COLS);
     const ohCell = ohRow.getCell(1);
-    const orderLabel = isZh
-      ? `${group.orderNo}  |  ${group.date}  |  ${group.style}  |  ${group.bt.replace('PT', '')}  |  ${isZh ? '线别' : 'Line'}: ${group.line}  |  ${isZh ? '检验员' : 'Inspector'}: ${group.inspector}`
-      : `${group.orderNo}  |  ${group.date}  |  ${group.style}  |  ${group.bt.replace('PT', '')}  |  Line: ${group.line}  |  Inspector: ${group.inspector}`;
+    const orderLabel = `${group.orderNo}  |  ${group.date}  |  ${group.style}  |  ${group.bt.replace('PT', '')}  |  Line / 线别: ${group.line}  |  Inspector / 检验员: ${group.inspector}`;
     ohCell.value = orderLabel;
     ohCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
     ohCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
@@ -3223,7 +3219,7 @@ export async function exportIPQCExcel(
 
       const bg = dataRowNum % 2 === 0 ? PALE_BLUE : WHITE_ARGB;
       const dr = ws.getRow(currentRow);
-      dr.height = 22;
+      dr.height = 38;
 
       const vals: (string | number)[] = [
         si2 + 1,
@@ -3266,13 +3262,13 @@ export async function exportIPQCExcel(
     osRow.height = 22;
     ws.mergeCells(currentRow, 1, currentRow, 4);
     const osCell = osRow.getCell(1);
-    osCell.value = isZh ? `小计 ${group.orderNo}` : `Subtotal ${group.orderNo}`;
+    osCell.value = `Subtotal / 小计 ${group.orderNo}`;
     osCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF333333' } };
     osCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: LIGHT_BLUE } };
     osCell.alignment = { vertical: 'middle', indent: 1 };
     osCell.border = thinBorder;
 
-    const subVals: (string | number)[] = ['', '', gChecked, gOK, gNG, gFindings > 0 ? `${gFindings} ${isZh ? '发现' : 'findings'}` : '-'];
+    const subVals: (string | number)[] = ['', '', gChecked, gOK, gNG, gFindings > 0 ? `${gFindings} findings / 发现` : '-'];
     for (let c = 5; c <= DETAIL_COLS; c++) {
       const cell = osRow.getCell(c);
       const val = subVals[c - 5];
@@ -3293,13 +3289,13 @@ export async function exportIPQCExcel(
   gtRow.height = 25;
   ws.mergeCells(currentRow, 1, currentRow, 4);
   const gtCell = gtRow.getCell(1);
-  gtCell.value = isZh ? '合计 GRAND TOTAL' : 'GRAND TOTAL';
+  gtCell.value = 'GRAND TOTAL / 合计';
   gtCell.font = { name: 'Arial', size: 10, bold: true, color: { argb: WHITE_ARGB } };
   gtCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEADER_BG } };
   gtCell.alignment = { vertical: 'middle', indent: 1 };
   gtCell.border = thinBorder;
 
-  const gtVals: (string | number)[] = ['', '', totalChecked, totalPass, totalFail, totalFindings > 0 ? `${totalFindings} ${isZh ? '发现' : 'findings'}` : '-'];
+  const gtVals: (string | number)[] = ['', '', totalChecked, totalPass, totalFail, totalFindings > 0 ? `${totalFindings} findings / 发现` : '-'];
   for (let c = 5; c <= DETAIL_COLS; c++) {
     const cell = gtRow.getCell(c);
     const val = gtVals[c - 5];
@@ -3319,8 +3315,8 @@ export async function exportIPQCExcel(
   footCell.font = { name: 'Arial', size: 8, italic: true, color: { argb: GRAY_FOOTER } };
 
   // ============ COLUMN WIDTHS ============
-  // Always use wider columns to fit bilingual text
-  const widths = [5, 8, 12, 48, 10, 10, 8, 55, 60];
+  // Column widths — wide enough for bilingual text with wrapText
+  const widths = [12, 18, 20, 55, 14, 12, 8, 62, 68];
   for (let c = 0; c < DETAIL_COLS; c++) ws.getColumn(c + 1).width = widths[c] || 10;
 
   // ============ GENERATE BUFFER ============
