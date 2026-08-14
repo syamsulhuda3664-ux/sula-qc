@@ -29,9 +29,14 @@ export const IPQC_COMPONENT_ZH: Record<string, string> = {
   // Assembly components
   'Pasang zipper slider & puller': '安装拉链头及拉片',
   'Pasang handle ke badan (Handle assembly)': '安装提手到本体',
+  'Pasang aksesori: tag, label, hook': '安装配件：吊牌、标签、挂钩',
+  // Luggage assembly (PTGH only)
   'Pasang wheel / roda (Wheel assembly for luggage)': '安装轮子（行李箱）',
   'Pasang trolley / pegangan tarik (Trolley handle)': '安装拉杆',
-  'Pasang aksesori: tag, label, hook': '安装配件：吊牌、标签、挂钩',
+  // Bag assembly (PTB2C, PTOEM only)
+  'Pasang buckle / snap hook ke webbing': '安装插扣/弹簧钩到织带',
+  'Pasang D-ring & O-ring': '安装D型环及O型环',
+  'Adjust panjang webbing & handle': '调整织带及提手长度',
 
   // Finishing components
   'Pemasangan label & wash label': '安装主标及洗水标',

@@ -19,7 +19,8 @@ export type IPQCStage = typeof IPQC_STAGES[number];
  * Components per stage. Generator picks one per session.
  * Realistic components checked during IPQC in bag/suitcase factory.
  */
-const STAGE_COMPONENTS: Record<IPQCStage, string[]> = {
+// Type for stage components — Assembly can have extra keys
+const STAGE_COMPONENTS: Record<string, string[]> = {
   Cutting: [
     'Panel kain utama (Main fabric panels)',
     'Lining / Furing (Lining fabric)',
@@ -37,9 +38,18 @@ const STAGE_COMPONENTS: Record<IPQCStage, string[]> = {
   Assembly: [
     'Pasang zipper slider & puller',
     'Pasang handle ke badan (Handle assembly)',
+    'Pasang aksesori: tag, label, hook',
+  ],
+  // Luggage-only components (PTGH / suitcase products only)
+  ASSEMBLY_LUGGAGE: [
     'Pasang wheel / roda (Wheel assembly for luggage)',
     'Pasang trolley / pegangan tarik (Trolley handle)',
-    'Pasang aksesori: tag, label, hook',
+  ],
+  // Bag-only components (PTB2C, PTOEM — no luggage parts)
+  ASSEMBLY_BAG_EXTRA: [
+    'Pasang buckle / snap hook ke webbing',
+    'Pasang D-ring & O-ring',
+    'Adjust panjang webbing & handle',
   ],
   Finishing: [
     'Pemasangan label & wash label',
@@ -58,6 +68,7 @@ interface DefectEntry {
   finding: string;
   action: string;
   weight: number; // probability weight (higher = more common)
+  luggageOnly?: boolean; // only for PTGH (suitcase/luggage products)
 }
 
 const STAGE_DEFECTS: Record<IPQCStage, DefectEntry[]> = {
@@ -86,8 +97,9 @@ const STAGE_DEFECTS: Record<IPQCStage, DefectEntry[]> = {
   Assembly: [
     { finding: 'Zipper stuck / macet saat ditarik', action: 'Ganti zipper slider, test berulang', weight: 15 },
     { finding: 'Handle loose / longgar setelah dipasang', action: 'Perkuat bartack, tambahan rivet jika perlu', weight: 12 },
-    { finding: 'Wheel tidak berputar lancar (2 dari 4 roda)', action: 'Ganti wheel yang bermasalah, test berputar', weight: 10 },
-    { finding: 'Trolley handle macet / tidak naik turun', action: 'Adjust mekanisme trolley, lubricate, ganti jika perlu', weight: 8 },
+    // Luggage-only defects (PTGH only)
+    { finding: 'Wheel tidak berputar lancar (2 dari 4 roda)', action: 'Ganti wheel yang bermasalah, test berputar', weight: 10, luggageOnly: true },
+    { finding: 'Trolley handle macet / tidak naik turun', action: 'Adjust mekanisme trolley, lubricate, ganti jika perlu', weight: 8, luggageOnly: true },
     { finding: 'Rivet longgar / bisa diputar', action: 'Re-rivet dengan tools yang benar, check pressure', weight: 7 },
     { finding: 'Buckle / snap hook salah posisi', action: 'Bongkar, pasang ulang di posisi benar', weight: 5 },
     { finding: 'Zipper head reversed / terbalik arah', action: 'Ganti zipper head dengan arah benar', weight: 4 },
@@ -229,8 +241,16 @@ function buildSessionSchedule(activeStages: IPQCStage[], rng: () => number): IPQ
  * Uses the session number to deterministically pick from the stage's component list.
  * Across 5 sessions, tries to cover different components within the same stage.
  */
-function pickComponent(stage: IPQCStage, sessionNo: number, stageOccurrence: number, rng: () => number): string {
-  const components = STAGE_COMPONENTS[stage];
+function pickComponent(stage: IPQCStage, sessionNo: number, stageOccurrence: number, rng: () => number, businessType?: string): string {
+  let components = STAGE_COMPONENTS[stage] || [];
+
+  // For Assembly: add luggage or bag-only components based on business type
+  if (stage === 'Assembly') {
+    const isLuggage = businessType === 'PTGH';
+    const extraKey = isLuggage ? 'ASSEMBLY_LUGGAGE' : 'ASSEMBLY_BAG_EXTRA';
+    components = [...components, ...(STAGE_COMPONENTS[extraKey] || [])];
+  }
+
   // Use stageOccurrence to pick a different component each time the same stage appears
   const idx = (stageOccurrence + Math.floor(rng() * 2)) % components.length;
   return components[idx];
@@ -323,7 +343,8 @@ export function generateIPQCFromFQC(
       stageOccurrence[stage] = (stageOccurrence[stage] || 0) + 1;
 
       // Pick component (varies by stage occurrence to avoid repetition)
-      const component = pickComponent(stage, ses, stageOccurrence[stage] - 1, sesRng);
+      const isLuggage = bt === 'PTGH';
+      const component = pickComponent(stage, ses, stageOccurrence[stage] - 1, sesRng, bt);
 
       // Check count: vary slightly per session (80-120% of base)
       const checkCount = Math.max(3, Math.round(baseCheckPerSession * (0.8 + sesRng() * 0.4)));
@@ -337,7 +358,11 @@ export function generateIPQCFromFQC(
       let action: string | null = null;
 
       if (hasDefect) {
-        const defects = STAGE_DEFECTS[stage];
+        // Filter defects: exclude luggage-only for non-PTGH business types
+        let defects = STAGE_DEFECTS[stage];
+        if (!isLuggage) {
+          defects = defects.filter(d => !d.luggageOnly);
+        }
         const defect = pickWeighted(defects, sesRng);
         if (defect) {
           // NG count: 1-3 typically for IPQC spot check
